@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  /* VerticalParts Official Palette — Preto, Amarelo, Branco */
+  --color-primary: #ffcd00;    /* Amarelo VerticalParts (loader/brand accent) */
+  --color-secondary: #000000;  /* Preto VerticalParts */
+  --color-accent: #ffcd00;     /* Amarelo VerticalParts */
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #0a0000;
+  --color-success: #2e7d32;
+  --color-warning: #fbc02d;
+  --color-danger: #d32f2f;
+
+  --font-display: "Inter", sans-serif;
+
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+body {
+  background-color: var(--color-background-light);
+  color: #0f172a;
+  /* slate-900 */
+  font-family: var(--font-display);
+}
+
+.dark body {
+  background-color: var(--color-background-dark);
+  color: #f1f5f9;
+  /* slate-100 */
+}
