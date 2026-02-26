@@ -1,312 +1,282 @@
 import React, { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  // Cadastros & Segurança
-  ShieldCheck,
-  Building2,
-  Warehouse,
-  Layers,
-  ClipboardList,
-  MapPin,
-  Shield,
-  Users,
-  // Operação de Entrada
-  PackageSearch,
-  CalendarDays,
-  ArrowDownLeft,
+import { NavLink } from "react-router-dom";
+import { 
+  ChevronRight, 
+  ChevronDown, 
+  LayoutDashboard, 
+  Settings2, 
+  Users, 
+  Package, 
+  Warehouse, 
+  MapPin, 
+  Truck, 
+  BarChart3, 
+  FileText, 
+  History, 
+  ShieldCheck, 
+  Bell, 
+  Search,
   ArrowRightLeft,
-  Building,
+  RotateCcw,
   Scale,
-  // Operação de Saída
-  PackageCheck,
-  Waves,
+  PackageSearch,
+  ArrowDownLeft,
+  Map,
+  ClipboardCheck,
   ShoppingCart,
   Grid3X3,
-  Box,
-  Truck,
-  Monitor,
   Activity,
-  FileText,
-  Layers2,
+  Waves,
+  CalendarDays,
+  ListTodo,
+  Truck as TruckOut,
   ShieldX,
-  // Estoque
-  Package,
-  History,
-  // Faturamento
+  RefreshCw,
+  PackagePlus,
+  BarChart3 as LineChart,
+  PieChart,
   DollarSign,
-  FileSignature,
-  // Integrações
-  Plug,
-  Globe,
+  Briefcase,
+  Building,
+  Receipt,
+  FileCheck,
+  Building2,
+  Sliders,
   FileCode,
-  // Configurações
-  Settings2,
+  Globe,
   Cpu,
-  Tag,
-  // Accordion
-  ChevronDown,
-  // Sidebar toggle
-  Menu,
-  X,
+  Terminal,
+  Gauge,
+  FlaskConical,
+  Wrench,
+  Server,
+  Shield,
+  AlertCircle,
+  ShoppingBag,
+  BookOpen,
+  Plug
 } from "lucide-react";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useApp } from "../../context/AppContext";
+import Tooltip from "../ui/Tooltip";
 
-function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
+function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// ============================================================
-// ESTRUTURA DE NAVEGAÇÃO — Hierarquia Oficial WMS VerticalParts
-// ============================================================
+const OrganogramIcon = () => (
+  <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+    Em Breve
+  </span>
+);
+
+// ─── ORGANOGRAMA MASTER — VerticalParts WMS ────────────────────────
 const NAVIGATION = [
-  // ── TELA INICIAL ───────────────────────────────────────────
+  // ── 1. OPERAR (AÇÃO NO CAMPO) ─────────────────────────────────────
   {
-    type: "home",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    path: "/",
-  },
-
-  // ── CATEGORIAS ─────────────────────────────────────────────
-  {
-    type: "category",
-    label: "Cadastros e Segurança",
-    icon: ShieldCheck,
-    id: "cadastros",
-    items: [
-      { label: "Empresas",       icon: Building2,     path: "/companies" },
-      { label: "Armazéns",       icon: Warehouse,     path: "/warehouses" },
-      { label: "Áreas do Armazém",icon: Layers,       path: "/areas" },
-      { label: "Setores",        icon: ClipboardList, path: "/sectors" },
-      { label: "Endereços",      icon: MapPin,        path: "/addresses" },
-      { label: "Grupo de Usuário",icon: Shield,       path: "/user-groups" },
-      { label: "Usuários",       icon: Users,         path: "/users" },
-    ],
-  },
-
-  {
-    type: "category",
-    label: "Operação de Entrada",
+    id: "operacao", label: "Operar (Ação no Campo)", num: "1",
     icon: PackageSearch,
-    id: "entrada",
-    badge: "Recebimento",
+    roles: ["operador", "gestor"],
     items: [
-      { label: "Portaria & Agendamento",   icon: Building,      path: "/gate-manager" },
-      { label: "Pesagem Rodoviária",       icon: Scale,         path: "/road-weighing" },
-      { label: "Agenda de Transporte",     icon: CalendarDays,  path: "/transport-schedule" },
-      { label: "Gerenciador de Recebimento",icon: PackageSearch,path: "/receiving-manager" },
-      { label: "Check-in Recebimento",     icon: ArrowDownLeft, path: "/receiving" },
-      { label: "Acomp. Cross-Docking",     icon: ArrowRightLeft,path: "/cross-docking" },
+      { label: "1.1 Cruzar Docas",                  icon: ArrowRightLeft, path: "/operacao/cruzar-docas", tooltip: "Mercadoria que chega e vai direto para o cliente/técnico sem ser guardada na prateleira (CrossDocking)." },
+      { label: "1.2 Processar Devoluções",          icon: RotateCcw,      path: "/operacao/processar-devolucoes" },
+      { label: "1.3 Pesar Cargas",                  icon: Scale,          path: "/operacao/pesar-cargas" },
+      { label: "1.4 Gerenciar Recebimento",         icon: PackageSearch,  path: "/operacao/gerenciar-recebimento" },
+      { label: "1.5 Conferir Recebimento",          icon: ArrowDownLeft,  path: "/operacao/conferir-recebimento" },
+      { label: "1.6 Gerar Mapa de Alocação",        icon: Map,            path: "/operacao/gerar-mapa" },
+      { label: "1.7 Realizar Conferência Cega",     icon: ClipboardCheck, path: "/operacao/conferencia-cega" },
+      { label: "1.8 Alocar Estoque",                icon: MapPin,         path: "/operacao/alocar-estoque" },
+      { label: "1.9 Kanban de Alocação",            icon: LayoutDashboard, path: "/operacao/kanban-alocacao" },
+      { label: "1.10 Separar Pedidos",              icon: ShoppingCart,   path: "/operacao/separar-pedidos", tooltip: "Área de separação de mercadorias no nível do chão (Picking)." },
+      { label: "1.11 Embalar Pedidos",              icon: Grid3X3,        path: "/operacao/embalar-pedidos", tooltip: "Processo de verificação e empacotamento final (Packing)." },
+      { label: "1.12 Monitorar Saída",              icon: Activity,       path: "/operacao/monitorar-saida" },
     ],
   },
-
+  // ── 2. PLANEJAR (ONDAS & SLA) ──────────────────────────────────────
   {
-    type: "category",
-    label: "Operação de Saída",
-    icon: PackageCheck,
-    id: "saida",
-    badge: "Expedição",
+    id: "planejamento", label: "Planejar (Ondas & SLA)", num: "2",
+    icon: Waves,
+    roles: ["planejador", "gestor"],
     items: [
-      { label: "Formação de Onda",         icon: Waves,         path: "/wave-picking" },
-      { label: "Separação (Picking)",      icon: ShoppingCart,  path: "/picking" },
-      { label: "Conferência de Colmeia",   icon: Grid3X3,       path: "/honeycomb-check" },
-      { label: "Embalagem (Packing)",      icon: Box,           path: "/packing" },
-      { label: "Embarque (Shipping)",      icon: Truck,         path: "/shipping" },
-      { label: "Monitoramento de Saída",   icon: Monitor,       path: "/outbound-monitoring" },
-      { label: "Acomp. de Ondas (SLA)",    icon: Activity,      path: "/wave-monitoring" },
-      { label: "Coleta & Manifesto",       icon: FileText,      path: "/manifest-manager" },
+      { label: "Gerar Ondas de Separação",          icon: Waves,          path: "/planejamento/gerar-ondas" },
+      { label: "Monitorar Prazos (SLA)",            icon: Activity,       path: "/planejamento/monitorar-prazos", tooltip: "Tempo limite/Prazo exigido para finalizar a tarefa (SLA)." },
+      { label: "Agendar Transportes",               icon: CalendarDays,   path: "/planejamento/agendar-transportes" },
+      { label: "Monitorar Atividades",              icon: ListTodo,       path: "/planejamento/monitorar-atividades" },
+      { label: "Gerenciar Manifestos",              icon: FileText,       path: "/planejamento/gerenciar-manifestos" },
+      { label: "Expedir Cargas",                    icon: TruckOut,       path: "/planejamento/expedir-cargas" },
     ],
   },
-
+  // ── 3. CONTROLAR (ESTOQUE) ────────────────────────────────────────
   {
-    type: "category",
-    label: "Estoque e Inventário",
-    icon: Package,
-    id: "estoque",
+    id: "estoque", label: "Controlar (Estoque)", num: "3",
+    icon: ListTodo,
+    roles: ["planejador", "gestor"],
     items: [
-      { label: "Gestão de Inventário",   icon: ClipboardList, path: "/inventory-management" },
-      { label: "Auditoria de Inventário",icon: History,       path: "/inventory" },
-      { label: "Ctrl. Avarias e Desm.",  icon: ShieldX,       path: "/damage-control" },
+      { label: "Auditar Inventário",                icon: ShieldCheck,    path: "/estoque/auditar-inventario" },
+      { label: "Consultar Kardex",                  icon: PieChart,       path: "/estoque/consultar-kardex" },
+      { label: "Analisar Estoque",                  icon: BarChart3,      path: "/estoque/analisar-estoque" },
+      { label: "Remanejar Produtos",                icon: RefreshCw,      path: "/estoque/remanejar" },
+      { label: "Controlar Lotes e Validade",        icon: PackagePlus,    path: "/estoque/controlar-lotes" },
+      { label: "Monitorar Avarias",                 icon: ShieldX,        path: "/estoque/monitorar-avarias" },
     ],
   },
-
+  // ── 4. FISCAL (DOCUMENTOS) ────────────────────────────────────────
   {
-    type: "category",
-    label: "Gestão de Contratos",
-    icon: FileSignature,
-    id: "faturamento",
-    badge: "Faturamento",
+    id: "fiscal", label: "Fiscal (Documentos)", num: "4",
+    icon: FileCheck,
+    roles: ["planejador", "gestor"],
     items: [
-      { label: "Contratos",          icon: FileSignature, path: "/contracts" },
-      { label: "Billing por Embalagem",icon: Box,         path: "/billing/packaging" },
-      { label: "Billing por Palete", icon: Layers,        path: "/billing/pallet" },
-      { label: "Billing por Peso",   icon: Package,       path: "/billing/weight" },
-      { label: "Billing por Endereço",icon: Monitor,      path: "/billing/address" },
-      { label: "Consulta de Cobrança",icon: DollarSign,   path: "/billing/query" },
+      { label: "Gerenciar NF-e",                    icon: FileCheck,      path: "/fiscal/gerenciar-nfe" },
+      { label: "Gerenciar CT-e",                    icon: Receipt,        path: "/fiscal/gerenciar-cte" },
+      { label: "Emitir Cobertura Fiscal",           icon: ShieldCheck,    path: "/fiscal/emitir-cobertura" },
+      { label: "Controlar Armazém Geral",           icon: Building,       path: "/fiscal/armazem-geral" },
     ],
   },
-
+  // ── 5. FINANCEIRO (PÓS-VENDA) ────────────────────────────────_____
   {
-    type: "category",
-    label: "Integrações",
+    id: "financeiro", label: "Financeiro (Pós-Venda)", num: "5",
+    icon: DollarSign,
+    roles: ["gestor"],
+    items: [
+      { label: "Calcular Diárias de Armazenagem",   icon: DollarSign,     path: "/financeiro/calcular-diarias" },
+    ],
+  },
+  // ── 6. CADASTRAR (BASE) ──────────────────────────────────────────
+  {
+    id: "cadastros", label: "Cadastrar (Base)", num: "6",
+    icon: ShieldCheck,
+    roles: ["gestor"],
+    items: [
+      { label: "Gerenciar Empresas",                icon: Users,          path: "/cadastros/empresas" },
+      { label: "Configurar Armazéns e Áreas",       icon: Warehouse,      path: "/cadastros/armazens" },
+      { label: "Cadastrar Endereços",               icon: MapPin,         path: "/cadastros/enderecos" },
+      { label: "Catálogo de Produtos",              icon: Package,        path: "/cadastros/produtos" },
+      { label: "Cadastrar Rotas e Veículos",        icon: Truck,          path: "/cadastros/rotas-veiculos" },
+    ],
+  },
+  // ── 7. INDICADORES (BI) ───────────────────────────────────────────
+  {
+    id: "bi", label: "Indicadores (BI)", num: "7",
+    icon: BarChart3,
+    roles: ["gestor"],
+    items: [
+      { label: "Ver Dashboard Financeiro",          icon: DollarSign,     path: "/indicadores/financeiro" },
+      { label: "Analisar Ocupação",                 icon: PieChart,       path: "/indicadores/ocupacao" },
+      { label: "Medir Produtividade",               icon: LineChart,      path: "/indicadores/produtividade" },
+      { label: "Auditar Logs do Sistema",           icon: BookOpen,       path: "/indicadores/auditoria" },
+    ],
+  },
+  // ── 8. INTEGRAR (SISTEMAS) ───────────────────────────────────────
+  {
+    id: "integracoes", label: "Integrar (Sistemas)", num: "8",
     icon: Plug,
-    id: "integracoes",
-    badge: "APIs & ETL",
+    roles: ["gestor"],
     items: [
-      { label: "Integração Omie",    icon: ArrowRightLeft,path: "/omie" },
-      { label: "Arquivos ETL",       icon: FileCode,      path: "/file-integration" },
-      { label: "Configuração REST",  icon: Globe,         path: "/rest-config" },
-      { label: "Resultados de API",  icon: Activity,      path: "/integration-results" },
+      { label: "Alertas de Integração",              icon: AlertCircle,    path: "/integrar/alertas" },
+      { label: "Sincronizar Ordens ERP",            icon: ArrowRightLeft, path: "/integrar/ordens-erp" },
+      { label: "Conectar Omie ERP",                 icon: ShoppingBag,    path: "/integrar/omie" },
+      { label: "Mapear Arquivos (Layouts)",         icon: FileCode,       path: "/integrar/arquivos" },
+      { label: "Configurar APIs REST",              icon: Globe,          path: "/integrar/apis" },
     ],
   },
-
+  // ── 9. CONFIGURAR (TI) ────────────────────────────────────────────
   {
-    type: "category",
-    label: "Configurações do Sistema",
+    id: "configuracoes", label: "Configurar (TI)", num: "9",
     icon: Settings2,
-    id: "configuracoes",
+    roles: ["gestor"],
     items: [
-      { label: "Configuração Geral", icon: Settings2,     path: "/settings" },
-      { label: "Dispositivos Serial",icon: Cpu,           path: "/serial-devices" },
-      { label: "Etiquetas",          icon: Tag,           path: "/labels" },
-      { label: "Estação de Kits",    icon: Layers2,       path: "/kit-station" },
-      { label: "Pesagem Operacional",icon: Scale,         path: "/weighing-station" },
+      { label: "Ajustar Configurações",             icon: Settings2,      path: "/config/geral" },
+      { label: "Integrar Balanças (Serial)",        icon: Cpu,           path: "/config/balancas" },
+      { label: "Gerenciar Service Desk",            icon: Gauge,          path: "/config/service-desk" },
+      { label: "Expurgar Dados Antigos",            icon: Terminal,       path: "/config/expurgo" },
+      { label: "Gerenciar Certificados",            icon: Server,         path: "/config/certificados" },
+    ],
+  },
+  // ── 10. SEGURANÇA ────────────────────────────────────────────────
+  {
+    id: "seguranca", label: "Segurança", num: "10",
+    icon: Shield,
+    roles: ["gestor"],
+    items: [
+      { label: "Gerenciar Usuários",                icon: Users,          path: "/seguranca/usuarios" },
+      { label: "Definir Grupos de Acesso",          icon: Shield,         path: "/seguranca/grupos" },
     ],
   },
 ];
 
-// ============================================================
-// SUB-COMPONENTE: Item de Menu Leaf (folha)
-// ============================================================
+// ─── Item folha (leaf) ────────────────────────────────────────────
 function NavItem({ item, collapsed }) {
   return (
     <NavLink
       to={item.path}
-      title={item.label}
       className={({ isActive }) =>
         cn(
-          "group flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-150 relative",
-          "hover:bg-primary/10 hover:text-primary",
+          "flex items-center gap-2.5 px-3 py-2 rounded-xl text-[11px] font-bold transition-all duration-300",
+          "hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:translate-x-1",
           isActive
-            ? "bg-primary text-secondary shadow-md shadow-primary/30 font-black"
-            : "text-slate-400"
+            ? "bg-secondary text-primary shadow-lg shadow-secondary/20"
+            : "text-slate-500 dark:text-slate-400"
         )
       }
     >
-      <item.icon
-        className={cn(
-          "shrink-0 transition-colors duration-150",
-          collapsed ? "w-5 h-5" : "w-3.5 h-3.5"
+      <item.icon className="w-3.5 h-3.5 shrink-0" />
+      <span className="truncate leading-tight">
+        {item.tooltip ? (
+          <Tooltip text={item.tooltip}>{item.label}</Tooltip>
+        ) : (
+          item.label
         )}
-      />
-      {!collapsed && (
-        <span className="truncate leading-tight">{item.label}</span>
-      )}
+      </span>
     </NavLink>
   );
 }
 
-// ============================================================
-// SUB-COMPONENTE: Categoria Accordion
-// ============================================================
-function CategoryAccordion({ category, collapsed, defaultOpen }) {
-  const location = useLocation();
-  const isAnyChildActive = category.items.some(
-    (item) => location.pathname === item.path
-  );
-  const [open, setOpen] = useState(defaultOpen || isAnyChildActive);
-
-  // Reabre automaticamente se uma rota filha for ativada externamente
-  React.useEffect(() => {
-    if (isAnyChildActive) setOpen(true);
-  }, [isAnyChildActive]);
+// ─── Acordeão de categoria ────────────────────────────────────────
+function CategoryAccordion({ category, collapsed }) {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div>
-      {/* Botão da categoria */}
+    <div className="mb-0.5 last:mb-0">
       <button
-        onClick={() => !collapsed && setOpen((p) => !p)}
-        title={category.label}
+        onClick={() => !collapsed && setIsOpen(!isOpen)}
         className={cn(
-          "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
-          isAnyChildActive
-            ? "bg-primary/10 text-primary"
-            : "text-slate-400 hover:bg-slate-800 hover:text-slate-200",
-          collapsed && "justify-center"
+          "w-full flex items-center justify-between p-2.5 rounded-xl transition-all duration-300",
+          "hover:bg-slate-100 dark:hover:bg-slate-800/50",
+          isOpen ? "bg-slate-50 dark:bg-slate-800/30" : ""
         )}
       >
-        {/* Ícone da categoria */}
-        <div
-          className={cn(
-            "shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-200",
-            isAnyChildActive
-              ? "bg-primary text-secondary"
-              : "bg-slate-800 text-slate-500 group-hover:bg-slate-700 group-hover:text-slate-300"
-          )}
-        >
-          <category.icon className="w-4 h-4" />
-        </div>
-
-        {!collapsed && (
-          <>
-            <div className="flex-1 text-left min-w-0">
-              <span className="text-[11px] font-black uppercase tracking-wider leading-tight truncate block">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={cn(
+            "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+            isOpen ? "bg-secondary text-primary shadow-inner" : "bg-slate-50 dark:bg-slate-800 text-slate-400"
+          )}>
+            <category.icon className="w-4 h-4" />
+          </div>
+          {!collapsed && (
+            <div className="text-left min-w-0">
+              <p className={cn(
+                "text-[9px] font-black uppercase tracking-[0.2em] mb-0.5 truncate",
+                isOpen ? "text-secondary" : "text-slate-400"
+              )}>
+                Setor {category.num}
+              </p>
+              <p className="text-[11px] font-black text-slate-700 dark:text-slate-200 truncate">
                 {category.label}
-              </span>
-              {category.badge && (
-                <span className="text-[8px] font-bold text-slate-600 uppercase tracking-widest leading-none">
-                  {category.badge}
-                </span>
-              )}
+              </p>
             </div>
-            <ChevronDown
-              className={cn(
-                "w-3.5 h-3.5 shrink-0 transition-transform duration-300 text-slate-600",
-                open && "rotate-180"
-              )}
-            />
-          </>
+          )}
+        </div>
+        {!collapsed && (
+          <ChevronRight className={cn(
+            "w-3 h-3 text-slate-300 transition-transform duration-300",
+            isOpen && "rotate-90 text-secondary"
+          )} />
         )}
       </button>
 
-      {/* Items filhos — Accordion */}
-      {!collapsed && (
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-300 ease-in-out",
-            open ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
-          )}
-        >
-          <div className="mt-1 ml-3.5 pl-3 border-l-2 border-slate-800 space-y-0.5 pb-2">
-            {category.items.map((item) => (
-              <NavItem key={item.path} item={item} collapsed={false} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Collapsed: tooltip-style popover (simplificado) */}
-      {collapsed && open && (
-        <div className="mt-1 space-y-0.5">
-          {category.items.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              title={item.label}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center justify-center w-10 h-8 mx-auto rounded-lg transition-all",
-                  "hover:bg-primary/10 hover:text-primary",
-                  isActive
-                    ? "bg-primary text-secondary"
-                    : "text-slate-500"
-                )
-              }
-            >
-              <item.icon className="w-3.5 h-3.5" />
-            </NavLink>
+      {isOpen && !collapsed && (
+        <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-100 dark:border-slate-800 flex flex-col gap-1 py-1 animate-in slide-in-from-top-1 duration-300">
+          {category.items.map((item, idx) => (
+            <NavItem key={idx} item={item} collapsed={collapsed} />
           ))}
         </div>
       )}
@@ -314,117 +284,65 @@ function CategoryAccordion({ category, collapsed, defaultOpen }) {
   );
 }
 
-// ============================================================
-// COMPONENTE PRINCIPAL: Sidebar
-// ============================================================
+// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const { currentUser } = useApp();
+
+  // Filtra o menu com base no Role do usuário, com verificação de segurança
+  const filteredNavigation = NAVIGATION.filter(cat => 
+    cat.roles && currentUser?.role && cat.roles.includes(currentUser.role)
+  );
 
   return (
-    <aside
-      className={cn(
-        "flex flex-col h-full bg-slate-950 border-r-2 border-slate-800 transition-all duration-300 ease-in-out overflow-hidden",
-        collapsed ? "w-16" : "w-64"
-      )}
-    >
-      {/* ── LOGOTIPO ───────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-4 border-b border-slate-800 shrink-0">
-        {!collapsed && (
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shrink-0">
-              <span className="text-secondary font-black text-xs">VP</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-none">
-                VerticalParts
-              </p>
-              <p className="text-[8px] font-bold text-slate-600 uppercase tracking-[0.15em] leading-none mt-0.5">
-                WMS System
-              </p>
-            </div>
-          </div>
-        )}
-        {collapsed && (
-          <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center mx-auto">
-            <span className="text-secondary font-black text-xs">VP</span>
-          </div>
-        )}
-        <button
-          onClick={() => setCollapsed((p) => !p)}
-          className={cn(
-            "w-7 h-7 rounded-lg flex items-center justify-center text-slate-600 hover:text-primary hover:bg-slate-800 transition-all shrink-0",
-            collapsed && "mx-auto mt-2"
-          )}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-        >
-          {collapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* ── NAVEGAÇÃO ──────────────────────────────────── */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5 scrollbar-thin scrollbar-track-slate-950 scrollbar-thumb-slate-800">
-
-        {/* DASHBOARD — fixo no topo */}
-        <NavLink
-          to="/"
-          end
-          title="Dashboard"
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group mb-2",
-              isActive
-                ? "bg-primary text-secondary font-black shadow-md shadow-primary/30"
-                : "text-slate-400 hover:bg-slate-800 hover:text-white",
-              collapsed && "justify-center"
-            )
-          }
-        >
-          <LayoutDashboard
-            className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-5 h-5")}
-          />
-          {!collapsed && (
-            <span className="text-[11px] font-black uppercase tracking-wider">
-              Dashboard
-            </span>
-          )}
-        </NavLink>
-
-        {/* Separador */}
-        {!collapsed && (
-          <p className="text-[9px] font-black text-slate-700 uppercase tracking-[0.25em] px-3 pt-2 pb-1">
-            Módulos
-          </p>
-        )}
-        {collapsed && <div className="h-px bg-slate-800 mx-2 my-2" />}
-
-        {/* CATEGORIAS */}
-        {NAVIGATION.filter((n) => n.type === "category").map((category) => (
-          <CategoryAccordion
-            key={category.id}
-            category={category}
-            collapsed={collapsed}
-          />
-        ))}
-      </nav>
-
-      {/* ── RODAPÉ ─────────────────────────────────────── */}
-      <div
-        className={cn(
-          "shrink-0 border-t border-slate-800 px-3 py-3 flex items-center gap-2.5",
-          collapsed && "justify-center"
-        )}
-      >
-        <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
-          <span className="text-[10px] font-black text-primary">DS</span>
+    <aside className={cn(
+      "fixed left-0 top-0 h-screen bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800 transition-all duration-500 z-[50] flex flex-col",
+      collapsed ? "w-20" : "w-72"
+    )}>
+      {/* BRANDING */}
+      <div className="p-6 h-28 flex items-center gap-4 relative">
+        <div className="w-12 h-12 flex items-center justify-center shrink-0 overflow-hidden">
+          <img src="/logo.svg" alt="VerticalParts Logo" className="w-full h-full object-contain" />
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="text-[10px] font-black text-slate-300 truncate">
-              danilo.supervisor
-            </p>
-            <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">
-              Supervisor
-            </p>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white tracking-tighter leading-tight truncate">
+              VerticalParts
+            </h1>
+            <p className="text-[9px] font-black text-secondary tracking-[0.4em] uppercase opacity-70">WMS Master</p>
+          </div>
+        )}
+        
+        <button 
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-lg flex items-center justify-center text-slate-400 hover:text-secondary hover:border-secondary transition-all z-50 shadow-sm"
+        >
+          <ChevronRight className={cn("w-3 h-3 transition-transform duration-500", !collapsed && "rotate-180")} />
+        </button>
+      </div>
+
+      {/* NAVIGATION SCROLL */}
+      <nav className="flex-1 overflow-y-auto px-4 py-2 scrollbar-none">
+        {collapsed 
+          ? <div className="h-px bg-slate-800 mx-2 my-2" />
+          : <p className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-[0.3em] mb-4 ml-2">Módulos Administrativos</p>
+        }
+
+        {/* CATEGORIAS FILTRADAS */}
+        {filteredNavigation.map((cat) => (
+          <CategoryAccordion key={cat.id} category={cat} collapsed={collapsed} />
+        ))}
+      </nav>
+
+      {/* USER FOOTER */}
+      <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-2xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center border border-slate-300 dark:border-slate-700 overflow-hidden shrink-0">
+          <Users className="w-5 h-5 text-slate-400" />
+        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-[10px] font-black text-slate-300 truncate">{currentUser.usuario}</p>
+            <p className="text-[8px] font-bold text-slate-600 uppercase tracking-widest">{currentUser.role}</p>
           </div>
         )}
       </div>

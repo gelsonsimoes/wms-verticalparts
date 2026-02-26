@@ -1,17 +1,19 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap");
 
 @theme {
   /* VerticalParts Official Palette — Preto, Amarelo, Branco */
-  --color-primary: #ffcd00;    /* Amarelo VerticalParts (loader/brand accent) */
-  --color-secondary: #000000;  /* Preto VerticalParts */
-  --color-accent: #ffcd00;     /* Amarelo VerticalParts */
+  --color-primary: #ffcd00; /* Amarelo VerticalParts (loader/brand accent) */
+  --color-secondary: #000000; /* Preto VerticalParts */
+  --color-accent: #ffcd00; /* Amarelo VerticalParts */
   --color-background-light: #f6f7f8;
   --color-background-dark: #0a0000;
   --color-success: #2e7d32;
   --color-warning: #fbc02d;
   --color-danger: #d32f2f;
 
-  --font-display: "Inter", sans-serif;
+  --font-display: "Poppins", sans-serif;
+  --font-sans: "Poppins", sans-serif;
 
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;

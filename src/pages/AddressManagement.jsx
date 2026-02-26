@@ -12,11 +12,11 @@ import {
 } from 'lucide-react';
 
 const addressData = [
-    { id: 1, code: 'RUA A-12-04', type: 'Picking', status: 'Ocupado', occupation: '85%', items: 12, lastUpdate: '10 min atrás' },
-    { id: 2, code: 'RUA A-12-05', type: 'Pulmão', status: 'Vazio', occupation: '0%', items: 0, lastUpdate: '2 dias atrás' },
-    { id: 3, code: 'RUA B-05-01', type: 'Picking', status: 'Ocupado', occupation: '40%', items: 4, lastUpdate: '1 hora atrás' },
-    { id: 4, code: 'RUA B-05-02', type: 'Picking', status: 'Alerta', occupation: '95%', items: 25, lastUpdate: 'Agora' },
-    { id: 5, code: 'EXP-01', type: 'Expedição', status: 'Ocupado', occupation: '60%', items: 8, lastUpdate: '30 min atrás' },
+    { id: 1, code: 'R1_PP1_CL012_N001', type: 'Picking', status: 'Ocupado', occupation: '85%', items: 12, lastUpdate: '10 min atrás' },
+    { id: 2, code: 'R1_PP1_CL012_N002', type: 'Pulmão', status: 'Vazio', occupation: '0%', items: 0, lastUpdate: '2 dias atrás' },
+    { id: 3, code: 'R2_PP1_CL005_N001', type: 'Picking', status: 'Ocupado', occupation: '40%', items: 4, lastUpdate: '1 hora atrás' },
+    { id: 4, code: 'R2_PP1_CL005_N002', type: 'Picking', status: 'Alerta', occupation: '95%', items: 25, lastUpdate: 'Agora' },
+    { id: 5, code: 'R3_PP1_CL001_N001', type: 'Expedição', status: 'Ocupado', occupation: '60%', items: 8, lastUpdate: '30 min atrás' },
 ];
 
 export default function AddressManagement() {

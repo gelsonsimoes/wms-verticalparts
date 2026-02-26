@@ -1,0 +1,368 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  ShieldCheck, 
+  Plus, 
+  RefreshCw, 
+  Link2, 
+  TrendingUp, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Calendar, 
+  DollarSign, 
+  Search, 
+  ChevronRight, 
+  X, 
+  Info,
+  Building2,
+  FileText,
+  PieChart,
+  ArrowRight
+} from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell,
+  PieChart as RePieChart,
+  Pie
+} from 'recharts';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
+
+// ====== MOCK DATA ======
+
+const MOCK_POLICIES = [
+  { id: 1, numero: 'AP-2026-98821', seguradora: 'Porto Seguro S.A.', inicio: '01/01/2026', termino: '01/01/2027', cobertura: 5000000, status: 'Vigente', estoqueVinculado: 4250000 },
+  { id: 2, numero: 'AP-2025-44102', seguradora: 'Allianz Global', inicio: '15/05/2025', termino: '15/05/2026', cobertura: 2500000, status: 'Vigente', estoqueVinculado: 2800000 },
+  { id: 3, numero: 'AP-2024-11200', seguradora: 'Mapfre Seguros', inicio: '10/02/2024', termino: '10/02/2025', cobertura: 1200000, status: 'Vencida', estoqueVinculado: 0 },
+];
+
+const MOCK_DEPOSITANTS = [
+  { id: 1, nome: 'VerticalParts Matriz', cnpj: '12.345.678/0001-99', valorEstoque: 1500000, coberto: true },
+  { id: 2, nome: 'VParts Import Export', cnpj: '98.765.432/0001-11', valorEstoque: 2200000, coberto: true },
+  { id: 3, nome: 'AutoParts Express', cnpj: '45.123.789/0001-22', valorEstoque: 800000, coberto: false },
+];
+
+// ====== COMPONENTE PRINCIPAL ======
+
+export default function InsuranceManagement() {
+  const [selectedId, setSelectedId] = useState(MOCK_POLICIES[0].id);
+  const [showBondModal, setShowBondModal] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const selectedPolicy = useMemo(() => 
+    MOCK_POLICIES.find(p => p.id === selectedId) || MOCK_POLICIES[0],
+    [selectedId]
+  );
+
+  const analysisData = useMemo(() => {
+    const isOver = selectedPolicy.estoqueVinculado > selectedPolicy.cobertura;
+    const balance = selectedPolicy.cobertura - selectedPolicy.estoqueVinculado;
+    
+    return {
+      isOver,
+      balance: Math.abs(balance),
+      progress: Math.min((selectedPolicy.estoqueVinculado / selectedPolicy.cobertura) * 100, 100),
+      chartData: [
+        { name: 'Cobertura', valor: selectedPolicy.cobertura },
+        { name: 'Estoque Real', valor: selectedPolicy.estoqueVinculado }
+      ]
+    };
+  }, [selectedPolicy]);
+
+  const COLORS = ['#ef4444', '#eab308', '#22c55e'];
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 space-y-6 animate-in fade-in duration-700">
+      
+      {/* HEADER & TOP TOOLBAR */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+        <div>
+           <div className="flex items-center gap-4 mb-2">
+              <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
+                 <ShieldCheck className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                 <h1 className="text-2xl font-black uppercase tracking-tight text-slate-900 dark:text-white leading-none">Gestão de Seguros e Apólices</h1>
+                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-2">Compliance de Cobertura de Estoque de Terceiros</p>
+              </div>
+           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+           <button className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm">
+              <Plus className="w-4 h-4" /> Cadastrar Apólice
+           </button>
+           <button className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm">
+              <RefreshCw className="w-4 h-4" /> Renovar Seguro
+           </button>
+           <button 
+             onClick={() => setShowBondModal(true)}
+             className="flex items-center gap-2 px-6 py-4 bg-primary text-secondary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+           >
+              <Link2 className="w-4 h-4" /> Vincular Contratos
+           </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        
+        {/* GRID PRINCIPAL (MASTER) - Col 1-7 */}
+        <div className="xl:col-span-7 space-y-4">
+           <div className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[32px] overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Histórico de Apólices Ativas</h3>
+                 <div className="relative w-48">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar Nº..."
+                      className="w-full bg-slate-50 dark:bg-slate-850 border-none rounded-lg py-1.5 pl-8 pr-3 text-[10px] font-bold outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                    />
+                 </div>
+              </div>
+              <div className="overflow-x-auto">
+                 <table className="w-full border-collapse">
+                    <thead>
+                       <tr className="bg-slate-50/50 dark:bg-slate-850/50">
+                          <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Nº Apólice / Seguradora</th>
+                          <th className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Vigência</th>
+                          <th className="p-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Cobertura</th>
+                          <th className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                       {MOCK_POLICIES.map((p) => (
+                         <tr 
+                           key={p.id}
+                           onClick={() => setSelectedId(p.id)}
+                           className={cn(
+                             "cursor-pointer transition-all group",
+                             selectedId === p.id ? "bg-primary/5" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
+                           )}
+                         >
+                            <td className="p-4">
+                               <div className="flex flex-col">
+                                  <span className="text-xs font-black text-slate-900 dark:text-white">{p.numero}</span>
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase">{p.seguradora}</span>
+                               </div>
+                            </td>
+                            <td className="p-4 text-center">
+                               <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                                  <span>{p.inicio}</span>
+                                  <ChevronRight className="w-3 h-3 opacity-30" />
+                                  <span>{p.termino}</span>
+                               </div>
+                            </td>
+                            <td className="p-4 text-right">
+                               <span className="text-xs font-black text-slate-900 dark:text-white">
+                                  {p.cobertura.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                               </span>
+                            </td>
+                            <td className="p-4 text-center">
+                               <span className={cn(
+                                 "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
+                                 p.status === 'Vigente' ? "bg-green-500/10 text-green-500" : "bg-danger/10 text-danger"
+                               )}>
+                                  {p.status}
+                               </span>
+                            </td>
+                         </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+           </div>
+        </div>
+
+        {/* PAINEL DE ANÁLISE (DETAIL) - Col 8-12 */}
+        <div className="xl:col-span-5 space-y-6">
+           <div className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[32px] p-8 shadow-sm space-y-8 sticky top-8">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                 <div className="flex items-center gap-3">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Análise de Cobertura Real</h3>
+                 </div>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPolicy.numero}</span>
+              </div>
+
+              {/* CARDS DE KPI */}
+              <div className="grid grid-cols-1 gap-4">
+                 <div className="bg-slate-50 dark:bg-slate-850 p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 flex justify-between items-center group overflow-hidden relative">
+                    <div className="relative z-10">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Total Segurado (Apólice)</p>
+                       <p className="text-xl font-black text-slate-900 dark:text-white">
+                          {selectedPolicy.cobertura.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                       </p>
+                    </div>
+                    <DollarSign className="w-12 h-12 text-slate-200 dark:text-slate-800 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" />
+                 </div>
+
+                 <div className="bg-slate-50 dark:bg-slate-850 p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 flex justify-between items-center group overflow-hidden relative">
+                    <div className="relative z-10">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Valor do Estoque Vinculado</p>
+                       <p className="text-xl font-black text-primary">
+                          {selectedPolicy.estoqueVinculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                       </p>
+                    </div>
+                    <Building2 className="w-12 h-12 text-primary/10 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" />
+                 </div>
+
+                 <div className={cn(
+                    "p-6 rounded-[24px] border flex justify-between items-center group overflow-hidden relative transition-all",
+                    analysisData.isOver 
+                       ? "bg-danger/5 border-danger/20" 
+                       : "bg-green-500/5 border-green-500/20"
+                 )}>
+                    <div className="relative z-10">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                          {analysisData.isOver ? 'Déficit de Cobertura' : 'Saldo de Segurança'}
+                       </p>
+                       <p className={cn(
+                          "text-xl font-black",
+                          analysisData.isOver ? "text-danger" : "text-green-500"
+                       )}>
+                          {analysisData.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                       </p>
+                    </div>
+                    {analysisData.isOver ? (
+                       <AlertTriangle className="w-12 h-12 text-danger/20 absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" />
+                    ) : (
+                       <CheckCircle2 className="w-12 h-12 text-green-500/20 absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" />
+                    )}
+                 </div>
+              </div>
+
+              {/* PROGRESSO VISUAL */}
+              <div className="space-y-3">
+                 <div className="flex justify-between items-end">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Utilização do Limite</p>
+                    <span className={cn(
+                       "text-xs font-black",
+                       analysisData.isOver ? "text-danger" : "text-slate-900 dark:text-white"
+                    )}>{analysisData.progress.toFixed(1)}%</span>
+                 </div>
+                 <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-100 dark:border-slate-800 p-0.5">
+                    <div 
+                      className={cn(
+                         "h-full rounded-full transition-all duration-1000",
+                         analysisData.isOver ? "bg-danger shadow-[0_0_10px_rgba(239,68,68,0.5)]" : "bg-primary shadow-[0_0_10px_rgba(var(--color-primary),0.5)]"
+                      )}
+                      style={{ width: `${analysisData.progress}%` }}
+                    />
+                 </div>
+              </div>
+
+              {/* GRÁFICO SIMPLES (RECHARTS) */}
+              <div className="h-48 w-full">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analysisData.chartData} barGap={8}>
+                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#33415510" />
+                       <XAxis 
+                         dataKey="name" 
+                         axisLine={false} 
+                         tickLine={false} 
+                         tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} 
+                       />
+                       <Tooltip 
+                         cursor={{ fill: '#33415510' }}
+                         contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px' }}
+                       />
+                       <Bar dataKey="valor" radius={[8, 8, 0, 0]}>
+                          {analysisData.chartData.map((entry, index) => (
+                             <Cell key={`cell-${index}`} fill={index === 0 ? '#64748b' : entry.valor > analysisData.chartData[0].valor ? '#ef4444' : '#eab308'} />
+                          ))}
+                       </Bar>
+                    </BarChart>
+                 </ResponsiveContainer>
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* MODAL: VINCULAR CONTRATOS */}
+      {showBondModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[48px] shadow-2xl relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 left-0 w-full h-3 bg-primary" />
+              
+              <div className="p-8 md:p-10 space-y-8">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-5">
+                       <div className="w-16 h-16 rounded-3xl bg-secondary flex items-center justify-center border-4 border-slate-800 shadow-xl">
+                          <Link2 className="w-8 h-8 text-primary" />
+                       </div>
+                       <div>
+                          <h3 className="text-xl font-black uppercase text-slate-900 dark:text-white tracking-tight">Vincular Contratos / Depositantes</h3>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Definir Escopo de Cobertura da Apólice</p>
+                       </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowBondModal(false)}
+                      className="w-12 h-12 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-400 hover:text-danger hover:scale-110 transition-all font-mono"
+                    >
+                       <X className="w-6 h-6" />
+                    </button>
+                 </div>
+
+                 {/* LISTA DE DEPOSITANTES */}
+                 <div className="space-y-4 max-h-[300px] overflow-y-auto px-2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-800">
+                    {MOCK_DEPOSITANTS.map(d => (
+                       <div key={d.id} className="bg-slate-50 dark:bg-slate-850 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group hover:border-primary/30 transition-all">
+                          <div className="flex items-center gap-4">
+                             <div className={cn(
+                                "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                                d.coberto ? "bg-green-500/10 text-green-500" : "bg-slate-200 dark:bg-slate-800 text-slate-400"
+                             )}>
+                                <Building2 className="w-5 h-5" />
+                             </div>
+                             <div>
+                                <p className="text-xs font-black text-slate-900 dark:text-white uppercase leading-none mb-1">{d.nome}</p>
+                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none">{d.cnpj}</p>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                             <div className="text-right">
+                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1 leading-none text-center">Valor em Estoque</p>
+                                <p className="text-xs font-black dark:text-slate-300">{d.valorEstoque.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                             </div>
+                             <div className="flex items-center h-6 w-11 bg-slate-200 dark:bg-slate-800 rounded-full p-1 cursor-pointer">
+                                <div className={cn(
+                                   "h-4 w-4 rounded-full transition-all duration-300",
+                                   d.coberto ? "translate-x-5 bg-primary" : "translate-x-0 bg-slate-400"
+                                )} />
+                             </div>
+                          </div>
+                       </div>
+                    ))}
+                 </div>
+
+                 <div className="flex gap-4">
+                    <button 
+                      onClick={() => setShowBondModal(false)}
+                      className="flex-1 py-5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-[24px] text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                    >
+                       Cancelar
+                    </button>
+                    <button 
+                      className="flex-[2] py-5 bg-primary text-secondary rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
+                    >
+                       <Save className="w-5 h-5" /> Confirmar Vínculos
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

@@ -13,6 +13,11 @@ export default function Header({ toggleSidebar }) {
                     <Menu className="w-6 h-6" />
                 </button>
 
+                <div className="flex items-center gap-2 lg:ml-2">
+                    <img src="/logo.svg" alt="VerticalParts Logo" className="w-8 h-8 object-contain" />
+                    <span className="hidden sm:block text-sm font-black uppercase tracking-tight text-slate-900 dark:text-white">VerticalParts WMS</span>
+                </div>
+
                 <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 w-64">
                     <Search className="w-4 h-4 text-slate-400" />
                     <input

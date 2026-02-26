@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useApp } from '../context/AppContext';
+import { Monitor, Tv, Eye } from 'lucide-react';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -103,6 +105,7 @@ const SLALabel = ({ label, data }) => (
 export default function WaveSLADashboard() {
   const [filter, setFilter] = useState('Todas');
   const [waves, setWaves] = useState(MOCK_WAVES);
+  const { isTvMode, setIsTvMode } = useApp();
 
   const filteredWaves = waves.filter(w => {
     if (filter === 'Todas') return true;
@@ -113,14 +116,22 @@ export default function WaveSLADashboard() {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+    <div className={cn(
+      "space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20",
+      isTvMode && "p-10 scale-110 origin-top"
+    )}>
       {/* ====== HEADER ====== */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <Activity className="w-8 h-8 text-secondary" /> Acompanhamento de Ondas (SLA)
+          <h1 className={cn(
+            "font-black tracking-tight flex items-center gap-3",
+            isTvMode ? "text-6xl mb-4" : "text-2xl"
+          )}>
+            <Activity className={cn("text-secondary", isTvMode ? "w-16 h-16" : "w-8 h-8")} /> Acompanhamento de Ondas (SLA)
           </h1>
-          <p className="text-sm text-slate-500 font-medium italic">Monitoramento tático de gargalos e tempos de processo</p>
+          <p className={cn("text-slate-500 font-medium italic", isTvMode ? "text-2xl" : "text-sm")}>
+            Monitoramento tático de gargalos e tempos de processo
+          </p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -136,6 +147,19 @@ export default function WaveSLADashboard() {
             </select>
           </div>
           
+          <button
+            onClick={() => setIsTvMode(!isTvMode)}
+            className={cn(
+              "flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl",
+              isTvMode 
+                ? "bg-danger text-white hover:bg-red-600 animate-pulse" 
+                : "bg-primary text-white hover:bg-primary/90"
+            )}
+          >
+            {isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />}
+            {isTvMode ? "Sair do Modo TV" : "Modo TV"}
+          </button>
+
           <div className="bg-white dark:bg-slate-800 p-1 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center shadow-sm">
              <div className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-secondary flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-secondary animate-ping" />
@@ -144,6 +168,26 @@ export default function WaveSLADashboard() {
           </div>
         </div>
       </div>
+
+      {/* ALERTAS VISUAIS MODO TV */}
+      {isTvMode && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+           <div className="bg-danger p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
+              <AlertTriangle className="w-24 h-24 text-white animate-bounce" />
+              <div>
+                <p className="text-white text-5xl font-black italic uppercase leading-tight">3 Ondas Críticas</p>
+                <p className="text-white/80 text-2xl font-bold uppercase tracking-widest">Atraso na Separação</p>
+              </div>
+           </div>
+           <div className="bg-warning p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
+              <Zap className="w-24 h-24 text-primary animate-pulse" />
+              <div>
+                <p className="text-primary text-5xl font-black italic uppercase leading-tight">5 Reabastecimentos</p>
+                <p className="text-primary/60 text-2xl font-bold uppercase tracking-widest">Pendentes no Chão</p>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* ====== ANALYTICS CARDS ====== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

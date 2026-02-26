@@ -25,8 +25,17 @@ function cn(...inputs) {
 
 // ====== COMPONENTE PRINCIPAL ======
 
+import { useApp } from '../context/AppContext';
+
+// ====== COMPONENTE PRINCIPAL ======
+
 export default function WeighingStation() {
-  const [activeScale, setActiveScale] = useState('Balança Toledo Ind. 12');
+  const { serialDevices } = useApp();
+  
+  // Filtra apenas dispositivos do tipo balança
+  const scales = serialDevices.filter(d => d.tipo === 'balanca');
+  
+  const [activeScale, setActiveScale] = useState(scales[0]?.nome || 'Nenhuma Balança Conectada');
   const [currentWeight, setCurrentWeight] = useState(0.000);
   const [theoreticalWeight, setTheoreticalWeight] = useState(12.500);
   const [accumulatedWeight, setAccumulatedWeight] = useState(0.000);
@@ -87,19 +96,21 @@ export default function WeighingStation() {
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Status da Comunicação</p>
               <div className="flex items-center gap-2">
                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50" />
-                 <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">verticalPerts Connector: ON</span>
+                 <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">verticalParts Connector: ON</span>
               </div>
            </div>
            <div className="flex flex-col gap-1 min-w-[200px]">
-              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecionar Balança Ativa</label>
+              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-1">Balança Ativa (Serial)</label>
               <select 
                 value={activeScale}
                 onChange={(e) => setActiveScale(e.target.value)}
                 className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl py-2 px-3 text-xs font-black uppercase text-slate-700 dark:text-slate-300 outline-none focus:border-primary transition-all shadow-sm"
               >
-                 <option>Balança Toledo Ind. 12</option>
-                 <option>Balança Filizola F-3000</option>
-                 <option>Plataforma Coleta Doca 04</option>
+                 {scales.length > 0 ? (
+                   scales.map(s => <option key={s.id} value={s.nome}>{s.nome} ({s.porta})</option>)
+                 ) : (
+                   <option>Nenhuma Balança Configurada</option>
+                 )}
               </select>
            </div>
         </div>

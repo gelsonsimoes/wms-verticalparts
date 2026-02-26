@@ -39,7 +39,36 @@ import KitStation from './pages/KitStation'; // Novo
 import GateManager from './pages/GateManager'; // Novo
 import RoadWeighingStation from './pages/RoadWeighingStation'; // Novo
 import ManifestManager from './pages/ManifestManager'; // Novo
+import NFeControl from './pages/NFeControl'; // Novo
+import GeneralWarehouseFiscal from './pages/GeneralWarehouseFiscal'; // Novo
+import CTeControl from './pages/CTeControl'; // Novo
+import StockReplenishment from './pages/StockReplenishment'; // Novo
+import LotManager from './pages/LotManager'; // Novo
+import ActivityManager from './pages/ActivityManager'; // Novo
+import KardexReport from './pages/KardexReport'; // Novo
+import OperatorPerformance from './pages/OperatorPerformance'; // Novo
+import StockAnalysis from './pages/StockAnalysis'; // Novo
+import DataPurge from './pages/DataPurge'; // Novo
+import SefazCertificates from './pages/SefazCertificates'; // Novo
+import ServiceDesk from './pages/ServiceDesk'; // Novo
+import ProductCatalog from './pages/ProductCatalog'; // Novo
+import RoutesVehicles from './pages/RoutesVehicles'; // Novo
+import AllocationMap from './pages/AllocationMap'; // Novo
+import BlindCheck from './pages/BlindCheck'; // Novo
+import ReturnDelivery from './pages/ReturnDelivery'; // Novo
+import IntegrationWaves from './pages/IntegrationWaves'; // Novo
+import FiscalCoverage from './pages/FiscalCoverage'; // Novo
+import DockActivities from './pages/DockActivities'; // Novo
+import ServiceOrder from './pages/ServiceOrder'; // Novo
+import InsuranceManagement from './pages/InsuranceManagement'; // Novo
+import IntegrationAlerts from './pages/IntegrationAlerts'; // Novo
+import ERPOrderIntegration from './pages/ERPOrderIntegration'; // Novo
+import ConferirRecebimento from './pages/ConferirRecebimento';
+import StockAllocation from './pages/StockAllocation';
+import AllocationKanban from './pages/AllocationKanban';
 import { AppProvider } from './context/AppContext';
+
+import ChatAssistant from './components/chat/ChatAssistant';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -55,57 +84,85 @@ function App() {
 
             <div className="flex-1 p-4 md:p-8 overflow-x-hidden">
               <Routes>
+                <Route path="/operacao/kanban-alocacao" element={<AllocationKanban />} />
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/companies" element={<Companies />} />
-                <Route path="/warehouses" element={<Warehouses />} />
-                <Route path="/addresses" element={<AddressManagement />} />
-                <Route path="/picking" element={<PickingManagement />} />
-                <Route path="/packing" element={<PackingStation />} />
-                <Route path="/shipping" element={<LoadCheck />} />
-                <Route path="/receiving" element={<ReceivingCheckIn />} />
-                <Route path="/inventory" element={<InventoryAudit />} />
-                <Route path="/areas" element={<WarehouseAreas />} />
-                <Route path="/sectors" element={<Sectors />} />
-                <Route path="/user-groups" element={<UserGroups />} />
-                <Route path="/users" element={<UsersPage />} />
-                <Route path="/serial-devices" element={<SerialDevices />} />
-                <Route path="/labels" element={<LabelManager />} />
-                <Route path="/honeycomb-check" element={<HoneycombCheck />} />
-                <Route path="/transport-schedule" element={<TransportSchedule />} />
-                <Route path="/outbound-monitoring" element={<OutboundMonitoring />} />
-                <Route path="/audit-logs" element={<AuditLogs />} />
-                <Route path="/file-integration" element={<FileIntegration />} />
-                <Route path="/rest-config" element={<RestConfig />} />
-                <Route path="/integration-results" element={<IntegrationResults />} />
-                <Route path="/contracts" element={<ContractManager />} />
-                
-                {/* Rotas de Billing */}
-                <Route path="/billing/packaging" element={<BillingReports />} />
-                <Route path="/billing/pallet" element={<BillingReports />} />
-                <Route path="/billing/weight" element={<BillingReports />} />
-                <Route path="/billing/address" element={<BillingReports />} />
-                <Route path="/billing/query" element={<BillingReports />} />
-                <Route path="/inventory-management" element={<InventoryManagement />} />
-                <Route path="/wave-picking" element={<WavePickingWizard />} />
-                <Route path="/wave-monitoring" element={<WaveSLADashboard />} />
-                <Route path="/receiving-manager" element={<ReceivingManager />} />
-                <Route path="/weighing-station" element={<WeighingStation />} />
-                <Route path="/cross-docking" element={<CrossDockingMonitoring />} />
-                <Route path="/settings" element={<GeneralSettings />} />
-                <Route path="/damage-control" element={<DamageControl />} />
-                <Route path="/kit-station" element={<KitStation />} />
-                <Route path="/gate-manager" element={<GateManager />} />
-                <Route path="/road-weighing" element={<RoadWeighingStation />} />
-                <Route path="/manifest-manager" element={<ManifestManager />} />
-                <Route path="/omie" element={<OmieIntegration />} />
+                <Route path="/cadastros/empresas" element={<Companies />} />
+                <Route path="/cadastros/armazens" element={<Warehouses />} />
+                <Route path="/cadastros/enderecos" element={<AddressManagement />} />
+                <Route path="/operacao/separar-pedidos" element={<PickingManagement />} />
+                <Route path="/operacao/embalar-pedidos" element={<PackingStation />} />
+                <Route path="/planejamento/expedir-cargas" element={<LoadCheck />} />
+                <Route path="/operacao/recebimento" element={<ReceivingCheckIn />} />
+                <Route path="/estoque/auditar-inventario" element={<InventoryAudit />} />
+                <Route path="/cadastros/areas" element={<WarehouseAreas />} />
+                <Route path="/cadastros/setores" element={<Sectors />} />
+                <Route path="/seguranca/grupos" element={<UserGroups />} />
+                <Route path="/seguranca/usuarios" element={<UsersPage />} />
+                <Route path="/config/balancas" element={<SerialDevices />} />
+                <Route path="/config/etiquetas" element={<LabelManager />} />
+                <Route path="/operacao/conferencia-colmeia" element={<HoneycombCheck />} />
+                <Route path="/planejamento/agendar-transportes" element={<TransportSchedule />} />
+                <Route path="/operacao/monitorar-saida" element={<OutboundMonitoring />} />
+                <Route path="/indicadores/auditoria" element={<AuditLogs />} />
+                <Route path="/integrar/arquivos" element={<FileIntegration />} />
+                <Route path="/integrar/apis" element={<RestConfig />} />
+                <Route path="/indicadores/integracao" element={<IntegrationResults />} />
+                <Route path="/financeiro/contratos" element={<ContractManager />} />
+                <Route path="/faturamento/embalagem" element={<BillingReports />} />
+                <Route path="/faturamento/palete" element={<BillingReports />} />
+                <Route path="/faturamento/peso" element={<BillingReports />} />
+                <Route path="/faturamento/endereco" element={<BillingReports />} />
+                <Route path="/financeiro/calcular-diarias" element={<BillingReports />} />
+                <Route path="/estoque/gestao-inventario" element={<InventoryManagement />} />
+                <Route path="/planejamento/gerar-ondas" element={<WavePickingWizard />} />
+                <Route path="/planejamento/monitorar-prazos" element={<WaveSLADashboard />} />
+                <Route path="/operacao/gerenciar-recebimento" element={<ReceivingManager />} />
+                <Route path="/operacao/conferir-recebimento" element={<ConferirRecebimento />} />
+                <Route path="/operacao/pesar-cargas" element={<WeighingStation />} />
+                <Route path="/operacao/cruzar-docas" element={<CrossDockingMonitoring />} />
+                <Route path="/config/geral" element={<GeneralSettings />} />
+                <Route path="/estoque/monitorar-avarias" element={<DamageControl />} />
+                <Route path="/operacao/estacao-kits" element={<KitStation />} />
+                <Route path="/planejamento/gerenciar-portaria" element={<GateManager />} />
+                <Route path="/operacao/pesagem-rodoviaria" element={<RoadWeighingStation />} />
+                <Route path="/planejamento/gerenciar-manifestos" element={<ManifestManager />} />
+                <Route path="/fiscal/gerenciar-nfe" element={<NFeControl />} />
+                <Route path="/fiscal/armazem-geral" element={<GeneralWarehouseFiscal />} />
+                <Route path="/fiscal/gerenciar-cte" element={<CTeControl />} />
+                <Route path="/estoque/remanejar" element={<StockReplenishment />} />
+                <Route path="/estoque/controlar-lotes" element={<LotManager />} />
+                <Route path="/planejamento/monitorar-atividades" element={<ActivityManager />} />
+                <Route path="/estoque/consultar-kardex" element={<KardexReport />} />
+                <Route path="/indicadores/produtividade" element={<OperatorPerformance />} />
+                <Route path="/indicadores/ocupacao" element={<StockAnalysis initialTab={0} />} />
+                <Route path="/estoque/analisar-estoque" element={<StockAnalysis initialTab={1} />} />
+                <Route path="/config/expurgo" element={<DataPurge />} />
+                <Route path="/config/certificados" element={<SefazCertificates />} />
+                <Route path="/config/service-desk" element={<ServiceDesk />} />
+                <Route path="/operacao/alocar-estoque" element={<StockAllocation />} />
+                <Route path="/cadastros/produtos" element={<ProductCatalog />} />
+                <Route path="/cadastros/rotas-veiculos" element={<RoutesVehicles />} />
+                <Route path="/operacao/gerar-mapa" element={<AllocationMap />} />
+                <Route path="/operacao/conferencia-cega" element={<BlindCheck />} />
+                <Route path="/operacao/processar-devolucoes" element={<ReturnDelivery />} />
+                <Route path="/integrar/ondas" element={<IntegrationWaves />} />
+                <Route path="/fiscal/emitir-cobertura" element={<FiscalCoverage />} />
+                <Route path="/planejamento/atividades-docas" element={<DockActivities />} />
+                <Route path="/operacao/ordem-servico" element={<ServiceOrder />} />
+                <Route path="/operacao/gestao-seguros" element={<InsuranceManagement />} />
+                <Route path="/integrar/alertas" element={<IntegrationAlerts />} />
+                <Route path="/integrar/ordens-erp" element={<ERPOrderIntegration />} />
+                <Route path="/integrar/omie" element={<OmieIntegration />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
           </main>
+          <ChatAssistant />
         </div>
       </Router>
     </AppProvider>
   );
 }
+
 
 export default App;

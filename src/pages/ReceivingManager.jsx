@@ -47,6 +47,8 @@ const STATUS_COLORS = {
   'Finalizada': 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400'
 };
 
+import { useApp } from '../context/AppContext';
+
 // ====== SUB-COMPONENTE: TOOLBAR BUTTON ======
 
 const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled = false, badge }) => (
@@ -75,6 +77,7 @@ const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled =
 // ====== COMPONENTE PRINCIPAL ======
 
 export default function ReceivingManager() {
+  const { companies } = useApp();
   const [filterStatus, setFilterStatus] = useState('Pendente');
   const [filterPeriod, setFilterPeriod] = useState('1 dia');
   const [selectedOR, setSelectedOR] = useState(null);

@@ -4,6 +4,13 @@ const AppContext = createContext();
 
 export function AppProvider({ children }) {
     // Global States
+    const [isTvMode, setIsTvMode] = useState(false);
+    const [currentUser, setCurrentUser] = useState({
+        usuario: 'danilo.supervisor',
+        nome: 'Danilo',
+        role: 'gestor' // 'operador', 'planejador', 'gestor'
+    });
+
     const [companies, setCompanies] = useState(() => {
         const saved = localStorage.getItem('vparts_companies');
         return saved ? JSON.parse(saved) : [
@@ -21,9 +28,9 @@ export function AppProvider({ children }) {
     const [warehouseAreas, setWarehouseAreas] = useState(() => {
         const saved = localStorage.getItem('vparts_warehouse_areas');
         return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'RECEBIMENTO', endereco: 'R1_PP1_N001' },
-            { id: 2, name: 'ESTRUTURA PORTA PALETES', endereco: 'R2_PP3_N002' },
-            { id: 3, name: 'EXPEDIÇÃO', endereco: 'R3_PP1_N001' }
+            { id: 1, name: 'RECEBIMENTO', endereco: 'R1_PP1_CL001_N001' },
+            { id: 2, name: 'ESTRUTURA PORTA PALETES', endereco: 'R2_PP3_CL005_N002' },
+            { id: 3, name: 'EXPEDIÇÃO', endereco: 'R3_PP1_CL001_N001' }
         ];
     });
 
@@ -85,9 +92,9 @@ export function AppProvider({ children }) {
     const [sectors, setSectors] = useState(() => {
         const saved = localStorage.getItem('vparts_sectors');
         return saved ? JSON.parse(saved) : [
-            { id: 1, setor: 'PEÇAS AUTOMOTIVAS', tipoSetor: 'Armazenagem', tipoLocal: 'Porta Palete', codigoIntegracao: 'INT-001', ativo: true, usoExclusivoCaixa: false, depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }], enderecos: ['R1_PP1_N001'], produtos: ['VP-FR4429-X'], usuarios: ['joao.silva'] },
+            { id: 1, setor: 'PEÇAS ELEVADORES', tipoSetor: 'Armazenagem', tipoLocal: 'Porta Palete', codigoIntegracao: 'INT-001', ativo: true, usoExclusivoCaixa: false, depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }], enderecos: ['R1_PP1_CL001_N001'], produtos: ['VEPEL-BPI-174FX'], usuarios: ['joao.silva'] },
             { id: 2, setor: 'EXPEDIÇÃO RÁPIDA', tipoSetor: 'Expedição', tipoLocal: 'Colmeia', codigoIntegracao: 'INT-002', ativo: true, usoExclusivoCaixa: true, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
-            { id: 3, setor: 'MANUTENÇÃO', tipoSetor: 'Serviço', tipoLocal: 'Bancada', codigoIntegracao: 'INT-003', ativo: false, usoExclusivoCaixa: false, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
+            { id: 3, setor: 'MANUTENÇÃO TÉCNICA', tipoSetor: 'Serviço', tipoLocal: 'Bancada', codigoIntegracao: 'INT-003', ativo: false, usoExclusivoCaixa: false, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
         ];
     });
 
@@ -133,50 +140,50 @@ export function AppProvider({ children }) {
         const saved = localStorage.getItem('vparts_transport_schedules');
         return saved ? JSON.parse(saved) : [
             { id: 1, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Transvip Logística', motorista: 'Danilo (Supervisor)', veiculo: 'ABC-1234', dataInicio: '2026-02-22T08:00', dataFim: '2026-02-22T10:00', turno: 'Manhã', qtdVolume: 45, notasFiscais: 'NF-001234, NF-001235', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T15:30', usuario: 'danilo.supervisor' }] },
-            { id: 2, tipo: 'Expedição', depositante: 'VerticalParts AutoPeças', doca: 'DOCA 03', transportadora: 'RodoExpress', motorista: 'Matheus (Expedição)', veiculo: 'DEF-5678', dataInicio: '2026-02-22T10:00', dataFim: '2026-02-22T12:00', turno: 'Manhã', qtdVolume: 120, notasFiscais: 'NF-005500', status: 'veiculo_recepcionado', historico: [{ status: 'agendado', data: '2026-02-20T10:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T09:45', usuario: 'matheus.expedicao' }] },
-            { id: 3, tipo: 'Recebimento', depositante: 'VerticalParts Distribuição', doca: 'DOCA 02', transportadora: 'Patrus Transportes', motorista: 'Thiago (Logística)', veiculo: 'GHI-9012', dataInicio: '2026-02-22T14:00', dataFim: '2026-02-22T16:00', turno: 'Tarde', qtdVolume: 80, notasFiscais: 'NF-007788, NF-007789, NF-007790', status: 'veiculo_patio', historico: [{ status: 'agendado', data: '2026-02-19T11:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T13:30', usuario: 'matheus.expedicao' }, { status: 'veiculo_patio', data: '2026-02-22T13:45', usuario: 'thiago.logistica' }] },
-            { id: 4, tipo: 'Expedição', depositante: 'VerticalParts Oficina', doca: 'DOCA 01', transportadora: 'Jadlog', motorista: 'Danilo (Supervisor)', veiculo: 'JKL-3456', dataInicio: '2026-02-23T08:00', dataFim: '2026-02-23T10:00', turno: 'Manhã', qtdVolume: 30, notasFiscais: 'NF-009900', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T16:00', usuario: 'danilo.supervisor' }] },
+            { id: 2, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 03', transportadora: 'RodoExpress', motorista: 'Matheus (Expedição)', veiculo: 'DEF-5678', dataInicio: '2026-02-22T10:00', dataFim: '2026-02-22T12:00', turno: 'Manhã', qtdVolume: 120, notasFiscais: 'NF-005500', status: 'veiculo_recepcionado', historico: [{ status: 'agendado', data: '2026-02-20T10:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T09:45', usuario: 'matheus.expedicao' }] },
+            { id: 3, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 02', transportadora: 'Patrus Transportes', motorista: 'Thiago (Logística)', veiculo: 'GHI-9012', dataInicio: '2026-02-22T14:00', dataFim: '2026-02-22T16:00', turno: 'Tarde', qtdVolume: 80, notasFiscais: 'NF-007788, NF-007789, NF-007790', status: 'veiculo_patio', historico: [{ status: 'agendado', data: '2026-02-19T11:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T13:30', usuario: 'matheus.expedicao' }, { status: 'veiculo_patio', data: '2026-02-22T13:45', usuario: 'thiago.logistica' }] },
+            { id: 4, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Jadlog', motorista: 'Danilo (Supervisor)', veiculo: 'JKL-3456', dataInicio: '2026-02-23T08:00', dataFim: '2026-02-23T10:00', turno: 'Manhã', qtdVolume: 30, notasFiscais: 'NF-009900', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T16:00', usuario: 'danilo.supervisor' }] },
         ];
     });
 
     const [orders, setOrders] = useState([
         { 
             id: 'SO-8842', 
-            client: 'VerticalParts Distribuição', 
+            client: 'VerticalParts Matriz', 
             status: 'Pendente', 
             items: 3, 
             totalQty: 12,
             value: 'R$ 4.500,00', 
             date: '21/02/2026',
             orderItems: [
-                { id: 1, sku: 'VEPEL-BPI-174FX', desc: 'Barreira de Proteção Infravermelha (174 Feixes)', ean: '789123456001', expected: 5, collected: 0, location: 'RUA-12-A1' },
-                { id: 2, sku: 'VPER-ESS-NY-27MM', desc: 'Escova de Segurança (Nylon - Base 27mm)', ean: '7891149108718', expected: 2, collected: 0, location: 'RUA-12-A2' },
-                { id: 3, sku: 'VPER-PAL-INO-1000', desc: 'Pallet de Aço Inox (1000mm)', ean: '789123456003', expected: 5, collected: 0, location: 'RUA-05-B1' },
+                { id: 1, sku: 'VEPEL-BPI-174FX', desc: 'Barreira de Proteção Infravermelha (174 Feixes)', ean: '789123456001', expected: 5, collected: 0, location: 'R1_PP2_CL012_N001' },
+                { id: 2, sku: 'VPER-ESS-NY-27MM', desc: 'Escova de Segurança (Nylon - Base 27mm)', ean: '7891149108718', expected: 2, collected: 0, location: 'R1_PP2_CL012_N002' },
+                { id: 3, sku: 'VPER-PAL-INO-1000', desc: 'Pallet de Aço Inox (1000mm)', ean: '789123456003', expected: 5, collected: 0, location: 'R2_PP1_CL005_N001' },
             ]
         },
         { 
             id: 'SO-8845', 
-            client: 'VerticalParts AutoPeças', 
+            client: 'VerticalParts Matriz', 
             status: 'Em Separação', 
             items: 2, 
             totalQty: 4,
             value: 'R$ 1.200,00', 
             date: '21/02/2026',
             orderItems: [
-                { id: 1, sku: 'VP-FL1', desc: 'Filtro de Óleo VP-FL1', ean: '7890000000001', expected: 2, collected: 1, location: 'RUA-01-C3' },
-                { id: 2, sku: 'VP-AIR-02', desc: 'Filtro de Ar Esportivo', ean: '7890000000002', expected: 2, collected: 0, location: 'RUA-01-C4' },
+                { id: 1, sku: 'VEPEL-BTI-JX02-CCS', desc: 'Botoeira de Inspeção - Mod. JX02', ean: '7890000000001', expected: 2, collected: 1, location: 'R1_PP1_CL001_N003' },
+                { id: 2, sku: 'VPER-LUM-LED-VRD-24V', desc: 'Luminária em LED Verde 24V', ean: '7890000000002', expected: 2, collected: 0, location: 'R1_PP1_CL001_N004' },
             ]
         },
         { 
             id: 'SO-8849', 
-            client: 'VerticalParts Oficina', 
+            client: 'VerticalParts Matriz', 
             status: 'Concluído', 
             items: 1, 
             totalQty: 22,
             value: 'R$ 15.800,00', 
             date: '20/02/2026',
             orderItems: [
-                { id: 1, sku: 'VP-WPR-99', desc: 'Palheta Limpador Silicone 24"', ean: '7890000000003', expected: 22, collected: 22, location: 'RUA-02-D1' },
+                { id: 1, sku: 'VPER-PNT-AL-22D-202X145-CT', desc: 'Pente de Alumínio - 22 Dentes (202x145mm)', ean: '7890000000003', expected: 22, collected: 22, location: 'R2_PP2_CL001_N001' },
             ]
         },
     ]);
@@ -184,8 +191,8 @@ export function AppProvider({ children }) {
     const [inventory, setInventory] = useState(() => {
         const saved = localStorage.getItem('vparts_inventory');
         return saved ? JSON.parse(saved) : [
-            { id: 1, part: 'Pastilha de Freio Cerâmica', sku: 'VP-FR4429-X', systemStock: 1540, countedStock: 1538, divergence: -2, status: 'Pendente', localizacao: 'RUA-12-04' },
-            { id: 2, part: 'Disco de Freio Ventilado', sku: 'VP-DF882-M', systemStock: 450, countedStock: 450, divergence: 0, status: 'Validado', localizacao: 'RUA-12-04' },
+            { id: 1, part: 'Pente de Alumínio - 22 Dentes (202x145mm)', sku: 'VPER-PNT-AL-22D-202X145-CT', systemStock: 1540, countedStock: 1538, divergence: -2, status: 'Pendente', localizacao: 'R2_PP2_CL001_N001' },
+            { id: 2, part: 'Botoeira de Inspeção - Mod. JX02', sku: 'VEPEL-BTI-JX02-CCS', systemStock: 450, countedStock: 450, divergence: 0, status: 'Validado', localizacao: 'R1_PP1_CL001_N003' },
         ];
     });
 
@@ -319,6 +326,8 @@ export function AppProvider({ children }) {
             serialDevices, serialDevicesCrud,
             labels, labelsCrud,
             transportSchedules, transportSchedulesCrud,
+            isTvMode, setIsTvMode,
+            currentUser, setCurrentUser,
         }}>
             {children}
         </AppContext.Provider>
