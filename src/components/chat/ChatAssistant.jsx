@@ -75,8 +75,8 @@ export default function ChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Modelo Gemini ativo — gemini-2.0-flash
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      // Modelo Gemini ativo — gemini-2.5-flash (mais recente disponível na chave)
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const chat = model.startChat({
         history: [
