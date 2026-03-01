@@ -98,7 +98,7 @@ function CadastrarModal({ item, onClose, onSave }) {
             </p>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { l: 'Endereço Origem *', k: 'origemEnd', ph: 'Ex: RUA-A-01-N4' },
+                { l: 'Endereço Origem *', k: 'origemEnd', ph: 'Ex: R1_PP1_A1' },
               ].map(f2 => (
                 <div key={f2.k} className="col-span-2 space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{f2.l}</label>
@@ -131,7 +131,7 @@ function CadastrarModal({ item, onClose, onSave }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1.5">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Destino *</label>
-                <input value={form.destEnd} onChange={e => f('destEnd', e.target.value)} placeholder="Ex: RUA-A-01-N1"
+                <input value={form.destEnd} onChange={e => f('destEnd', e.target.value)} placeholder="Ex: R1_PP1_A1"
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
               </div>
               <div className="space-y-1.5">

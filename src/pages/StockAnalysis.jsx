@@ -43,42 +43,42 @@ const ESTADO_CFG = {
 
 // ─── MOCK — CURVA ABC ─────────────────────────────────────────────
 const MOCK_ABC = [
-  { cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira',  local:'RUA-A-01-N4', visitas:320, abc:'A' },
-  { cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',        local:'RUA-C-02-N3', visitas:290, abc:'A' },
-  { cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',      local:'RUA-B-03-N5', visitas:248, abc:'A' },
-  { cod:'VP-PA1023-J', desc:'Palheta Dianteira KIT',         local:'RUA-B-05-N5', visitas:185, abc:'B' },
-  { cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4',         local:'RUA-D-01-N4', visitas:160, abc:'B' },
-  { cod:'VP-FA3311-K', desc:'Filtro de Ar Esportivo',        local:'RUA-A-04-N6', visitas:140, abc:'B' },
-  { cod:'VP-SF0881-R', desc:'Sensor de Farol LED',           local:'RUA-E-02-N5', visitas:55,  abc:'C' },
-  { cod:'VP-AM1201-B', desc:'Amortecedor Dianteiro',         local:'RUA-F-01-N3', visitas:42,  abc:'C' },
-  { cod:'VP-SK0099-Z', desc:'Sensor de ABS Dianteiro',       local:'RUA-G-03-N2', visitas:30,  abc:'C' },
-  { cod:'VP-PH9901-D', desc:'Pedaleira Esportiva',           local:'RUA-H-02-N1', visitas:18,  abc:'C' },
+  { cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira',  local:'R1_PP1_D4', visitas:320, abc:'A' },
+  { cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',        local:'R1_PP2_C2', visitas:290, abc:'A' },
+  { cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',      local:'R2_PP3_D3', visitas:248, abc:'A' },
+  { cod:'VP-PA1023-J', desc:'Palheta Dianteira KIT',         local:'R2_PP3_D5', visitas:185, abc:'B' },
+  { cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4',         local:'R2_PP4_D1', visitas:160, abc:'B' },
+  { cod:'VP-FA3311-K', desc:'Filtro de Ar Esportivo',        local:'R3_PP5_D4', visitas:140, abc:'B' },
+  { cod:'VP-SF0881-R', desc:'Sensor de Farol LED',           local:'R3_PP5_D2', visitas:55,  abc:'C' },
+  { cod:'VP-AM1201-B', desc:'Amortecedor Dianteiro',         local:'R1_PP1_C1', visitas:42,  abc:'C' },
+  { cod:'VP-SK0099-Z', desc:'Sensor de ABS Dianteiro',       local:'R1_PP1_B3', visitas:30,  abc:'C' },
+  { cod:'VP-PH9901-D', desc:'Pedaleira Esportiva',           local:'R1_PP1_A2', visitas:18,  abc:'C' },
 ];
 
 const MOCK_ABC_LOCAL = [
-  { local:'RUA-A-01-N4', regiao:'Picking A',  visitas:540, abc:'A' },
-  { local:'RUA-C-02-N3', regiao:'Picking C',  visitas:480, abc:'A' },
-  { local:'RUA-B-03-N5', regiao:'Pulmão B',   visitas:390, abc:'A' },
-  { local:'RUA-B-05-N5', regiao:'Pulmão B',   visitas:260, abc:'B' },
-  { local:'RUA-D-01-N4', regiao:'Pulmão D',   visitas:210, abc:'B' },
-  { local:'RUA-A-04-N6', regiao:'Pulmão A',   visitas:180, abc:'B' },
-  { local:'RUA-E-02-N5', regiao:'Pulmão E',   visitas:80,  abc:'C' },
-  { local:'RUA-F-01-N3', regiao:'Pulmão F',   visitas:60,  abc:'C' },
-  { local:'RUA-G-03-N2', regiao:'Pulmão G',   visitas:45,  abc:'C' },
+  { local:'R1_PP1_D4', regiao:'Picking A',  visitas:540, abc:'A' },
+  { local:'R1_PP2_C2', regiao:'Picking C',  visitas:480, abc:'A' },
+  { local:'R2_PP3_D3', regiao:'Pulmão B',   visitas:390, abc:'A' },
+  { local:'R2_PP3_D5', regiao:'Pulmão B',   visitas:260, abc:'B' },
+  { local:'R2_PP4_D1', regiao:'Pulmão D',   visitas:210, abc:'B' },
+  { local:'R3_PP5_D4', regiao:'Pulmão A',   visitas:180, abc:'B' },
+  { local:'R3_PP5_D2', regiao:'Pulmão E',   visitas:80,  abc:'C' },
+  { local:'R1_PP1_C1', regiao:'Pulmão F',   visitas:60,  abc:'C' },
+  { local:'R1_PP1_B3', regiao:'Pulmão G',   visitas:45,  abc:'C' },
 ];
 
 // ─── MOCK — ESTOQUE SINTÉTICO ────────────────────────────────────────
 const INITIAL_ESTOQUE = [
-  { id:1, cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira',  depositante:'Atacado BR Peças',  estado:'Bom',                  local:'RUA-A-01-N4', lote:'LT-0241', estoqueTotal:78,  disponivel:78  },
-  { id:2, cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',      depositante:'Grupo Freios Sul',  estado:'Bloqueado',            local:'RUA-B-03-N5', lote:'LT-0238', estoqueTotal:12,  disponivel:0   },
-  { id:3, cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',         depositante:'Rede Filtros SP',   estado:'Bom',                  local:'RUA-C-02-N3', lote:'LT-0233', estoqueTotal:40,  disponivel:40  },
-  { id:4, cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4 500ml',   depositante:'Química Total',     estado:'Bom',                  local:'RUA-D-01-N4', lote:'LT-0228', estoqueTotal:36,  disponivel:36  },
-  { id:5, cod:'VP-FA3311-K', desc:'Filtro de Ar Esportivo',         depositante:'SportAuto Brasil',  estado:'Avariado',             local:'RUA-A-04-N6', lote:'LT-0220', estoqueTotal:24,  disponivel:0   },
-  { id:6, cod:'VP-PA1023-J', desc:'Palheta Dianteira KIT',          depositante:'Wiper Parts',       estado:'Bom',                  local:'RUA-B-05-N5', lote:'LT-0215', estoqueTotal:48,  disponivel:48  },
-  { id:7, cod:'VP-AM1201-B', desc:'Amortecedor Dianteiro',          depositante:'Shock Distribuidora',estado:'Desmembrado/Truncado', local:'RUA-F-01-N3', lote:'LT-0204', estoqueTotal:8,   disponivel:5   },
-  { id:8, cod:'VP-SK0099-Z', desc:'Sensor de ABS Dianteiro',        depositante:'ElectroParts',      estado:'Bom',                  local:'RUA-G-03-N2', lote:'LT-0200', estoqueTotal:15,  disponivel:15  },
-  { id:9, cod:'VP-SF0881-R', desc:'Sensor de Farol LED',            depositante:'LuxAuto Peças',     estado:'Avariado',             local:'RUA-E-02-N5', lote:'LT-0196', estoqueTotal:5,   disponivel:0   },
-  { id:10,cod:'VP-PH9901-D', desc:'Pedaleira Esportiva',            depositante:'Acessórios TOP',    estado:'Bom',                  local:'RUA-H-02-N1', lote:'LT-0190', estoqueTotal:20,  disponivel:20  },
+  { id:1, cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira',  depositante:'Atacado BR Peças',  estado:'Bom',                  local:'R1_PP1_D4', lote:'LT-0241', estoqueTotal:78,  disponivel:78  },
+  { id:2, cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',      depositante:'Grupo Freios Sul',  estado:'Bloqueado',            local:'R2_PP3_D3', lote:'LT-0238', estoqueTotal:12,  disponivel:0   },
+  { id:3, cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',         depositante:'Rede Filtros SP',   estado:'Bom',                  local:'R1_PP2_C2', lote:'LT-0233', estoqueTotal:40,  disponivel:40  },
+  { id:4, cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4 500ml',   depositante:'Química Total',     estado:'Bom',                  local:'R2_PP4_D1', lote:'LT-0228', estoqueTotal:36,  disponivel:36  },
+  { id:5, cod:'VP-FA3311-K', desc:'Filtro de Ar Esportivo',         depositante:'SportAuto Brasil',  estado:'Avariado',             local:'R3_PP5_D4', lote:'LT-0220', estoqueTotal:24,  disponivel:0   },
+  { id:6, cod:'VP-PA1023-J', desc:'Palheta Dianteira KIT',          depositante:'Wiper Parts',       estado:'Bom',                  local:'R2_PP3_D5', lote:'LT-0215', estoqueTotal:48,  disponivel:48  },
+  { id:7, cod:'VP-AM1201-B', desc:'Amortecedor Dianteiro',          depositante:'Shock Distribuidora',estado:'Desmembrado/Truncado', local:'R1_PP1_C1', lote:'LT-0204', estoqueTotal:8,   disponivel:5   },
+  { id:8, cod:'VP-SK0099-Z', desc:'Sensor de ABS Dianteiro',        depositante:'ElectroParts',      estado:'Bom',                  local:'R1_PP1_B3', lote:'LT-0200', estoqueTotal:15,  disponivel:15  },
+  { id:9, cod:'VP-SF0881-R', desc:'Sensor de Farol LED',            depositante:'LuxAuto Peças',     estado:'Avariado',             local:'R3_PP5_D2', lote:'LT-0196', estoqueTotal:5,   disponivel:0   },
+  { id:10,cod:'VP-PH9901-D', desc:'Pedaleira Esportiva',            depositante:'Acessórios TOP',    estado:'Bom',                  local:'R1_PP1_A2', lote:'LT-0190', estoqueTotal:20,  disponivel:20  },
 ];
 
 // ─── GRÁFICO DE ROSCA SVG PURO ───────────────────────────────────────

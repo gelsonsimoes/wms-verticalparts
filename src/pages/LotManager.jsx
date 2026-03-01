@@ -233,7 +233,7 @@ function DividirModal({ lote, onClose, onConfirm }) {
             </div>
             <div className="space-y-1.5">
               <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Destino (Lote Filho) *</label>
-              <input value={novoLocal} onChange={e => setNovoLocal(e.target.value)} placeholder="Ex: RUA-C-02-N2"
+              <input value={novoLocal} onChange={e => setNovoLocal(e.target.value)} placeholder="Ex: R1_PP1_C2"
                 className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-purple-500 transition-all" />
             </div>
           </div>

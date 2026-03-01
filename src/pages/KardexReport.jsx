@@ -59,12 +59,12 @@ const MOVIMENTOS_PRODUTO = [
 
 // ─── MOCK DATA — ENDEREÇO ─────────────────────────────────────────────
 const MOVIMENTOS_ENDERECO = [
-  { id:'E001', data:'20/02/2026', endereco:'RUA-A-01-N4', regiao:'Pulmão Setor A',  cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:48, saidas:0,  saldoFinal:78,  tipo:'Entrada',  nrOp:'REC-0541', docFiscal:'NF 000.541' },
-  { id:'E002', data:'20/02/2026', endereco:'RUA-A-01-N4', regiao:'Pulmão Setor A',  cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:0,  saidas:12, saldoFinal:66,  tipo:'Saída',    nrOp:'SEP-0892', docFiscal:'OV 000.892' },
-  { id:'E003', data:'21/02/2026', endereco:'RUA-B-03-N5', regiao:'Pulmão Setor B',  cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',    depositante:'Grupo Freios Sul',  entradas:12, saidas:0,  saldoFinal:12,  tipo:'Entrada',  nrOp:'REC-0512', docFiscal:'NF 000.512' },
-  { id:'E004', data:'21/02/2026', endereco:'RUA-C-02-N3', regiao:'Picking Setor C', cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',       depositante:'Rede Filtros SP',   entradas:0,  saidas:20, saldoFinal:40,  tipo:'Saída',    nrOp:'SEP-0905', docFiscal:'OV 000.905' },
-  { id:'E005', data:'22/02/2026', endereco:'RUA-D-01-N4', regiao:'Pulmão Setor D',  cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4',       depositante:'Química Total',     entradas:0,  saidas:0,  saldoFinal:36,  tipo:'Ajuste',   nrOp:'AJ-0022',  docFiscal:'AI 000.022' },
-  { id:'E006', data:'22/02/2026', endereco:'PK-A-01-N1',  regiao:'Picking Setor A', cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:18, saidas:0,  saldoFinal:18,  tipo:'Transferência', nrOp:'REM-0061', docFiscal:'—' },
+  { id:'E001', data:'20/02/2026', endereco:'R1_PP1_D4', regiao:'Pulmão Setor A',  cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:48, saidas:0,  saldoFinal:78,  tipo:'Entrada',  nrOp:'REC-0541', docFiscal:'NF 000.541' },
+  { id:'E002', data:'20/02/2026', endereco:'R1_PP1_D4', regiao:'Pulmão Setor A',  cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:0,  saidas:12, saldoFinal:66,  tipo:'Saída',    nrOp:'SEP-0892', docFiscal:'OV 000.892' },
+  { id:'E003', data:'21/02/2026', endereco:'R2_PP3_D3', regiao:'Pulmão Setor B',  cod:'VP-DC2210-F', desc:'Disco de Freio Ventilado',    depositante:'Grupo Freios Sul',  entradas:12, saidas:0,  saldoFinal:12,  tipo:'Entrada',  nrOp:'REC-0512', docFiscal:'NF 000.512' },
+  { id:'E004', data:'21/02/2026', endereco:'R1_PP2_C2', regiao:'Picking Setor C', cod:'VP-FO1122-M', desc:'Filtro de Óleo Premium',       depositante:'Rede Filtros SP',   entradas:0,  saidas:20, saldoFinal:40,  tipo:'Saída',    nrOp:'SEP-0905', docFiscal:'OV 000.905' },
+  { id:'E005', data:'22/02/2026', endereco:'R2_PP4_D1', regiao:'Pulmão Setor D',  cod:'VP-LB0091-A', desc:'Fluido de Freio DOT 4',       depositante:'Química Total',     entradas:0,  saidas:0,  saldoFinal:36,  tipo:'Ajuste',   nrOp:'AJ-0022',  docFiscal:'AI 000.022' },
+  { id:'E006', data:'22/02/2026', endereco:'R1_PP1_A1',  regiao:'Picking Setor A', cod:'VP-FR4429-X', desc:'Pastilha de Freio Dianteira', depositante:'Atacado BR Peças',  entradas:18, saidas:0,  saldoFinal:18,  tipo:'Transferência', nrOp:'REM-0061', docFiscal:'—' },
 ];
 
 // ─── EXPORTAÇÃO CSV / EXCEL ────────────────────────────────────────

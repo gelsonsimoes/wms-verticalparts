@@ -4,6 +4,32 @@ const AppContext = createContext();
 
 export function AppProvider({ children }) {
     // Global States
+    const RUAS = ['R1', 'R2', 'R3'];
+    const PP_POR_RUA = { R1: ['PP1','PP2'], R2: ['PP3','PP4'], R3: ['PP5'] };
+    const NIVEIS = ['A','B','C','D'];
+    const POSICOES = Array.from({length: 20}, (_, i) => i + 1);
+
+    const LOCATIONS = [];
+    RUAS.forEach(rua => {
+    PP_POR_RUA[rua].forEach(pp => {
+        NIVEIS.forEach(nivel => {
+        POSICOES.forEach(pos => {
+            LOCATIONS.push({
+            id: `${rua}_${pp}_${nivel}${pos}`,
+            rua,
+            portaPalete: pp,
+            nivel,
+            posicao: pos,
+            label: `${rua}_${pp}_${nivel}${pos}`,
+            tipo: nivel === 'A' ? 'Piso' : nivel === 'D' ? 'Topo' : 'Intermediário',
+            status: 'Disponível',
+            capacidade: 1,
+            });
+        });
+        });
+    });
+    });
+
     const [isTvMode, setIsTvMode] = useState(false);
     const [currentUser, setCurrentUser] = useState({
         usuario: 'danilo.supervisor',
@@ -45,11 +71,7 @@ export function AppProvider({ children }) {
 
     const [warehouseLocations, setWarehouseLocations] = useState(() => {
         const saved = localStorage.getItem('vparts_wh_locations');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, warehouseId: 1, rua: 'R1', predio: 'P1', andar: 'A1', apto: '001', peso: 500, cubagem: 1.2, ativo: true },
-            { id: 2, warehouseId: 1, rua: 'R1', predio: 'P1', andar: 'A2', apto: '001', peso: 500, cubagem: 1.2, ativo: true },
-            { id: 3, warehouseId: 1, rua: 'R2', predio: 'P1', andar: 'A1', apto: '001', peso: 800, cubagem: 2.0, ativo: true },
-        ];
+        return saved ? JSON.parse(saved) : LOCATIONS;
     });
 
     const [warehouseColmeias, setWarehouseColmeias] = useState(() => {
@@ -329,6 +351,7 @@ export function AppProvider({ children }) {
             transportSchedules, transportSchedulesCrud,
             isTvMode, setIsTvMode,
             currentUser, setCurrentUser,
+            LOCATIONS,
         }}>
             {children}
         </AppContext.Provider>

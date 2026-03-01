@@ -49,13 +49,16 @@ const STATUS_COLOR = {
 };
 
 // ─── GERADOR DE ENDEREÇO MOCK ─────────────────────────────────────────
-const RUAS = ['A','B','C','D','E'];
+const RUAS = ['R1','R2','R3'];
+const PP_RUA = { R1:['PP1','PP2'], R2:['PP3','PP4'], R3:['PP5'] };
+const NIVEIS = ['A','B','C','D'];
 function gerarEndereco(tipoLocal) {
-  const rua   = RUAS[Math.floor(Math.random() * RUAS.length)];
-  const col   = String(Math.floor(Math.random() * 10) + 1).padStart(2, '0');
-  const nivel = Math.floor(Math.random() * 5) + 1;
-  const tipo  = tipoLocal || TIPO_LOCAL[Math.floor(Math.random() * 2)];
-  return { endereco: `${rua}-${col}-N${nivel}`, tipoLocal: tipo };
+  const rua = RUAS[Math.floor(Math.random() * RUAS.length)];
+  const pp = PP_RUA[rua][Math.floor(Math.random() * PP_RUA[rua].length)];
+  const nivel = NIVEIS[Math.floor(Math.random() * NIVEIS.length)];
+  const pos = Math.floor(Math.random() * 20) + 1;
+  const tipo = tipoLocal || TIPO_LOCAL[Math.floor(Math.random() * 2)];
+  return { endereco: `${rua}_${pp}_${nivel}${pos}`, tipoLocal: tipo };
 }
 
 function gerarLote(ordemId) {
@@ -81,22 +84,29 @@ function makeRow(override = {}) {
 }
 
 const ROWS_INIT = [
-  makeRow({ id:'r1', ordemId:'ORD-001', depositante:'VerticalParts SP', tipoRecebimento:'Compra', produto:'Motor de Tração 220V', lote:'LOT-001-221001', enderecoSugerido:'B-03-N2', tipoLocal:'Pulmão', status:'Posicionado' }),
-  makeRow({ id:'r2', ordemId:'ORD-002', depositante:'Elevadores ABC Ltda', tipoRecebimento:'Devolução', produto:'Freio Magnético D-200', lote:'LOT-002-221002', enderecoSugerido:'C-07-N1', tipoLocal:'Picking', status:'Finalizado' }),
+  makeRow({ id:'r1', ordemId:'ORD-001', depositante:'VerticalParts SP', tipoRecebimento:'Compra', produto:'Motor de Tração 220V', lote:'LOT-001-221001', enderecoSugerido:'R1_PP2_B3', tipoLocal:'Pulmão', status:'Posicionado' }),
+  makeRow({ id:'r2', ordemId:'ORD-002', depositante:'Elevadores ABC Ltda', tipoRecebimento:'Devolução', produto:'Freio Magnético D-200', lote:'LOT-002-221002', enderecoSugerido:'R2_PP3_A7', tipoLocal:'Picking', status:'Finalizado' }),
   makeRow({ id:'r3', ordemId:'ORD-003', depositante:'Kone Brasil', tipoRecebimento:'Transferência', produto:'Cabo de Aço 10mm', lote:null, enderecoSugerido:null, tipoLocal:null, status:'Pendente' }),
   makeRow({ id:'r4', ordemId:'ORD-004', depositante:'Schindler Partes', tipoRecebimento:'Compra', produto:'Painel Elétrico 800W', lote:null, enderecoSugerido:null, tipoLocal:null, status:'Pendente' }),
   makeRow({ id:'r5', ordemId:'ORD-005', depositante:'VerticalParts SP', tipoRecebimento:'Cross-Docking', produto:'Porta de Cabine Inox', lote:null, enderecoSugerido:null, tipoLocal:null, status:'Pendente' }),
-  makeRow({ id:'r6', ordemId:'ORD-006', depositante:'Kone Brasil', tipoRecebimento:'Compra', produto:'Guia de Corrediça 40mm', lote:'LOT-006-221006', enderecoSugerido:'A-01-N3', tipoLocal:'Pulmão', status:'Cancelado' }),
+  makeRow({ id:'r6', ordemId:'ORD-006', depositante:'Kone Brasil', tipoRecebimento:'Compra', produto:'Guia de Corrediça 40mm', lote:'LOT-006-221006', enderecoSugerido:'R1_PP1_C1', tipoLocal:'Pulmão', status:'Cancelado' }),
 ];
 
 // ─── MODAL ALTERAR ENDEREÇO ───────────────────────────────────────────
 function ModalAlterarEndereco({ rows, onClose, onSave }) {
-  const [rua,    setRua]    = useState('A');
-  const [col,    setCol]    = useState('01');
-  const [nivel,  setNivel]  = useState('1');
+  const { LOCATIONS } = require('../../context/AppContext').useApp();
+  const [enderecoId, setEnderecoId] = useState(LOCATIONS[0]?.id || 'R1_PP1_A1');
   const [tipo,   setTipo]   = useState('Pulmão');
 
-  const endPreview = `${rua}-${col}-N${nivel}`;
+  const endPreview = enderecoId;
+
+  // Group locations
+  const groupedLocations = LOCATIONS.reduce((acc, loc) => {
+    const key = `${loc.rua} — ${loc.portaPalete}`;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(loc);
+    return acc;
+  }, {});
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -126,25 +136,17 @@ function ModalAlterarEndereco({ rows, onClose, onSave }) {
 
         {/* Formulário */}
         <div className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Rua</label>
-              <select value={rua} onChange={e => setRua(e.target.value)} className="w-full px-2 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-black text-center outline-none transition-all">
-                {['A','B','C','D','E'].map(r => <option key={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Coluna</label>
-              <select value={col} onChange={e => setCol(e.target.value)} className="w-full px-2 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-black text-center outline-none transition-all">
-                {Array.from({length:10},(_,i) => String(i+1).padStart(2,'0')).map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nível</label>
-              <select value={nivel} onChange={e => setNivel(e.target.value)} className="w-full px-2 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-black text-center outline-none transition-all">
-                {['1','2','3','4','5'].map(n => <option key={n}>{n}</option>)}
-              </select>
-            </div>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Sugerido</label>
+            <select value={enderecoId} onChange={e => setEnderecoId(e.target.value)} className="w-full px-2 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-black outline-none transition-all">
+              {Object.entries(groupedLocations).map(([groupData, locs]) => (
+                <optgroup key={groupData} label={groupData}>
+                  {locs.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.id} ({loc.tipo})</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </div>
 
           <div className="space-y-1">
