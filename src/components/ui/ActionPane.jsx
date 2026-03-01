@@ -22,7 +22,7 @@ export default function ActionPane({ title, groups = [] }) {
                 <button
                   key={actionIndex}
                   disabled={action.disabled}
-                  onClick={action.onClick}
+                  onClick={action.onClick || (() => console.log('Ação: ' + action.label))}
                   className={`
                     flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all
                     ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}

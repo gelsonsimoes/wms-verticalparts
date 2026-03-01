@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Breadcrumbs from '../ui/Breadcrumbs';
 import ActionPane from '../ui/ActionPane';
 import FastTab from '../ui/FastTab';
@@ -22,6 +22,11 @@ const MOCK_DATA = [
 ];
 
 export default function EnterprisePageBase({ title, breadcrumbItems = [] }) {
+  const [registroId] = useState('VP-AUTO-001');
+  const [depositante, setDepositante] = useState('VerticalParts Matriz');
+  const [tipoOperacao, setTipoOperacao] = useState('Entrada Normal');
+  const [dataReferencia, setDataReferencia] = useState('2026-02-26');
+
   const breadcrumbs = [
     { label: 'WMS', path: '/' },
     ...breadcrumbItems,
@@ -66,15 +71,15 @@ export default function EnterprisePageBase({ title, breadcrumbItems = [] }) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
              <div className="space-y-1">
                 <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">ID Registro</label>
-                <input disabled value="VP-AUTO-001" className="w-full bg-[#F3F4F6] border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-black text-black" />
+                <input readOnly value={registroId} className="w-full bg-[#F3F4F6] border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-black text-black" />
              </div>
              <div className="space-y-1">
                 <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Depositante</label>
-                <input value="VerticalParts Matriz" className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black focus:border-[var(--vp-primary)] outline-none" />
+                <input value={depositante} onChange={(e) => setDepositante(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black focus:border-[var(--vp-primary)] outline-none" />
              </div>
              <div className="space-y-1">
                 <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Tipo Operação</label>
-                <select className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none">
+                <select value={tipoOperacao} onChange={(e) => setTipoOperacao(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none">
                    <option>Entrada Normal</option>
                    <option>Devolução</option>
                    <option>Transferência</option>
@@ -82,7 +87,7 @@ export default function EnterprisePageBase({ title, breadcrumbItems = [] }) {
              </div>
              <div className="space-y-1">
                 <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Data Referência</label>
-                <input type="date" value="2026-02-26" className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none" />
+                <input type="date" value={dataReferencia} onChange={(e) => setDataReferencia(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none" />
              </div>
           </div>
         </FastTab>
