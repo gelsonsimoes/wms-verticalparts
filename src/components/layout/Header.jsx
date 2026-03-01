@@ -2,8 +2,10 @@ import React from 'react';
 import { Bell, Search, Menu, LogOut, Settings, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-export default function Header({ toggleSidebar }) {
+export default function Header({ toggleSidebar, onLogout, session }) {
   const { currentUser } = useApp();
+  // Usa dados da sessão de login se disponíveis, senão cai no AppContext
+  const user = session || currentUser;
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-[var(--vp-border)] px-6 py-3 flex items-center justify-between shadow-sm">
@@ -62,18 +64,24 @@ export default function Header({ toggleSidebar }) {
 
         {/* User Menu */}
         <div className="flex items-center gap-3 group relative">
-          <div className="hidden sm:text-right">
-            <p className="text-xs font-black text-[var(--vp-text-data)] uppercase">{currentUser?.nome || 'Convidado'}</p>
-            <p className="text-[10px] font-bold text-[var(--vp-text-label)] uppercase tracking-widest leading-none mt-0.5">{currentUser?.role === 'gestor' ? 'Supervisor' : currentUser?.role || 'Usuário'}</p>
+          <div className="hidden sm:block text-right">
+            <p className="text-xs font-black text-[var(--vp-text-data)] uppercase">{user?.nome || 'Convidado'}</p>
+            <p className="text-[10px] font-bold text-[var(--vp-text-label)] uppercase tracking-widest leading-none mt-0.5">
+              {user?.login ? `ID: ${user.login}` : user?.role === 'gestor' ? 'Supervisor' : user?.role || 'Usuário'}
+            </p>
           </div>
           <div className="w-8 h-8 bg-[var(--vp-primary)] rounded-sm flex items-center justify-center cursor-pointer hover:bg-[#F2C94C] transition-colors shadow-sm">
             <span className="text-xs font-black text-black">
-              {currentUser?.nome?.substring(0, 2).toUpperCase() || 'VP'}
+              {user?.nome?.substring(0, 2).toUpperCase() || 'VP'}
             </span>
           </div>
 
           {/* Dropdown Menu */}
           <div className="absolute right-0 top-full mt-2 hidden group-hover:block bg-white border border-[var(--vp-border)] rounded-sm shadow-xl overflow-hidden min-w-[180px]">
+            <div className="px-4 py-3 border-b border-[var(--vp-border)]">
+              <p className="text-[10px] font-black text-[var(--vp-text-data)] uppercase">{user?.nome}</p>
+              <p className="text-[9px] font-bold text-[var(--vp-text-label)] uppercase tracking-widest mt-0.5">{user?.nivel || user?.role}</p>
+            </div>
             <button className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-[var(--vp-text-data)] hover:bg-[var(--vp-bg-alt)] flex items-center gap-2 transition-colors">
               <User size={14} /> Perfil
             </button>
@@ -81,8 +89,11 @@ export default function Header({ toggleSidebar }) {
               <Settings size={14} /> Configurações
             </button>
             <div className="h-px bg-[var(--vp-border)]" />
-            <button className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
-              <LogOut size={14} /> Sair
+            <button
+              onClick={onLogout}
+              className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+            >
+              <LogOut size={14} /> Sair do sistema
             </button>
           </div>
         </div>

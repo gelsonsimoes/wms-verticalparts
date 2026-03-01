@@ -4,6 +4,7 @@ import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import { AppProvider } from './context/AppContext';
 import ChatAssistant from './components/chat/ChatAssistant';
+import Login from './pages/Login';
 
 // Refactored Enterprise Pages
 import Dashboard from './pages/Dashboard';
@@ -88,6 +89,28 @@ import EnterprisePageBase from './components/layout/EnterprisePageBase';
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  // ── Autenticação simples via localStorage ────────────────────────────────
+  const [session, setSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vp_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const handleLogin = (user) => setSession(user);
+
+  const handleLogout = () => {
+    localStorage.removeItem('vp_session');
+    setSession(null);
+  };
+
+  // Tela de login — fora do AppProvider para não carregar o sistema
+  if (!session) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <AppProvider>
       <Router>
@@ -95,7 +118,7 @@ function App() {
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
           <main className={`flex-1 flex flex-col ${isSidebarOpen ? 'lg:ml-72' : 'lg:ml-20'} min-w-0 transition-all duration-300 ease-in-out`}>
-            <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+            <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} onLogout={handleLogout} session={session} />
 
             <div className="flex-1 overflow-x-hidden bg-white">
               <Routes>
