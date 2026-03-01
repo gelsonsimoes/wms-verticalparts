@@ -2,157 +2,134 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
-import Dashboard from './pages/Dashboard';
-import AddressManagement from './pages/AddressManagement';
-import LoadCheck from './pages/LoadCheck';
-import Companies from './pages/Companies';
-import Warehouses from './pages/Warehouses';
-import PickingManagement from './pages/PickingManagement';
-import PackingStation from './pages/PackingStation';
-import InventoryAudit from './pages/InventoryAudit';
-import OmieIntegration from './pages/OmieIntegration';
-import ReceivingCheckIn from './pages/ReceivingCheckIn';
-import WarehouseAreas from './pages/WarehouseAreas';
-import Sectors from './pages/Sectors';
-import UserGroups from './pages/UserGroups';
-import UsersPage from './pages/UsersPage';
-import SerialDevices from './pages/SerialDevices';
-import LabelManager from './pages/LabelManager';
-import HoneycombCheck from './pages/HoneycombCheck';
-import TransportSchedule from './pages/TransportSchedule';
-import OutboundMonitoring from './pages/OutboundMonitoring';
-import AuditLogs from './pages/AuditLogs';
-import FileIntegration from './pages/FileIntegration';
-import RestConfig from './pages/RestConfig';
-import IntegrationResults from './pages/IntegrationResults';
-import ContractManager from './pages/ContractManager';
-import BillingReports from './pages/BillingReports';
-import InventoryManagement from './pages/InventoryManagement';
-import WavePickingWizard from './pages/WavePickingWizard';
-import WaveSLADashboard from './pages/WaveSLADashboard';
-import ReceivingManager from './pages/ReceivingManager';
-import WeighingStation from './pages/WeighingStation'; // Novo
-import CrossDockingMonitoring from './pages/CrossDockingMonitoring'; // Novo
-import GeneralSettings from './pages/GeneralSettings'; // Novo
-import DamageControl from './pages/DamageControl'; // Novo
-import KitStation from './pages/KitStation'; // Novo
-import GateManager from './pages/GateManager'; // Novo
-import RoadWeighingStation from './pages/RoadWeighingStation'; // Novo
-import ManifestManager from './pages/ManifestManager'; // Novo
-import NFeControl from './pages/NFeControl'; // Novo
-import GeneralWarehouseFiscal from './pages/GeneralWarehouseFiscal'; // Novo
-import CTeControl from './pages/CTeControl'; // Novo
-import StockReplenishment from './pages/StockReplenishment'; // Novo
-import LotManager from './pages/LotManager'; // Novo
-import ActivityManager from './pages/ActivityManager'; // Novo
-import KardexReport from './pages/KardexReport'; // Novo
-import OperatorPerformance from './pages/OperatorPerformance'; // Novo
-import StockAnalysis from './pages/StockAnalysis'; // Novo
-import DataPurge from './pages/DataPurge'; // Novo
-import SefazCertificates from './pages/SefazCertificates'; // Novo
-import ServiceDesk from './pages/ServiceDesk'; // Novo
-import ProductCatalog from './pages/ProductCatalog'; // Novo
-import RoutesVehicles from './pages/RoutesVehicles'; // Novo
-import AllocationMap from './pages/AllocationMap'; // Novo
-import BlindCheck from './pages/BlindCheck'; // Novo
-import ReturnDelivery from './pages/ReturnDelivery'; // Novo
-import IntegrationWaves from './pages/IntegrationWaves'; // Novo
-import FiscalCoverage from './pages/FiscalCoverage'; // Novo
-import DockActivities from './pages/DockActivities'; // Novo
-import ServiceOrder from './pages/ServiceOrder'; // Novo
-import InsuranceManagement from './pages/InsuranceManagement'; // Novo
-import IntegrationAlerts from './pages/IntegrationAlerts'; // Novo
-import ERPOrderIntegration from './pages/ERPOrderIntegration'; // Novo
-import ConferirRecebimento from './pages/ConferirRecebimento';
-import StockAllocation from './pages/StockAllocation';
-import AllocationKanban from './pages/AllocationKanban';
 import { AppProvider } from './context/AppContext';
-
 import ChatAssistant from './components/chat/ChatAssistant';
 
+// Refactored Enterprise Pages
+import Dashboard from './pages/Dashboard';
+import AllocationKanban from './pages/AllocationKanban';
+import LoadDetails from './pages/LoadDetails';
+import InventoryManagement from './pages/InventoryManagement';
+import OrderManagement from './pages/OrderManagement';
+import Companies from './pages/Companies';
+import Warehouses from './pages/Warehouses';
+import UsersPage from './pages/UsersPage';
+import BillingReports from './pages/BillingReports';
+import FinancialDashboard from './pages/FinancialDashboard';
+import IntegrationAlerts from './pages/IntegrationAlerts';
+import ERPOrderIntegration from './pages/ERPOrderIntegration';
+import NFeControl from './pages/NFeControl';
+import ServiceOrder from './pages/ServiceOrder';
+import GateManager from './pages/GateManager';
+import ServiceDesk from './pages/ServiceDesk';
+
+// Boilerplate Component for Non-Refactored Pages
+import EnterprisePageBase from './components/layout/EnterprisePageBase';
+
 function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
     <AppProvider>
       <Router>
-        <div className="flex min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-white font-sans selection:bg-primary/30">
+        <div className="flex min-h-screen bg-white text-[var(--vp-text-data)] font-sans">
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-          <main className="flex-1 flex flex-col lg:ml-72 min-w-0">
+          <main className={`flex-1 flex flex-col ${isSidebarOpen ? 'lg:ml-72' : 'lg:ml-20'} min-w-0 transition-all duration-300`}>
             <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-            <div className="flex-1 p-4 md:p-8 overflow-x-hidden">
+            <div className="flex-1 overflow-x-hidden bg-white">
               <Routes>
-                <Route path="/operacao/kanban-alocacao" element={<AllocationKanban />} />
+                {/* 1. PRINCIPAL */}
                 <Route path="/" element={<Dashboard />} />
+
+                {/* 2. OPERAR */}
+                <Route path="/operacao/cruzar-docas" element={<EnterprisePageBase title="1.1 Cruzar Docas" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/processar-devolucoes" element={<EnterprisePageBase title="1.2 Processar Devoluções" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/pesar-cargas" element={<EnterprisePageBase title="1.3 Pesar Cargas" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/gerenciar-recebimento" element={<EnterprisePageBase title="1.4 Gerenciar Recebimento" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/conferir-recebimento" element={<EnterprisePageBase title="1.5 Conferir Recebimento" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/gerar-mapa" element={<EnterprisePageBase title="1.6 Gerar Mapa de Alocação" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/conferencia-cega" element={<EnterprisePageBase title="1.7 Realizar Conferência Cega" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/alocar-estoque" element={<EnterprisePageBase title="1.8 Alocar Estoque" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/kanban-alocacao" element={<AllocationKanban />} />
+                <Route path="/operacao/separar-pedidos" element={<EnterprisePageBase title="1.10 Separar Pedidos" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/embalar-pedidos" element={<EnterprisePageBase title="1.11 Embalar Pedidos" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/monitorar-saida" element={<EnterprisePageBase title="1.12 Monitorar Saída" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/recebimento" element={<EnterprisePageBase title="1.13 Recebimento (Check-in)" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/estacao-kits" element={<EnterprisePageBase title="1.14 Estação de Kits" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/conferencia-colmeia" element={<EnterprisePageBase title="1.15 Conferência Colmeia" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/ordem-servico" element={<ServiceOrder />} />
+                <Route path="/operacao/gestao-seguros" element={<EnterprisePageBase title="1.17 Gestão de Seguros" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/pesagem-rodoviaria" element={<EnterprisePageBase title="1.18 Pesagem Rodoviária" breadcrumbItems={[{label: 'Operar'}]} />} />
+                <Route path="/operacao/gerenciamento-pedidos" element={<OrderManagement />} />
+
+                {/* 3. PLANEJAR */}
+                <Route path="/planejamento/gerar-ondas" element={<EnterprisePageBase title="2.1 Gerar Ondas de Separação" breadcrumbItems={[{label: 'Planejar'}]} />} />
+                <Route path="/planejamento/monitorar-prazos" element={<EnterprisePageBase title="2.2 Monitorar Prazos (SLA)" breadcrumbItems={[{label: 'Planejar'}]} />} />
+                <Route path="/planejamento/agendar-transportes" element={<EnterprisePageBase title="2.3 Agendar Transportes" breadcrumbItems={[{label: 'Planejar'}]} />} />
+                <Route path="/planejamento/monitorar-atividades" element={<EnterprisePageBase title="2.4 Monitorar Atividades" breadcrumbItems={[{label: 'Planejar'}]} />} />
+                <Route path="/planejamento/gerenciar-manifestos" element={<EnterprisePageBase title="2.5 Gerenciar Manifestos" breadcrumbItems={[{label: 'Planejar'}]} />} />
+                <Route path="/planejamento/expedir-cargas" element={<LoadDetails />} />
+                <Route path="/planejamento/gerenciar-portaria" element={<GateManager />} />
+                <Route path="/planejamento/atividades-docas" element={<EnterprisePageBase title="2.8 Atividades de Docas" breadcrumbItems={[{label: 'Planejar'}]} />} />
+
+                {/* 4. CONTROLAR */}
+                <Route path="/estoque/auditar-inventario" element={<EnterprisePageBase title="3.1 Auditar Inventário" breadcrumbItems={[{label: 'Controlar'}]} />} />
+                <Route path="/estoque/consultar-kardex" element={<EnterprisePageBase title="3.2 Consultar Kardex" breadcrumbItems={[{label: 'Controlar'}]} />} />
+                <Route path="/estoque/analisar-estoque" element={<InventoryManagement />} />
+                <Route path="/estoque/remanejar" element={<EnterprisePageBase title="3.4 Remanejar Produtos" breadcrumbItems={[{label: 'Controlar'}]} />} />
+                <Route path="/estoque/controlar-lotes" element={<EnterprisePageBase title="3.5 Controlar Lotes e Validade" breadcrumbItems={[{label: 'Controlar'}]} />} />
+                <Route path="/estoque/monitorar-avarias" element={<EnterprisePageBase title="3.6 Monitorar Avarias" breadcrumbItems={[{label: 'Controlar'}]} />} />
+                <Route path="/estoque/gestao-inventario" element={<EnterprisePageBase title="3.7 Gestão de Inventário" breadcrumbItems={[{label: 'Controlar'}]} />} />
+
+                {/* 5. FISCAL */}
+                <Route path="/fiscal/gerenciar-nfe" element={<NFeControl />} />
+                <Route path="/fiscal/gerenciar-cte" element={<EnterprisePageBase title="4.2 Gerenciar CT-e" breadcrumbItems={[{label: 'Fiscal'}]} />} />
+                <Route path="/fiscal/emitir-cobertura" element={<EnterprisePageBase title="4.3 Emitir Cobertura Fiscal" breadcrumbItems={[{label: 'Fiscal'}]} />} />
+                <Route path="/fiscal/armazem-geral" element={<EnterprisePageBase title="4.4 Controlar Armazém Geral" breadcrumbItems={[{label: 'Fiscal'}]} />} />
+
+                {/* 6. FINANCEIRO */}
+                <Route path="/financeiro/calcular-diarias" element={<BillingReports />} />
+                <Route path="/financeiro/contratos" element={<EnterprisePageBase title="5.2 Gerenciar Contratos" breadcrumbItems={[{label: 'Financeiro'}]} />} />
+
+                {/* 7. CADASTRAR */}
                 <Route path="/cadastros/empresas" element={<Companies />} />
                 <Route path="/cadastros/armazens" element={<Warehouses />} />
-                <Route path="/cadastros/enderecos" element={<AddressManagement />} />
-                <Route path="/operacao/separar-pedidos" element={<PickingManagement />} />
-                <Route path="/operacao/embalar-pedidos" element={<PackingStation />} />
-                <Route path="/planejamento/expedir-cargas" element={<LoadCheck />} />
-                <Route path="/operacao/recebimento" element={<ReceivingCheckIn />} />
-                <Route path="/estoque/auditar-inventario" element={<InventoryAudit />} />
-                <Route path="/cadastros/areas" element={<WarehouseAreas />} />
-                <Route path="/cadastros/setores" element={<Sectors />} />
-                <Route path="/seguranca/grupos" element={<UserGroups />} />
-                <Route path="/seguranca/usuarios" element={<UsersPage />} />
-                <Route path="/config/balancas" element={<SerialDevices />} />
-                <Route path="/config/etiquetas" element={<LabelManager />} />
-                <Route path="/operacao/conferencia-colmeia" element={<HoneycombCheck />} />
-                <Route path="/planejamento/agendar-transportes" element={<TransportSchedule />} />
-                <Route path="/operacao/monitorar-saida" element={<OutboundMonitoring />} />
-                <Route path="/indicadores/auditoria" element={<AuditLogs />} />
-                <Route path="/integrar/arquivos" element={<FileIntegration />} />
-                <Route path="/integrar/apis" element={<RestConfig />} />
-                <Route path="/indicadores/integracao" element={<IntegrationResults />} />
-                <Route path="/financeiro/contratos" element={<ContractManager />} />
-                <Route path="/faturamento/embalagem" element={<BillingReports />} />
-                <Route path="/faturamento/palete" element={<BillingReports />} />
-                <Route path="/faturamento/peso" element={<BillingReports />} />
-                <Route path="/faturamento/endereco" element={<BillingReports />} />
-                <Route path="/financeiro/calcular-diarias" element={<BillingReports />} />
-                <Route path="/estoque/gestao-inventario" element={<InventoryManagement />} />
-                <Route path="/planejamento/gerar-ondas" element={<WavePickingWizard />} />
-                <Route path="/planejamento/monitorar-prazos" element={<WaveSLADashboard />} />
-                <Route path="/operacao/gerenciar-recebimento" element={<ReceivingManager />} />
-                <Route path="/operacao/conferir-recebimento" element={<ConferirRecebimento />} />
-                <Route path="/operacao/pesar-cargas" element={<WeighingStation />} />
-                <Route path="/operacao/cruzar-docas" element={<CrossDockingMonitoring />} />
-                <Route path="/config/geral" element={<GeneralSettings />} />
-                <Route path="/estoque/monitorar-avarias" element={<DamageControl />} />
-                <Route path="/operacao/estacao-kits" element={<KitStation />} />
-                <Route path="/planejamento/gerenciar-portaria" element={<GateManager />} />
-                <Route path="/operacao/pesagem-rodoviaria" element={<RoadWeighingStation />} />
-                <Route path="/planejamento/gerenciar-manifestos" element={<ManifestManager />} />
-                <Route path="/fiscal/gerenciar-nfe" element={<NFeControl />} />
-                <Route path="/fiscal/armazem-geral" element={<GeneralWarehouseFiscal />} />
-                <Route path="/fiscal/gerenciar-cte" element={<CTeControl />} />
-                <Route path="/estoque/remanejar" element={<StockReplenishment />} />
-                <Route path="/estoque/controlar-lotes" element={<LotManager />} />
-                <Route path="/planejamento/monitorar-atividades" element={<ActivityManager />} />
-                <Route path="/estoque/consultar-kardex" element={<KardexReport />} />
-                <Route path="/indicadores/produtividade" element={<OperatorPerformance />} />
-                <Route path="/indicadores/ocupacao" element={<StockAnalysis initialTab={0} />} />
-                <Route path="/estoque/analisar-estoque" element={<StockAnalysis initialTab={1} />} />
-                <Route path="/config/expurgo" element={<DataPurge />} />
-                <Route path="/config/certificados" element={<SefazCertificates />} />
-                <Route path="/config/service-desk" element={<ServiceDesk />} />
-                <Route path="/operacao/alocar-estoque" element={<StockAllocation />} />
-                <Route path="/cadastros/produtos" element={<ProductCatalog />} />
-                <Route path="/cadastros/rotas-veiculos" element={<RoutesVehicles />} />
-                <Route path="/operacao/gerar-mapa" element={<AllocationMap />} />
-                <Route path="/operacao/conferencia-cega" element={<BlindCheck />} />
-                <Route path="/operacao/processar-devolucoes" element={<ReturnDelivery />} />
-                <Route path="/integrar/ondas" element={<IntegrationWaves />} />
-                <Route path="/fiscal/emitir-cobertura" element={<FiscalCoverage />} />
-                <Route path="/planejamento/atividades-docas" element={<DockActivities />} />
-                <Route path="/operacao/ordem-servico" element={<ServiceOrder />} />
-                <Route path="/operacao/gestao-seguros" element={<InsuranceManagement />} />
+                <Route path="/cadastros/enderecos" element={<EnterprisePageBase title="6.3 Cadastrar Endereços" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+                <Route path="/cadastros/produtos" element={<EnterprisePageBase title="6.4 Catálogo de Produtos" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+                <Route path="/cadastros/rotas-veiculos" element={<EnterprisePageBase title="6.5 Cadastrar Rotas e Veículos" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+                <Route path="/cadastros/areas" element={<EnterprisePageBase title="6.6 Configurar Áreas" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+                <Route path="/cadastros/setores" element={<EnterprisePageBase title="6.7 Configurar Setores" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+                <Route path="/config/etiquetas" element={<EnterprisePageBase title="6.8 Gerenciar Etiquetas" breadcrumbItems={[{label: 'Cadastrar'}]} />} />
+
+                {/* 8. INDICADORES */}
+                <Route path="/indicadores/financeiro" element={<FinancialDashboard />} />
+                <Route path="/indicadores/ocupacao" element={<EnterprisePageBase title="7.2 Analisar Ocupação" breadcrumbItems={[{label: 'Indicadores'}]} />} />
+                <Route path="/indicadores/produtividade" element={<EnterprisePageBase title="7.3 Medir Produtividade" breadcrumbItems={[{label: 'Indicadores'}]} />} />
+                <Route path="/indicadores/auditoria" element={<EnterprisePageBase title="7.4 Auditar Logs do Sistema" breadcrumbItems={[{label: 'Indicadores'}]} />} />
+                <Route path="/indicadores/integracao" element={<EnterprisePageBase title="7.5 Resultados de Integração" breadcrumbItems={[{label: 'Indicadores'}]} />} />
+
+                {/* 9. INTEGRAR */}
                 <Route path="/integrar/alertas" element={<IntegrationAlerts />} />
                 <Route path="/integrar/ordens-erp" element={<ERPOrderIntegration />} />
-                <Route path="/integrar/omie" element={<OmieIntegration />} />
+                <Route path="/integrar/omie" element={<EnterprisePageBase title="8.3 Conectar Omie ERP" breadcrumbItems={[{label: 'Integrar'}]} />} />
+                <Route path="/integrar/arquivos" element={<EnterprisePageBase title="8.4 Mapear Arquivos (Layouts)" breadcrumbItems={[{label: 'Integrar'}]} />} />
+                <Route path="/integrar/apis" element={<EnterprisePageBase title="8.5 Configurar APIs REST" breadcrumbItems={[{label: 'Integrar'}]} />} />
+                <Route path="/integrar/ondas" element={<EnterprisePageBase title="8.6 Integrar Ondas (Arquivo)" breadcrumbItems={[{label: 'Integrar'}]} />} />
+
+                {/* 10. CONFIGURAR */}
+                <Route path="/config/geral" element={<EnterprisePageBase title="9.1 Ajustar Configurações" breadcrumbItems={[{label: 'Configurar'}]} />} />
+                <Route path="/config/balancas" element={<EnterprisePageBase title="9.2 Integrar Balanças (Serial)" breadcrumbItems={[{label: 'Configurar'}]} />} />
+                <Route path="/config/service-desk" element={<ServiceDesk />} />
+                <Route path="/config/expurgo" element={<EnterprisePageBase title="9.4 Expurgar Dados Antigos" breadcrumbItems={[{label: 'Configurar'}]} />} />
+                <Route path="/config/certificados" element={<EnterprisePageBase title="9.5 Gerenciar Certificados" breadcrumbItems={[{label: 'Configurar'}]} />} />
+
+                {/* 11. SEGURANÇA */}
+                <Route path="/seguranca/usuarios" element={<UsersPage />} />
+                <Route path="/seguranca/grupos" element={<EnterprisePageBase title="10.2 Definir Grupos de Acesso" breadcrumbItems={[{label: 'Segurança'}]} />} />
+
+                {/* Redirecionamento Padrão */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
@@ -163,6 +140,5 @@ function App() {
     </AppProvider>
   );
 }
-
 
 export default App;

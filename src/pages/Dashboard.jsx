@@ -38,118 +38,130 @@ const throughputData = [
 ];
 
 const StatsCard = ({ label, value, change, trend, icon: Icon, color }) => (
-    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex justify-between items-start mb-4">
-            <div className={`p-2 rounded-xl bg-${color}/10 border border-${color}/20`}>
-                <Icon className={`w-5 h-5 text-${color}`} />
+    <div className="bg-white p-3 rounded-sm border border-[var(--vp-border)] hover:border-[var(--vp-primary)] transition-colors">
+        <div className="flex justify-between items-start mb-2">
+            <div className={`p-1.5 rounded-sm bg-gray-50 border border-gray-100`}>
+                <Icon className={`w-4 h-4 text-black`} />
             </div>
-            <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${trend === 'up' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
-                }`}>
-                {trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {change}
+            <div className={`badge-tech ${trend === 'up' ? 'badge-success' : 'badge-error'}`}>
+                {trend === 'up' ? '▲' : '▼'} {change}
             </div>
         </div>
         <div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{value}</h3>
+            <p className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest mb-0.5">{label}</p>
+            <h3 className="text-lg font-black text-black leading-tight tracking-tight">{value}</h3>
         </div>
     </div>
 );
 
 export default function Dashboard() {
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight border-l-4 border-accent pl-4">Gestão à Vista</h1>
-                    <p className="text-sm text-slate-500">Monitoramento em tempo real do CD VerticalParts</p>
+        <div className="space-y-4 p-2">
+            {/* Header Section - D365 Style */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-[var(--vp-border)]">
+                <div className="flex items-center gap-3">
+                   <div className="p-1.5 bg-black rounded-sm">
+                      <Database className="w-4 h-4 text-[var(--vp-primary)]" />
+                   </div>
+                   <div>
+                        <h1 className="text-sm font-black tracking-tight text-black uppercase">Gestão à Vista</h1>
+                        <p className="text-[10px] text-[var(--vp-text-label)] font-bold uppercase tracking-widest mt-0.5">Centro de Distribuição VerticalParts - Real Time Analytics</p>
+                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+                <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 bg-gray-50 px-3 py-1.5 rounded-sm border border-[var(--vp-border)]">
+                    <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
                     </span>
-                    ATUALIZADO AGORA
+                    SISTEMA ONLINE - ATUALIZADO AGORA
                 </div>
             </div>
 
-            {/* KPI Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI Grid - HIGH DENSITY */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {kpiData.map((kpi) => (
                     <StatsCard key={kpi.label} {...kpi} />
                 ))}
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500">Fluxo de Movimentação (In/Out)</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 bg-white p-4 rounded-sm border border-[var(--vp-border)]">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--vp-text-label)]">Fluxo de Movimentação (In/Out)</h3>
                         <div className="flex gap-4">
-                            <div className="flex items-center gap-1.5 font-bold text-[10px] text-primary">
-                                <div className="w-2 h-2 rounded-full bg-primary"></div> ENTRADA
+                            <div className="flex items-center gap-1.5 font-black text-[9px] text-[#1769ba]">
+                                <div className="w-1.5 h-1.5 rounded-sm bg-[#1769ba]"></div> ENTRADA
                             </div>
-                            <div className="flex items-center gap-1.5 font-bold text-[10px] text-slate-300">
-                                <div className="w-2 h-2 rounded-full bg-slate-300"></div> SAÍDA
+                            <div className="flex items-center gap-1.5 font-black text-[9px] text-gray-300">
+                                <div className="w-1.5 h-1.5 rounded-sm bg-gray-300"></div> SAÍDA
                             </div>
                         </div>
                     </div>
-                    <div className="h-64 w-full">
+                    <div className="h-48 w-full font-mono">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={throughputData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <CartesianGrid strokeDasharray="2 2" vertical={false} stroke="#f1f5f9" />
                                 <XAxis
                                     dataKey="name"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }}
-                                    dy={10}
+                                    tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 700 }}
+                                    dy={5}
                                 />
                                 <YAxis hide />
                                 <Tooltip
-                                    cursor={{ fill: '#f1f5f9' }}
+                                    cursor={{ fill: '#f8fafc' }}
                                     contentStyle={{
-                                        borderRadius: '12px',
-                                        border: 'none',
-                                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                                        borderRadius: '2px',
+                                        border: '1px solid #e2e8f0',
+                                        fontSize: '10px',
+                                        fontWeight: 'bold',
+                                        padding: '8px'
                                     }}
                                 />
-                                <Bar dataKey="in" fill="#1769ba" radius={[4, 4, 0, 0]} barSize={24} />
-                                <Bar dataKey="out" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={24} />
+                                <Bar dataKey="in" fill="#1769ba" radius={[1, 1, 0, 0]} barSize={16} />
+                                <Bar dataKey="out" fill="#e2e8f0" radius={[1, 1, 0, 0]} barSize={16} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="bg-primary p-6 rounded-2xl text-white flex flex-col justify-between overflow-hidden relative">
-                    <div className="relative z-10">
-                        <h3 className="text-xs font-black uppercase tracking-widest opacity-60 mb-1">Acuracidade de Estoque</h3>
-                        <h2 className="text-4xl font-black">99.2%</h2>
-                        <p className="text-xs mt-2 opacity-80 decoration-slate-200 underline underline-offset-4 cursor-pointer">Ver relatório detalhado</p>
+                <div className="bg-[#1A1A1A] p-4 rounded-sm border border-black flex flex-col justify-between overflow-hidden relative shadow-inner">
+                    <div className="relative z-10 border-b border-gray-800 pb-3 mb-4">
+                        <h3 className="text-[9px] font-black uppercase tracking-widest text-[#FFD700] mb-1">Indicador de Performance</h3>
+                        <div className="flex items-baseline justify-between">
+                            <h2 className="text-3xl font-black text-white tracking-tighter">99.2%</h2>
+                            <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">Acuracidade</span>
+                        </div>
+                        <p className="text-[9px] mt-2 text-gray-500 font-bold decoration-gray-600 underline underline-offset-4 cursor-pointer hover:text-[#FFD700]">AUDITAR RELATÓRIO FULL KARDEX</p>
                     </div>
 
-                    <div className="relative z-10 space-y-4 mt-8">
-                        <div className="flex justify-between items-center text-xs font-bold">
-                            <span>Rua A / Mod 12</span>
-                            <span>100%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
-                            <div className="h-full bg-white w-full"></div>
+                    <div className="relative z-10 space-y-3">
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[10px] font-black text-white uppercase tracking-wider">
+                                <span>Rua A / Mod 12</span>
+                                <span className="text-[#FFD700]">100%</span>
+                            </div>
+                            <div className="h-1 w-full bg-gray-800 rounded-sm overflow-hidden border border-gray-700">
+                                <div className="h-full bg-[#FFD700] w-full shadow-[0_0_8px_rgba(255,215,0,0.5)]"></div>
+                            </div>
                         </div>
 
-                        <div className="flex justify-between items-center text-xs font-bold opacity-80">
-                            <span>Rua B / Mod 05</span>
-                            <span>98.4%</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
-                            <div className="h-full bg-white w-[98%]"></div>
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between items-center text-[10px] font-black text-white/70 uppercase tracking-wider">
+                                <span>Rua B / Mod 05</span>
+                                <span className="text-[#FFD700]">98.4%</span>
+                            </div>
+                            <div className="h-1 w-full bg-gray-800 rounded-sm overflow-hidden border border-gray-700">
+                                <div className="h-full bg-[#FFD700] w-[98.4%]"></div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Decorative element */}
-                    <div className="absolute -right-4 -bottom-4 opacity-10">
-                        <Database className="w-32 h-32" />
+                    {/* Decorative element (D365 Style Watermark) */}
+                    <div className="absolute -right-4 -bottom-4 opacity-5 pointer-events-none">
+                        <Database className="w-24 h-24 text-white" />
                     </div>
                 </div>
             </div>

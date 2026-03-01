@@ -1,33 +1,235 @@
 @import "tailwindcss";
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap");
 
-@theme {
-  /* VerticalParts Official Palette — Preto, Amarelo, Branco */
-  --color-primary: #ffcd00; /* Amarelo VerticalParts (loader/brand accent) */
-  --color-secondary: #000000; /* Preto VerticalParts */
-  --color-accent: #ffcd00; /* Amarelo VerticalParts */
-  --color-background-light: #f6f7f8;
-  --color-background-dark: #0a0000;
-  --color-success: #2e7d32;
-  --color-warning: #fbc02d;
-  --color-danger: #d32f2f;
+/* ─────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS - VERTICAL PARTS ENTERPRISE (D365 INSPIRED)
+   ─────────────────────────────────────────────────────────────────────── */
 
+@theme {
+  /* Paleta de Cores & Aplicação Estrutural */
+  --color-primary: #FFD700;           /* Amarelo Vibrante: CTAs, Status Ativo, Seleção */
+  --color-primary-hover: #F2C94C;     /* Amarelo Hover */
+  --color-secondary: #1A1A1A;         /* Preto Sólido: Nav, Sidebar, Top Bar */
+  
+  /* Backgrounds */
+  --color-background-main: #FFFFFF;    /* Branco: Conteúdo principal, Tabelas */
+  --color-background-alt: #F8F9FA;     /* Cinza Claríssimo: Diferenciação de seções */
+  
+  /* Tipografia & Contraste */
+  --color-text-label: #4F4F4F;        /* Cinza Escuro: Rótulos (Labels) */
+  --color-text-dynamic: #000000;      /* Preto: Dados Dinâmicos */
+  --color-text-white: #FFFFFF;        /* Branco: Texto em áreas escuras */
+  
+  /* Bordas e Estados */
+  --color-border-base: #E0E0E0;       /* Cinza Claro: Divisores e Bordas */
+  --color-hover-row: rgba(255, 215, 0, 0.05); /* Amarelo 5%: Hover em tabelas */
+  
+  /* Fontes */
   --font-display: "Poppins", sans-serif;
   --font-sans: "Poppins", sans-serif;
 
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  /* Bordas Quadradas (Radius 2px) */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   ESTILOS BASE E RESETS
+   ─────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Variáveis nativas para uso em CSS puro ou bibliotecas externas */
+  --vp-primary: #FFD700;
+  --vp-primary-gradient: linear-gradient(180deg, #FFD700 0%, #F2C94C 100%);
+  --vp-secondary: #1A1A1A;
+  --vp-bg-main: #FFFFFF;
+  --vp-bg-alt: #F8F9FA;
+  --vp-label: #4F4F4F;
+  --vp-text: #000000;
+  --vp-border: #E0E0E0;
+  --vp-row-hover: rgba(255, 215, 0, 0.05);
 }
 
 body {
-  background-color: var(--color-background-light);
-  color: #0f172a;
-  /* slate-900 */
-  font-family: var(--font-display);
+  background-color: var(--vp-bg-main);
+  color: var(--vp-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
 }
 
+/* ── Poppins Universal Reset — VerticalParts WMS ── */
+*, *::before, *::after {
+  font-family: "Poppins", sans-serif;
+}
+
+input,
+select,
+textarea,
+button,
+optgroup,
+option {
+  font-family: "Poppins", sans-serif;
+  font-size: inherit;
+}
+
+/* Garante que o placeholder também use Poppins */
+::placeholder {
+  font-family: "Poppins", sans-serif;
+}
+
+/* Garante Poppins em conteúdo gerado */
+::before,
+::after {
+  font-family: "Poppins", sans-serif;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   COMPONENTES CORE (D365 STYLE)
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Botões Flat Design (Sem sombras pesadas) */
+button, .btn {
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--vp-primary-gradient);
+  color: var(--vp-secondary);
+  border: 1px solid #E2B700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(180deg, #F2C94C 0%, #E2B700 100%);
+  border-color: #D4A800;
+}
+
+.btn-secondary {
+  background-color: var(--vp-bg-main);
+  border: 1px solid var(--vp-border);
+  color: var(--vp-text-label);
+}
+
+.btn-secondary:hover {
+  background-color: var(--vp-bg-alt);
+  border-color: #CCCCCC;
+}
+
+/* Form Elements: Bordas quadradas e compactas */
+input, select, textarea {
+  border: 1px solid var(--vp-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 14px;
+  background-color: var(--vp-bg-main);
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--vp-primary);
+  box-shadow: 0 0 0 1px var(--vp-primary);
+}
+
+/* Labels em Cinza Escuro */
+label {
+  color: var(--vp-label);
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Data Grid: Linhas estritas com 40px de altura */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+tr {
+  height: 40px;
+  border-bottom: 1px solid var(--vp-border);
+}
+
+tr:hover {
+  background-color: var(--vp-row-hover);
+}
+
+th {
+  background-color: var(--vp-bg-alt);
+  color: var(--vp-label);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 16px;
+}
+
+td {
+  padding: 0 16px;
+  font-size: 13px;
+  color: var(--vp-text);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   BADGES TÉCNICOS (COMPACTOS)
+   ─────────────────────────────────────────────────────────────────────── */
+
+.badge-tech {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 2px;
+  border: 1px solid transparent;
+}
+
+.badge-pending {
+  background-color: #FFF9C4;
+  color: #827717;
+  border-color: #FBC02D;
+}
+
+.badge-success {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+  border-color: #81C784;
+}
+
+.badge-info {
+  background-color: #E3F2FD;
+  color: #1565C0;
+  border-color: #64B5F6;
+}
+
+.badge-error {
+  background-color: #FFEBEE;
+  color: #C62828;
+  border-color: #E57373;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   MODO ESCURO (CONSERVAÇÃO DE ESTILO)
+   ─────────────────────────────────────────────────────────────────────── */
+
 .dark body {
-  background-color: var(--color-background-dark);
-  color: #f1f5f9;
-  /* slate-100 */
+  background-color: #121212;
+  color: #E0E0E0;
+}
+
+.dark input, .dark select {
+  background-color: #1A1A1A;
+  border-color: #333333;
+  color: #FFFFFF;
 }

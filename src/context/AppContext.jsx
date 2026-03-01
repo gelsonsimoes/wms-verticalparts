@@ -14,14 +14,14 @@ export function AppProvider({ children }) {
     const [companies, setCompanies] = useState(() => {
         const saved = localStorage.getItem('vparts_companies');
         return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'VerticalParts Matriz', cnpj: '12.345.678/0001-90', omieKey: 'XXXX-XXXX', status: 'Ativo' }
+            { id: 1, name: 'VerticalParts Matriz', cnpj: '12.345.678/0001-90', address: 'Rua Armandina Braga de Almeida, 383, Guarulhos-SP, 07141-003', omieKey: 'XXXX-XXXX', status: 'Ativo' }
         ];
     });
 
     const [warehouses, setWarehouses] = useState(() => {
         const saved = localStorage.getItem('vparts_warehouses');
         return saved ? JSON.parse(saved) : [
-            { id: 1, codigoInterno: 'CD01', nome: 'CD Principal MG', entidade: 'VerticalParts Matriz', ativo: true, addresses: 1240, occupation: 78 }
+            { id: 1, codigoInterno: 'VPARMZ', nome: 'CD Central Guarulhos', entidade: 'VerticalParts Matriz', ativo: true, addresses: 1240, occupation: 78, tipo: 'Distribuição' }
         ];
     });
 
@@ -92,7 +92,7 @@ export function AppProvider({ children }) {
     const [sectors, setSectors] = useState(() => {
         const saved = localStorage.getItem('vparts_sectors');
         return saved ? JSON.parse(saved) : [
-            { id: 1, setor: 'PEÇAS ELEVADORES', tipoSetor: 'Armazenagem', tipoLocal: 'Porta Palete', codigoIntegracao: 'INT-001', ativo: true, usoExclusivoCaixa: false, depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }], enderecos: ['R1_PP1_CL001_N001'], produtos: ['VEPEL-BPI-174FX'], usuarios: ['joao.silva'] },
+            { id: 1, setor: 'PEÇAS ELEVADORES', tipoSetor: 'Armazenagem', tipoLocal: 'Porta Palete', codigoIntegracao: 'INT-001', ativo: true, usoExclusivoCaixa: false, depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }], enderecos: ['R1_PP1_CL001_N001'], produtos: ['VPER-PNT-AL-22D-202X145-CT'], usuarios: ['danilo.supervisor'] },
             { id: 2, setor: 'EXPEDIÇÃO RÁPIDA', tipoSetor: 'Expedição', tipoLocal: 'Colmeia', codigoIntegracao: 'INT-002', ativo: true, usoExclusivoCaixa: true, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
             { id: 3, setor: 'MANUTENÇÃO TÉCNICA', tipoSetor: 'Serviço', tipoLocal: 'Bancada', codigoIntegracao: 'INT-003', ativo: false, usoExclusivoCaixa: false, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
         ];
@@ -101,18 +101,19 @@ export function AppProvider({ children }) {
     const [userGroups, setUserGroups] = useState(() => {
         const saved = localStorage.getItem('vparts_user_groups');
         return saved ? JSON.parse(saved) : [
-            { id: 1, grupo: 'ADMINISTRADORES', ativaExportacoes: true, permitirDownload: true, coletor: ['Recebimento', 'Separação', 'Inventário'], enterprise: ['Dashboard', 'Cadastros', 'Relatórios'], web: ['WMS Web Completo'], operacaoDeposito: ['Entrada', 'Saída', 'Transferência'], atividades: ['Separação da Onda', 'Conferência', 'Expedição'], usuarios: ['joao.silva', 'maria.santos'] },
-            { id: 2, grupo: 'OPERADORES', ativaExportacoes: false, permitirDownload: false, coletor: ['Recebimento', 'Separação'], enterprise: ['Dashboard'], web: ['WMS Web Básico'], operacaoDeposito: ['Entrada'], atividades: ['Separação da Onda'], usuarios: ['carlos.lima'] },
-            { id: 3, grupo: 'SUPERVISORES', ativaExportacoes: true, permitirDownload: true, coletor: ['Recebimento', 'Separação', 'Inventário', 'Expedição'], enterprise: ['Dashboard', 'Cadastros', 'Relatórios', 'Segurança'], web: ['WMS Web Completo'], operacaoDeposito: ['Entrada', 'Saída', 'Transferência', 'Ajuste'], atividades: ['Separação da Onda', 'Conferência', 'Expedição', 'Auditoria'], usuarios: [] },
+            { id: 1, grupo: 'ADMINISTRADORES', ativaExportacoes: true, permitirDownload: true, coletor: ['Recebimento', 'Separação', 'Inventário'], enterprise: ['Dashboard', 'Cadastros', 'Relatórios'], web: ['WMS Web Completo'], operacaoDeposito: ['Entrada', 'Saída', 'Transferência'], atividades: ['Separação da Onda', 'Conferência', 'Expedição'], usuarios: ['danilo.supervisor', 'gelson.estrat'] },
+            { id: 2, grupo: 'OPERADORES', ativaExportacoes: false, permitirDownload: false, coletor: ['Recebimento', 'Separação'], enterprise: ['Dashboard'], web: ['WMS Web Básico'], operacaoDeposito: ['Entrada'], atividades: ['Separação da Onda'], usuarios: ['matheus.oper', 'thiago.almox'] },
+            { id: 3, grupo: 'SUPERVISORES', ativaExportacoes: true, permitirDownload: true, coletor: ['Recebimento', 'Separação', 'Inventário', 'Expedição'], enterprise: ['Dashboard', 'Cadastros', 'Relatórios', 'Segurança'], web: ['WMS Web Completo'], operacaoDeposito: ['Entrada', 'Saída', 'Transferência', 'Ajuste'], atividades: ['Separação da Onda', 'Conferência', 'Expedição', 'Auditoria'], usuarios: ['danilo.supervisor'] },
         ];
     });
 
     const [users, setUsers] = useState(() => {
         const saved = localStorage.getItem('vparts_users');
         return saved ? JSON.parse(saved) : [
-            { id: 1, usuario: 'danilo.supervisor', nomeUsuario: 'Danilo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }] },
-            { id: 2, usuario: 'matheus.expedicao', nomeUsuario: 'Matheus', nivel: 'Supervisor', departamento: 'Operações', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], depositantes: [] },
-            { id: 3, usuario: 'thiago.logistica', nomeUsuario: 'Thiago', nivel: 'Operador', departamento: 'Recebimento', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }] },
+            { id: 1, usuario: 'danilo.supervisor', nomeUsuario: 'Danilo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES', 'SUPERVISORES'], cargo: 'Supervisor' },
+            { id: 2, usuario: 'matheus.oper', nomeUsuario: 'Matheus', nivel: 'Operador', departamento: 'Expedição', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Operador' },
+            { id: 3, usuario: 'thiago.almox', nomeUsuario: 'Thiago', nivel: 'Operador', departamento: 'Almoxarifado', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Almox' },
+            { id: 4, usuario: 'gelson.estrat', nomeUsuario: 'Gelson', nivel: 'Administrador', departamento: 'Estratégia', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], cargo: 'Estratégias e Processos' },
         ];
     });
 

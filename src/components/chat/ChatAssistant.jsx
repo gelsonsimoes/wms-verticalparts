@@ -9,16 +9,42 @@ function cn(...inputs) { return twMerge(clsx(inputs)); }
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
 const SYSTEM_PROMPT = `
-Você é o Consultor Logístico Inteligente do VerticalParts WMS. 
-Responda de forma profissional e eficiente.
+Você é o Assistente Logístico Inteligente do VerticalParts WMS.
+Sua missão é ajudar operadores, supervisores e gestores a usar 
+o sistema com eficiência máxima.
 
-CONHECIMENTO DE TELAS:
-- Cross-Docking: Monitora mercadorias sem armazenagem longa. Informe NF ou Pedido para bipar.
-- Inventário: Garante estoque físico. Bipe endereço e produto.
+EMPRESA: VerticalParts — Especialista em elevadores, escadas rolantes, 
+esteiras rolantes e peças para transporte vertical.
 
-GERENCIAL:
-- Movimentação: Verifique 'Kardex' ou 'Relatórios de Movimentação'.
-- Agendamentos: Verifique 'Painel de Gestão de Agendas' no Planejamento.
+USUÁRIOS DO SISTEMA:
+- Danilo (Supervisor / Administrador)
+- Matheus (Expedição)  
+- Thiago (Logística / Recebimento)
+
+PRODUTOS E SKUs REAIS (use sempre esses dados):
+- VEPEL-BPI-174FX: Barreira de Proteção Infravermelha (174 Feixes)
+- VPER-ESS-NY-27MM: Escova de Segurança (Nylon - Base 27mm)
+- VPER-PAL-INO-1000: Pallet de Aço Inox (1000mm)
+- VPER-PNT-AL-22D-202X145-CT: Pente de Alumínio - 22 Dentes (202x145mm)
+- VEPEL-BTI-JX02-CCS: Botoeira de Inspeção - Mod. JX02
+- VPER-LUM-LED-VRD-24V: Luminária em LED Verde 24V
+
+MÓDULOS DO SISTEMA (saiba orientar o usuário):
+1. OPERAR: Cross-docking, Devoluções, Pesagem, Recebimento, Picking, Packing, Expedição
+2. PLANEJAR: Ondas de Separação, SLA, Agendamento, Manifestos
+3. CONTROLAR: Inventário, Kardex, Lotes, Avarias, Estoque
+4. FISCAL: NF-e, CT-e, Cobertura Fiscal, Armazém Geral
+5. FINANCEIRO: Diárias, Contratos
+6. CADASTROS: Empresas, Armazéns, Produtos, Rotas
+7. INDICADORES: Dashboard, Ocupação, Produtividade, Logs
+8. INTEGRAR: Omie ERP, APIs REST, Arquivos, Alertas
+
+REGRAS DE COMPORTAMENTO:
+- Responda SEMPRE em Português do Brasil
+- Seja objetivo e prático — o operador está no campo
+- Use linguagem simples para operadores, técnica para gestores
+- Nunca invente dados — baseie-se nos SKUs e usuários reais acima
+- Se não souber algo específico do sistema, diga onde o usuário pode encontrar
 `;
 
 export default function ChatAssistant() {
@@ -31,6 +57,7 @@ export default function ChatAssistant() {
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [aiStatus, setAiStatus] = useState('online'); 
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -48,8 +75,8 @@ export default function ChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Usando gemini-1.5-flash sem systemInstruction na inicialização (mais compatível)
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Modelo Gemini ativo — gemini-pro
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
       const chat = model.startChat({
         history: [
@@ -65,13 +92,32 @@ export default function ChatAssistant() {
       const result = await chat.sendMessage(input);
       const text = result.response.text();
       setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      setAiStatus('online');
     } catch (error) {
       console.error("Gemini Error:", error);
-      let errorMsg = "O Google ainda não ativou totalmente o modelo para sua chave. Tente novamente em alguns minutos (o delay de propagação é normal).";
-      if (error.message.includes('404')) errorMsg = "Erro 404: Modelo não encontrado. Verifique se o projeto selecionado no Cloud Console é o 'VerticalParts-WMS'.";
+      let errorMsg = "⚠️ Erro ao conectar com o assistente. Verifique sua conexão e tente novamente.";
+      
+      if (error.message?.includes('404')) {
+        errorMsg = "⚠️ Modelo de IA não encontrado. Entre em contato com o administrador do sistema.";
+      } else if (error.message?.includes('403') || error.message?.includes('API_KEY')) {
+        errorMsg = "⚠️ Chave de API inválida ou sem permissão. Verifique as configurações em Config > Geral.";
+      } else if (error.message?.includes('429')) {
+        errorMsg = "⚠️ Limite de requisições atingido. Aguarde alguns segundos e tente novamente.";
+      } else if (error.message?.includes('NETWORK') || error.message?.includes('fetch')) {
+        errorMsg = "⚠️ Sem conexão com a internet. Verifique sua rede.";
+      }
+      
+      setAiStatus('error');
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleClearHistory = () => {
+    if (window.confirm('Deseja apagar todo o histórico do chat?')) {
+      localStorage.removeItem('vp_chat_history');
+      setMessages([{ role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }]);
     }
   };
 
@@ -85,11 +131,34 @@ export default function ChatAssistant() {
               <div className="flex items-center gap-3">
                 <Bot className="w-6 h-6 text-primary" />
                 <div>
-                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest">WMS Assistant</h3>
+                  <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center">
+                    WMS Assistant
+                    <span className="relative flex h-2 w-2 ml-2 shrink-0">
+                      {aiStatus === 'online' ? (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </>
+                      ) : (
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      )}
+                    </span>
+                  </h3>
                   <p className="text-[9px] text-primary font-bold uppercase">VerticalParts</p>
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-2 text-slate-500 hover:text-white transition-transform hover:rotate-90"><X className="w-5 h-5" /></button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={handleClearHistory} 
+                  title="Limpar conversa"
+                  className="p-2 text-slate-500 hover:text-red-400 transition-colors"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <button onClick={() => setIsOpen(false)} className="p-2 text-slate-500 hover:text-white transition-transform hover:rotate-90">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

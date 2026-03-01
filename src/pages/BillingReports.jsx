@@ -25,7 +25,7 @@ import {
 
 // ====== CONFIGURAÇÕES DOS RELATÓRIOS ======
 const REPORT_CONFIGS = {
-    '/billing/packaging': {
+    '/faturamento/embalagem': {
         title: 'Armazenagem por Embalagem',
         icon: Box,
         columns: ['Armazém', 'Data', 'Depositante', 'Setor', 'Local', 'Descrição do Produto', 'Qtd Unidade'],
@@ -35,7 +35,7 @@ const REPORT_CONFIGS = {
             { id: 3, Armazém: 'CD-02', Data: '22/02/2026', Depositante: 'Thiago (Logística)', Setor: 'Almoxarifado', Local: 'B-05-01', 'Descrição do Produto': 'Pallet de Aço Inox (1000mm)', 'Qtd Unidade': 85 },
         ]
     },
-    '/billing/pallet': {
+    '/faturamento/palete': {
         title: 'Armazenagem por Palete',
         icon: Layers,
         columns: ['Armazém', 'Depositante', 'Tipo Palete', 'Posições Ocupadas', 'Setor de Alocação', 'Vencimento'],
@@ -44,7 +44,7 @@ const REPORT_CONFIGS = {
             { id: 2, Armazém: 'CD-01', Depositante: 'Coca-Cola', 'Tipo Palete': 'CHEP', 'Posições Ocupadas': 88, 'Setor de Alocação': 'Picking Frios', Vencimento: '15/05/2026' },
         ]
     },
-    '/billing/weight': {
+    '/faturamento/peso': {
         title: 'Armazenagem por Peso',
         icon: Package,
         columns: ['Armazém', 'Depositante', 'Peso Total (Kg)', 'Peso Médio/Palete', 'Status Carga', 'Local'],
@@ -53,7 +53,7 @@ const REPORT_CONFIGS = {
             { id: 2, Armazém: 'CD-02', Depositante: 'Gerdau', 'Peso Total (Kg)': 8400, 'Peso Médio/Palete': 1200, 'Status Carga': 'Processando', Local: 'ENTRADA-1' },
         ]
     },
-    '/billing/address': {
+    '/faturamento/endereco': {
         title: 'Armazenagem por Endereço',
         icon: Monitor,
         columns: ['Localização', 'Status Ocupação', 'Tempo Permanente', 'Custo p/ Dia', 'Identificador'],
@@ -62,7 +62,7 @@ const REPORT_CONFIGS = {
             { id: 2, Localização: 'A-10-01-02', 'Status Ocupação': '80%', 'Tempo Permanente': '4 Dias', 'Custo p/ Dia': 10.00, Identificador: 'LOC-553' },
         ]
     },
-    '/billing/query': {
+    '/financeiro/calcular-diarias': {
         title: 'Consulta para Cobrança (Billing)',
         icon: DollarSign,
         columns: ['Depositante', 'Saldo Palete', 'Saldo Peso (Kg)', 'Saldo Unidade', 'Vencimento Ciclo', 'Valor Acumulado'],
@@ -75,7 +75,7 @@ const REPORT_CONFIGS = {
 
 export default function BillingReports() {
     const location = useLocation();
-    const config = REPORT_CONFIGS[location.pathname] || REPORT_CONFIGS['/billing/packaging'];
+    const config = REPORT_CONFIGS[location.pathname] || REPORT_CONFIGS['/faturamento/embalagem'];
     
     const [showParams, setShowParams] = useState(true);
     const [params, setParams] = useState({ start: '2026-02-01', end: '2026-02-28' });
