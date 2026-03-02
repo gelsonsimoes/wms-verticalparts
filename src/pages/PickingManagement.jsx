@@ -15,6 +15,7 @@ export default function PickingManagement() {
     const [scanError, setScanError] = useState(null);
     const [lastScannedId, setLastScannedId] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showFinalizeModal, setShowFinalizeModal] = useState(false);
     const scanInputRef = useRef(null);
 
     // Persistência da ordem selecionada para não perder o progresso em caso de refresh
@@ -55,7 +56,12 @@ export default function PickingManagement() {
             const ean = scanValue.trim();
             if (!ean) return;
 
-            const itemIndex = selectedOrder.orderItems.findIndex(item => item.ean === ean);
+            const eanUpper = ean.toUpperCase();
+            const itemIndex = selectedOrder.orderItems.findIndex(item =>
+                item.ean === ean ||
+                item.ean.toUpperCase().includes(eanUpper) ||
+                item.sku?.toUpperCase().includes(eanUpper)
+            );
 
             if (itemIndex !== -1) {
                 const item = selectedOrder.orderItems[itemIndex];
@@ -86,16 +92,29 @@ export default function PickingManagement() {
     };
 
     const handleFinalize = () => {
-        const allCollected = selectedOrder.orderItems.every(item => item.collected === item.expected);
-        
+        const allCollected = selectedOrder.orderItems.every(
+            item => item.collected === item.expected
+        );
         if (!allCollected) {
-            if (!window.confirm('Existem itens pendentes. Deseja finalizar a separação assim mesmo?')) {
-                return;
-            }
+            setShowFinalizeModal(true); // abre modal em vez de window.confirm
+            return;
         }
+        confirmarFinalizacao();
+    };
 
+    const confirmarFinalizacao = () => {
         updateOrderStatus(selectedOrder.id, 'Concluído');
+        setShowFinalizeModal(false);
         handleBackToList();
+    };
+
+    const handlePularItem = (itemId) => {
+        // Marca o item como pulado para revisitar depois
+        const updatedItems = selectedOrder.orderItems.map(i =>
+            i.id === itemId ? { ...i, pulado: true } : i
+        );
+        const updatedOrder = { ...selectedOrder, orderItems: updatedItems };
+        setSelectedOrder(updatedOrder);
     };
 
     const getStatusStyle = (status) => {
@@ -156,9 +175,15 @@ export default function PickingManagement() {
                         <p className="text-lg font-black">{progress}%</p>
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Barra Evolução</p>
-                        <div className="mt-3 h-2 w-full bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
-                            <div className="h-full bg-secondary transition-all duration-1000" style={{ width: `${progress}%` }} />
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            Evolução
+                        </p>
+                        <p className="text-lg font-black">{progress}%</p>
+                        <div className="mt-2 h-2 w-full bg-slate-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-secondary transition-all duration-1000 rounded-full" 
+                                style={{ width: `${progress}%` }} 
+                            />
                         </div>
                     </div>
                 </div>
@@ -188,6 +213,42 @@ export default function PickingManagement() {
                         </div>
                     )}
                 </div>
+
+                {showFinalizeModal && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                                        <AlertCircle className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-slate-800 dark:text-white">
+                                            Itens pendentes
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">
+                                            Nem todos os itens foram coletados. Deseja finalizar mesmo assim?
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button
+                                        onClick={() => setShowFinalizeModal(false)}
+                                        className="flex-1 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-500 hover:border-slate-400 transition-all"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmarFinalizacao}
+                                        className="flex-1 py-2.5 bg-secondary text-primary rounded-xl text-xs font-black hover:bg-secondary/90 active:scale-95 transition-all shadow-md"
+                                    >
+                                        Finalizar mesmo assim
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tabela de Itens */}
                 <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
@@ -227,9 +288,25 @@ export default function PickingManagement() {
                                         <td className="px-6 py-4 text-center font-black text-sm">{item.expected}</td>
                                         <td className="px-6 py-4 text-center font-black text-lg text-secondary">{item.collected}</td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-tighter border ${isDone ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}>
-                                                {isDone ? 'Completo' : 'Pendente'}
-                                            </span>
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <span className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-tighter border 
+                                                    ${isDone 
+                                                        ? 'bg-success/10 text-success border-success/20' 
+                                                        : item.pulado
+                                                            ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/40'
+                                                            : 'bg-warning/10 text-warning border-warning/20'
+                                                    }`}>
+                                                    {isDone ? 'Completo' : item.pulado ? 'Pulado' : 'Pendente'}
+                                                </span>
+                                                {!isDone && !item.pulado && (
+                                                    <button
+                                                        onClick={() => handlePularItem(item.id)}
+                                                        className="text-[8px] font-black text-slate-400 hover:text-amber-600 uppercase tracking-wider transition-colors"
+                                                    >
+                                                        Pular →
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
