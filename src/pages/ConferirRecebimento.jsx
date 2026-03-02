@@ -67,6 +67,8 @@ export default function ConferirRecebimento() {
   const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
   const [supervisorPassword, setSupervisorPassword] = useState('');
   const [pendingUpdate, setPendingUpdate] = useState(null);
+  const [lastConfirmed, setLastConfirmed] = useState(null); // feedback visual
+  const [errorMsg, setErrorMsg] = useState('');
 
   const productInputRef = useRef(null);
 
@@ -82,13 +84,28 @@ export default function ConferirRecebimento() {
   };
 
   const handleConfirmItem = (e) => {
-    e.preventDefault();
-    if (!scannedProduct || !currentQty) return;
+    if (e && e.preventDefault) e.preventDefault();
+    setErrorMsg('');
+    
+    if (!scannedProduct) {
+      setErrorMsg('⚠️ Bipe ou digite o código do produto.');
+      return;
+    }
+    if (!currentQty || parseInt(currentQty) <= 0) {
+      setErrorMsg('⚠️ Informe a quantidade conferida.');
+      return;
+    }
 
-    const itemIndex = items.findIndex(i => i.ean === scannedProduct || i.id === scannedProduct);
+    // Busca por EAN completo OU parcial (case-insensitive)
+    const q = scannedProduct.toLowerCase();
+    const itemIndex = items.findIndex(i =>
+      i.ean.toLowerCase().includes(q) ||
+      i.produto.toLowerCase().includes(q) ||
+      i.id === scannedProduct
+    );
     
     if (itemIndex === -1) {
-      alert("Produto não encontrado nesta NF-e.");
+      setErrorMsg('❌ Produto não encontrado nesta NF-e. Verifique o código.');
       return;
     }
 
@@ -98,15 +115,26 @@ export default function ConferirRecebimento() {
 
     const performUpdate = () => {
       const updatedItems = [...items];
+      const novoStatus = totalConferida === item.qtdNF ? 'Concluído' 
+                       : totalConferida > item.qtdNF ? 'Divergente' 
+                       : 'Pendente';
       updatedItems[itemIndex] = {
         ...item,
         qtdConferida: totalConferida,
-        lote: lote || '-',
-        validade: validade || '-',
-        status: totalConferida === item.qtdNF ? 'Concluído' : totalConferida > item.qtdNF ? 'Divergente' : 'Pendente'
+        lote: lote || item.lote,
+        validade: validade || item.validade,
+        status: novoStatus,
+        avaria: isDamaged ? (damageType || 'Avaria não especificada') : null,
       };
       setItems(updatedItems);
+      setLastConfirmed({ 
+        sku: item.ean, 
+        produto: item.produto, 
+        qty: newQty, 
+        status: novoStatus 
+      });
       resetPanel();
+      setTimeout(() => setLastConfirmed(null), 4000);
     };
 
     if (totalConferida !== item.qtdNF) {
@@ -159,8 +187,10 @@ export default function ConferirRecebimento() {
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50 min-w-[240px]"
             >
               <option value="">Selecione a NF-e...</option>
-              <option value="NF-10293">NF-10293 - FORNECEDOR ABC LTDA</option>
-              <option value="NF-88271">NF-88271 - LOGISTICA XYZ S.A</option>
+              <option value="NF-78901">NF-78901 — VerticalParts Matriz (OR-55920)</option>
+              <option value="NF-78845">NF-78845 — VerticalParts Matriz (OR-55921)</option>
+              <option value="NF-79100">NF-79100 — VParts Import Export (OR-55925)</option>
+              <option value="NF-78500">NF-78500 — VerticalParts Matriz (OR-55890)</option>
             </select>
             <button 
               onClick={handleStart}
@@ -175,6 +205,39 @@ export default function ConferirRecebimento() {
           </div>
         </div>
       </div>
+
+      {isStarted && (() => {
+        const total = items.length;
+        const concluidos = items.filter(i => i.status === 'Concluído').length;
+        const divergentes = items.filter(i => i.status === 'Divergente').length;
+        const pct = Math.round((concluidos / total) * 100);
+        return (
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 
+                          dark:border-slate-700 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex gap-4 text-xs font-bold">
+                <span className="text-slate-400">
+                  Conferidos: <strong className="text-slate-800 dark:text-white">
+                    {concluidos}/{total}
+                  </strong>
+                </span>
+                {divergentes > 0 && (
+                  <span className="text-red-600 font-black">
+                    ⚠️ {divergentes} divergente(s)
+                  </span>
+                )}
+              </div>
+              <span className="text-sm font-black text-primary">{pct}%</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary rounded-full transition-all duration-500"
+                style={{ width: pct + '%' }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 2. PAINEL DE OPERAÇÃO */}
       <div className={cn(
@@ -193,6 +256,33 @@ export default function ConferirRecebimento() {
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary rounded-2xl pl-14 pr-6 py-5 text-2xl font-black outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-700"
               />
             </div>
+
+            {errorMsg && (
+              <div className="mt-2 px-4 py-2 bg-red-50 border border-red-200 rounded-xl 
+                              text-xs font-bold text-red-600 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {errorMsg}
+              </div>
+            )}
+
+            {lastConfirmed && (
+              <div className="mt-2 px-4 py-3 bg-green-50 border-2 border-green-300 
+                              rounded-xl flex items-center gap-3 animate-in slide-in-from-top-2">
+                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-black text-green-700">
+                    ✅ Conferido: {lastConfirmed.qty}x {lastConfirmed.sku}
+                  </p>
+                  <p className="text-[10px] text-green-600">{lastConfirmed.produto}</p>
+                </div>
+                <span className={`ml-auto text-[10px] font-black px-2 py-1 rounded-full
+                  ${lastConfirmed.status === 'Concluído' ? 'bg-green-200 text-green-800' :
+                    lastConfirmed.status === 'Divergente' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'}`}>
+                  {lastConfirmed.status}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-3 space-y-1.5">
@@ -298,7 +388,7 @@ export default function ConferirRecebimento() {
                       {item.lote} / {item.validade}
                     </td>
                     <td className="px-6 py-4 text-right pr-6">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex flex-col items-end gap-1">
                         {isDivergent && <Lock className="w-3 h-3 text-danger animate-pulse" />}
                         <span className={cn(
                           "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
@@ -308,6 +398,12 @@ export default function ConferirRecebimento() {
                         )}>
                           {item.status}
                         </span>
+                        {item.avaria && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase
+                                           bg-orange-100 border border-orange-200 text-orange-600 mt-1">
+                            ⚠️ {item.avaria}
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -322,6 +418,40 @@ export default function ConferirRecebimento() {
       <div className="fixed bottom-0 right-0 left-0 lg:left-72 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 px-8 flex justify-end z-40">
         <button 
           disabled={!isStarted}
+          onClick={() => {
+            const pendentes = items.filter(i => i.status === 'Pendente');
+            const divergentes = items.filter(i => i.status === 'Divergente');
+            
+            if (pendentes.length > 0) {
+              const confirmar = window.confirm(
+                `Ainda há ${pendentes.length} item(ns) não conferido(s).\n` +
+                `Finalizar com divergência requer aprovação do supervisor.\n` +
+                `Deseja continuar?`
+              );
+              if (!confirmar) return;
+            }
+            
+            if (divergentes.length > 0) {
+              alert(
+                `⚠️ Atenção: ${divergentes.length} item(ns) com divergência.\n` +
+                `O sistema registrará ocorrência para aprovação do supervisor.\n` +
+                `A OR será movida para "Aguardando Alocação" após aprovação.`
+              );
+            }
+            
+            const allOk = pendentes.length === 0 && divergentes.length === 0;
+            alert(
+              allOk
+                ? `✅ Conferência finalizada com sucesso!\nNF: ${nfe} — todos os itens conferidos.\nOR movida para: Aguardando Alocação.`
+                : `📋 Conferência finalizada com ressalvas.\nNF: ${nfe}\nAcesse 1.4 Gerenciar Recebimento para liberar com divergência.`
+            );
+            
+            setIsStarted(false);
+            setItems(INITIAL_ITEMS.map(i => ({...i, qtdConferida: 0, status: 'Pendente', avaria: null})));
+            setNfe('');
+            setLastConfirmed(null);
+            setErrorMsg('');
+          }}
           className="bg-primary text-slate-900 px-10 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:grayscale"
         >
           Finalizar Carga
