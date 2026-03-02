@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useApp } from '../context/AppContext';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -94,7 +95,7 @@ const ROWS_INIT = [
 
 // ─── MODAL ALTERAR ENDEREÇO ───────────────────────────────────────────
 function ModalAlterarEndereco({ rows, onClose, onSave }) {
-  const { LOCATIONS } = require('../../context/AppContext').useApp();
+  const { LOCATIONS } = useApp();
   const [enderecoId, setEnderecoId] = useState(LOCATIONS[0]?.id || 'R1_PP1_A1');
   const [tipo,   setTipo]   = useState('Pulmão');
 
