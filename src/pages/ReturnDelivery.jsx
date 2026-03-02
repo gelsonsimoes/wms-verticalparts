@@ -26,6 +26,7 @@ import {
   ArrowDown,
   Check,
   X,
+  Plus,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -35,7 +36,12 @@ function cn(...i) { return twMerge(clsx(i)); }
 // ─── ENUMS ────────────────────────────────────────────────────────────
 const STATUS_OPTS = ['Todos', 'Pendente', 'Executando', 'Cancelada', 'Finalizada'];
 const ESTADO_PECA = ['Bom', 'Avariado', 'Desmembrado/Truncado'];
-const SETORES_DESTINO = ['TRIAGEM-A', 'TRIAGEM-B', 'AVARIAS', 'DESMEM', 'QUARENTENA'];
+const TIPO_DEVOLUCAO = [
+  'Insucesso de Entrega',
+  'Garantia',
+  'Devolução Comercial',
+];
+const SETORES_DESTINO = ['TRIAGEM-A','TRIAGEM-B','AVARIAS','DESMEM','QUARENTENA','GARANTIA'];
 
 const STATUS_COLOR = {
   Pendente:   'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -77,6 +83,7 @@ const DEVOLUCOES_INIT = [
     dataSolicitacao: '2026-02-20',
     ordemCliente: 'OC-45012',
     nfOriginal: 'NF-45123',
+    tipoDevolucao: 'Insucesso de Entrega',
     depositante: 'VerticalParts SP',
     status: 'Pendente',
     itens: makeItens('DEV-001'),
@@ -89,6 +96,7 @@ const DEVOLUCOES_INIT = [
     dataSolicitacao: '2026-02-21',
     ordemCliente: 'OC-45088',
     nfOriginal: 'NF-45124',
+    tipoDevolucao: 'Garantia',
     depositante: 'Elevadores ABC Ltda',
     status: 'Executando',
     itens: [
@@ -103,6 +111,7 @@ const DEVOLUCOES_INIT = [
     dataSolicitacao: '2026-02-18',
     ordemCliente: 'OC-44990',
     nfOriginal: 'NF-45099',
+    tipoDevolucao: 'Devolução Comercial',
     depositante: 'Kone Brasil',
     status: 'Finalizada',
     itens: [
@@ -117,6 +126,7 @@ const DEVOLUCOES_INIT = [
     dataSolicitacao: '2026-02-22',
     ordemCliente: 'OC-45120',
     nfOriginal: 'NF-45201',
+    tipoDevolucao: 'Insucesso de Entrega',
     depositante: 'Schindler Partes',
     status: 'Pendente',
     itens: makeItens('DEV-004'),
@@ -129,6 +139,7 @@ const DEVOLUCOES_INIT = [
     dataSolicitacao: '2026-02-19',
     ordemCliente: 'OC-45033',
     nfOriginal: 'NF-45140',
+    tipoDevolucao: 'Insucesso de Entrega',
     depositante: 'VerticalParts SP',
     status: 'Cancelada',
     itens: [],
@@ -256,6 +267,98 @@ function DetailGrid({ devId, itens, onChangeItem, isLocked }) {
         </div>
       </td>
     </tr>
+  );
+}
+
+function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
+  const [form, setForm] = useState({
+    ordemCliente: '',
+    nfOriginal: '',
+    depositante: '',
+    tipoDevolucao: 'Insucesso de Entrega',
+    responsavel: 'Danilo',
+    dataSolicitacao: new Date().toISOString().slice(0,10),
+  });
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const num = String(totalExistente + 1).padStart(3,'0');
+  const idGerado = `INS-2026-${num}`;
+
+  const salvar = () => {
+    if (!form.ordemCliente || !form.nfOriginal || !form.depositante) {
+      alert('Preencha OC, NF e Depositante.'); return;
+    }
+    onSalvar({
+      id: 'DEV-' + Date.now(),
+      idInsucesso: idGerado,
+      dataSolicitacao: form.dataSolicitacao,
+      ordemCliente: form.ordemCliente.toUpperCase(),
+      nfOriginal: form.nfOriginal.toUpperCase(),
+      depositante: form.depositante,
+      tipoDevolucao: form.tipoDevolucao,
+      responsavel: form.responsavel,
+      status: 'Pendente',
+      itens: [],
+      expanded: false,
+      selecionado: false,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}/>
+      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] border-2 border-slate-200 dark:border-slate-700 w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600"/>
+        <div className="px-6 py-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center">
+              <RotateCcw className="w-5 h-5 text-amber-600"/>
+            </div>
+            <div>
+              <p className="text-sm font-black">Nova Devolução</p>
+              <p className="text-[10px] text-slate-400">ID gerado: <strong className="text-secondary">{idGerado}</strong></p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {label:'Ordem de Cliente',k:'ordemCliente',placeholder:'OC-00000'},
+              {label:'NF Original',k:'nfOriginal',placeholder:'NF-00000'},
+              {label:'Depositante',k:'depositante',placeholder:'Nome da empresa',full:true},
+            ].map(({label,k,placeholder,full})=>(
+              <div key={k} className={full?"col-span-2 space-y-1":"space-y-1"}>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+                <input value={form[k]} onChange={e=>set(k,e.target.value)} placeholder={placeholder}
+                  className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none transition-all dark:bg-slate-800"/>
+              </div>
+            ))}
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</label>
+              <select value={form.tipoDevolucao} onChange={e=>set('tipoDevolucao',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800">
+                {TIPO_DEVOLUCAO.map(t=><option key={t}>{t}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável</label>
+              <select value={form.responsavel} onChange={e=>set('responsavel',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800">
+                {['Danilo','Matheus','Thiago'].map(r=><option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Solicitação</label>
+              <input type="date" value={form.dataSolicitacao} onChange={e=>set('dataSolicitacao',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"/>
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-500">Cancelar</button>
+            <button onClick={salvar} className="flex-1 py-2.5 bg-secondary text-primary rounded-xl text-xs font-black hover:bg-secondary/90 active:scale-95 transition-all">
+              Criar Devolução
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -391,6 +494,18 @@ export default function ReturnDelivery() {
         <ModalCancelar count={selecionados.length} onClose={() => setModal(null)} onConfirm={confirmCancelar} />
       )}
 
+      {modal === 'nova' && (
+        <ModalNovaDevolucao
+          onClose={() => setModal(null)}
+          onSalvar={(nova) => {
+            setDevs(ds => [nova, ...ds]);
+            setModal(null);
+            showToast('Nova devolução criada com sucesso!');
+          }}
+          totalExistente={devs.length}
+        />
+      )}
+
       {/* ═══ TOAST ═══ */}
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
@@ -407,7 +522,11 @@ export default function ReturnDelivery() {
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 3 — Entrada e Recebimento</p>
             <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Devolução ou Insucesso de Entrega</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Triagem de peças devolvidas · Remanejamento para estoque definitivo</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Triagem de peças devolvidas · Remanejamento para estoque definitivo · 
+              <span className="text-amber-500 font-black"> Garantia: </span>
+              peças com defeito de fabricação ou falha dentro do prazo de garantia do fornecedor — encaminhadas para setor GARANTIA aguardando laudo técnico e reposição
+            </p>
           </div>
 
           {/* KPIs */}
@@ -449,6 +568,11 @@ export default function ReturnDelivery() {
         </div>
 
         <div className="flex-1" />
+
+        <button onClick={() => setModal('nova')}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[#1A1A1A] text-[#FFD700] border-2 border-[#FFD700]/30 rounded-xl text-xs font-black hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all">
+          <Plus className="w-3.5 h-3.5"/>Nova Devolução
+        </button>
 
         {/* Importar CRN */}
         <button onClick={() => fileRef.current?.click()} disabled={importing}
@@ -495,7 +619,7 @@ export default function ReturnDelivery() {
                 </th>
                 {/* Expand */}
                 <th className="p-3 w-8" />
-                {['ID Insucesso','Data Solicitação','Ordem de Cliente','NF Original','Depositante','Status'].map(h => (
+                {['ID Insucesso','Data Solicitação','Ordem de Cliente','NF Original','Tipo','Depositante','Status'].map(h => (
                   <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -541,6 +665,9 @@ export default function ReturnDelivery() {
                           <FileText className="w-3 h-3 text-slate-400" />
                           <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{d.nfOriginal}</span>
                         </div>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{d.tipoDevolucao}</span>
                       </td>
                       <td className="p-3 text-xs text-slate-600 dark:text-slate-400">{d.depositante}</td>
                       <td className="p-3">
