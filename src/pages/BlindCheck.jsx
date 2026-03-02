@@ -62,7 +62,7 @@ const SUPERVISOR_CREDS = [
 ];
 
 // ─── MODAL SUPERVISOR ─────────────────────────────────────────────────
-function ModalSupervisor({ onClose, onOk }) {
+function ModalSupervisor({ onClose, onOk, titulo = 'Liberar com Divergência' }) {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha]     = useState('');
   const [erro, setErro]       = useState('');
@@ -92,7 +92,7 @@ function ModalSupervisor({ onClose, onOk }) {
               <ShieldCheck className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm font-black text-slate-800 dark:text-white">Liberar com Divergência</p>
+              <p className="text-sm font-black text-slate-800 dark:text-white">{titulo}</p>
               <p className="text-[10px] text-red-500 font-bold">Autorização de Supervisor obrigatória</p>
             </div>
           </div>
@@ -171,6 +171,11 @@ function ModalConferencia({ ordem, onClose, onSave }) {
   const [flash, setFlash]           = useState(null); // 'ok' | 'erro' | 'skip'
   const [log, setLog]               = useState([]);
   const [showDivModal, setShowDivModal] = useState(false);
+  const [showIgnorarModal, setShowIgnorarModal] = useState(false);
+  const [loteInput, setLoteInput] = useState('');
+  const [validadeInput, setValidadeInput] = useState('');
+  const [tentativas, setTentativas] = useState(0);
+  const MAX_RECONTAGEM = 3;
   const [fase, setFase]             = useState('conferindo'); // 'conferindo' | 'divergente' | 'ok'
 
   // Foco automático no campo de barcode quando abre
@@ -199,20 +204,33 @@ function ModalConferencia({ ordem, onClose, onSave }) {
       return;
     }
     setItens(prev => prev.map(i =>
-      i.id === item.id ? { ...i, qtContada: i.qtContada + qtInput } : i
+      i.id === item.id ? { 
+        ...i, 
+        qtContada: i.qtContada + qtInput,
+        lote: loteInput || i.lote || '',
+        validade: validadeInput || i.validade || '',
+      } : i
     ));
     addLog(`+${qtInput}x ${item.descricao} (bc: ${bc})`, 'ok');
     triggerFlash('ok');
     setBarcode('');
     setQtInput(1);
+    setLoteInput('');
+    setValidadeInput('');
   };
 
   // ── Ignorar Contagem ────────────────────────────────────────────
   const handleIgnorar = () => {
-    addLog(`Leitura ignorada (bc: "${barcode}" ou erro)`, 'skip');
+    if (!barcode.trim()) { barcodeRef.current?.focus(); return; }
+    setShowIgnorarModal(true);
+  };
+
+  const confirmarIgnorar = () => {
+    addLog(`Leitura IGNORADA por supervisor (bc: "${barcode}")`, 'skip');
     triggerFlash('skip');
     setBarcode('');
     setQtInput(1);
+    setShowIgnorarModal(false);
   };
 
   // ── Finalizar Conferência ───────────────────────────────────────
@@ -224,7 +242,12 @@ function ModalConferencia({ ordem, onClose, onSave }) {
 
   // ── Recontagem ──────────────────────────────────────────────────
   const handleRecontar = () => {
-    setItens(prev => prev.map(i => ({ ...i, qtContada: 0 })));
+    if (tentativas >= MAX_RECONTAGEM) {
+      alert(`Limite de ${MAX_RECONTAGEM} recontagens atingido.\nSolicite autorização do supervisor para prosseguir.`);
+      return;
+    }
+    setTentativas(t => t + 1);
+    setItens(prev => prev.map(i => ({ ...i, qtContada: 0, lote: '', validade: '' })));
     setLog([]);
     setFase('conferindo');
     setTimeout(() => barcodeRef.current?.focus(), 100);
@@ -245,6 +268,13 @@ function ModalConferencia({ ordem, onClose, onSave }) {
   return (
     <>
       {showDivModal && <ModalSupervisor onClose={() => setShowDivModal(false)} onOk={handleLiberarDivergencia} />}
+      {showIgnorarModal && (
+        <ModalSupervisor 
+          titulo="Ignorar Contagem"
+          onClose={() => setShowIgnorarModal(false)} 
+          onOk={confirmarIgnorar} 
+        />
+      )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
@@ -314,6 +344,9 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                 <div className="flex-1">
                   <p className="text-sm font-black">DIVERGÊNCIA ENCONTRADA</p>
                   <p className="text-[10px] opacity-90 mt-0.5">A quantidade contada não corresponde à Nota Fiscal. Escolha uma ação:</p>
+                  <p className="text-[9px] opacity-70 mt-1">
+                    Tentativa {tentativas + 1} de {MAX_RECONTAGEM} · Próxima recontagem usará {MAX_RECONTAGEM - tentativas - 1} restante(s)
+                  </p>
                   <div className="flex gap-2 mt-3">
                     <button onClick={handleRecontar}
                       className="flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl text-xs font-black transition-all border border-white/30">
@@ -397,6 +430,34 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                 </div>
               </div>
 
+              {/* LOTE INDÚSTRIA */}
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5" />Lote Indústria (opcional)
+                </label>
+                <input
+                  value={loteInput}
+                  onChange={e => setLoteInput(e.target.value)}
+                  disabled={fase !== 'conferindo'}
+                  placeholder="Ex: LOT-2026-001..."
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-mono outline-none transition-all disabled:opacity-40"
+                />
+              </div>
+
+              {/* DATA DE VENCIMENTO */}
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  Validade / Fabricação (opcional)
+                </label>
+                <input
+                  type="date"
+                  value={validadeInput}
+                  onChange={e => setValidadeInput(e.target.value)}
+                  disabled={fase !== 'conferindo'}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm outline-none transition-all disabled:opacity-40"
+                />
+              </div>
+
               {/* AÇÕES */}
               <div className="flex gap-2 flex-wrap">
                 <button onClick={handleRegistrar} disabled={!barcode.trim() || fase !== 'conferindo'}
@@ -404,12 +465,28 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                   <CheckCircle2 className="w-4 h-4" />Registrar Contagem
                 </button>
                 <button onClick={handleIgnorar} disabled={fase !== 'conferindo'}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 rounded-2xl text-sm font-black hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40">
+                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 rounded-2xl text-[10px] font-black hover:bg-amber-100 active:scale-95 transition-all disabled:opacity-40">
                   <SkipForward className="w-4 h-4" />Ignorar
                 </button>
-                <button onClick={handleFinalizar} disabled={totalCont === 0 || fase !== 'conferindo'}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white rounded-2xl text-sm font-black hover:bg-green-700 active:scale-95 transition-all shadow-md disabled:opacity-40">
-                  <Zap className="w-4 h-4" />Finalizar
+                
+                {/* Finalizar Minha Conferência — salva parcial sem validar */}
+                <button
+                  onClick={() => {
+                    onSave(itens, 'Em Conferência'); // mantém status, salva progresso
+                  }}
+                  disabled={totalCont === 0 || fase !== 'conferindo'}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-slate-300 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black hover:bg-slate-100 active:scale-95 transition-all disabled:opacity-40 text-center"
+                >
+                  <SkipForward className="w-4 h-4" />Finalizar Minha Conf.
+                </button>
+
+                {/* Finalizar Todas Conferências — valida contra NF */}
+                <button
+                  onClick={handleFinalizar}
+                  disabled={totalCont === 0 || fase !== 'conferindo'}
+                  className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-green-600 text-white rounded-2xl text-[10px] font-black hover:bg-green-700 active:scale-95 transition-all shadow-md disabled:opacity-40"
+                >
+                  <Zap className="w-4 h-4" />Finalizar Todas
                 </button>
               </div>
 
@@ -473,8 +550,16 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                         </div>
                       )}
                       {fase === 'conferindo' && (
-                        <div className="mt-1 flex items-center gap-1 text-[8px] text-slate-400 italic">
-                          <EyeOff className="w-2.5 h-2.5" />Qt. esperada oculta (conf. cega)
+                        <div className="mt-1 flex flex-col gap-1">
+                          <div className="flex items-center gap-1 text-[8px] text-slate-400 italic">
+                            <EyeOff className="w-2.5 h-2.5" />Qt. esperada oculta (conf. cega)
+                          </div>
+                          {(item.lote || item.validade) && (
+                            <div className="flex flex-col gap-0.5 mt-1 border-t border-slate-100 dark:border-slate-800 pt-1">
+                              {item.lote && <p className="text-[8px] font-bold text-slate-500">Lote: {item.lote}</p>}
+                              {item.validade && <p className="text-[8px] font-bold text-slate-500">Val: {item.validade}</p>}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -509,8 +594,7 @@ export default function BlindCheck() {
 
   const iniciarConferencia = (o) => {
     if (o.status === 'Finalizado') return;
-    setOrdens(prev => prev.map(x => x.id === o.id ? { ...x, status: 'Em Conferência' } : x));
-    setModalOR(o);
+    setModalOR(o); // abre o modal sem mudar status ainda
   };
 
   const handleSave = (itensAtualizados, novoStatus) => {
@@ -519,7 +603,10 @@ export default function BlindCheck() {
     ));
     setModalOR(null);
     showToast(
-      novoStatus === 'Finalizado' ? `${modalOR.ordemId} finalizada sem divergências!` : `${modalOR.ordemId} liberada com divergência.`,
+      novoStatus === 'Finalizado'     ? `${modalOR.ordemId} finalizada sem divergências!` : 
+      novoStatus === 'Divergente'     ? `${modalOR.ordemId} liberada com divergência.` :
+      novoStatus === 'Em Conferência' ? `${modalOR.ordemId} salva. Retome quando quiser.` :
+      `${modalOR.ordemId} atualizada.`,
       novoStatus === 'Finalizado' ? 'ok' : 'warn'
     );
   };
