@@ -1,279 +1,497 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { 
-    BarChart3, 
-    FileSpreadsheet, 
-    Filter, 
-    Calendar, 
-    ChevronDown, 
-    X, 
-    Search, 
-    RefreshCw, 
-    Layers, 
-    Box, 
-    Package, 
-    Monitor, 
-    DollarSign, 
-    ArrowRightLeft,
-    ChevronRight,
-    Play,
-    Info,
-    ArrowUpRight,
-    ArrowDownRight,
-    GripVertical
+import {
+  BarChart3,
+  FileSpreadsheet,
+  Filter,
+  Calendar,
+  X,
+  Loader2,
+  Layers,
+  Box,
+  Package,
+  Monitor,
+  DollarSign,
+  ArrowRightLeft,
+  Play,
+  Info,
+  GripVertical,
+  ChevronUp,
+  ChevronDown,
+  CheckCircle2,
 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-// ====== CONFIGURAÇÕES DOS RELATÓRIOS ======
-const REPORT_CONFIGS = {
-    '/faturamento/embalagem': {
-        title: 'Armazenagem por Embalagem',
-        icon: Box,
-        columns: ['Armazém', 'Data', 'Depositante', 'Setor', 'Local', 'Descrição do Produto', 'Qtd Unidade'],
-        mockData: [
-            { id: 1, Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Danilo (Supervisor)', Setor: 'Segurança', Local: 'A-10-01', 'Descrição do Produto': 'Barreira de Proteção Infravermelha (174 Feixes)', 'Qtd Unidade': 450 },
-            { id: 2, Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Matheus (Expedição)', Setor: 'Peças', Local: 'A-10-02', 'Descrição do Produto': 'Escova de Segurança (Nylon - Base 27mm)', 'Qtd Unidade': 120 },
-            { id: 3, Armazém: 'CD-02', Data: '22/02/2026', Depositante: 'Thiago (Logística)', Setor: 'Almoxarifado', Local: 'B-05-01', 'Descrição do Produto': 'Pallet de Aço Inox (1000mm)', 'Qtd Unidade': 85 },
-        ]
-    },
-    '/faturamento/palete': {
-        title: 'Armazenagem por Palete',
-        icon: Layers,
-        columns: ['Armazém', 'Depositante', 'Tipo Palete', 'Posições Ocupadas', 'Setor de Alocação', 'Vencimento'],
-        mockData: [
-            { id: 1, Armazém: 'CD-01', Depositante: 'Nestlé SA', 'Tipo Palete': 'PBR', 'Posições Ocupadas': 124, 'Setor de Alocação': 'Pulmão Secos', Vencimento: '30/06/2026' },
-            { id: 2, Armazém: 'CD-01', Depositante: 'Coca-Cola', 'Tipo Palete': 'CHEP', 'Posições Ocupadas': 88, 'Setor de Alocação': 'Picking Frios', Vencimento: '15/05/2026' },
-        ]
-    },
-    '/faturamento/peso': {
-        title: 'Armazenagem por Peso',
-        icon: Package,
-        columns: ['Armazém', 'Depositante', 'Peso Total (Kg)', 'Peso Médio/Palete', 'Status Carga', 'Local'],
-        mockData: [
-            { id: 1, Armazém: 'CD-02', Depositante: 'Vale Metais', 'Peso Total (Kg)': 12500, 'Peso Médio/Palete': 850, 'Status Carga': 'Alocado', Local: 'PÁTIO-A' },
-            { id: 2, Armazém: 'CD-02', Depositante: 'Gerdau', 'Peso Total (Kg)': 8400, 'Peso Médio/Palete': 1200, 'Status Carga': 'Processando', Local: 'ENTRADA-1' },
-        ]
-    },
-    '/faturamento/endereco': {
-        title: 'Armazenagem por Endereço',
-        icon: Monitor,
-        columns: ['Localização', 'Status Ocupação', 'Tempo Permanente', 'Custo p/ Dia', 'Identificador'],
-        mockData: [
-            { id: 1, Localização: 'A-10-01-01', 'Status Ocupação': '100%', 'Tempo Permanente': '12 Dias', 'Custo p/ Dia': 12.50, Identificador: 'LOC-552' },
-            { id: 2, Localização: 'A-10-01-02', 'Status Ocupação': '80%', 'Tempo Permanente': '4 Dias', 'Custo p/ Dia': 10.00, Identificador: 'LOC-553' },
-        ]
-    },
-    '/financeiro/calcular-diarias': {
-        title: 'Consulta para Cobrança (Billing)',
-        icon: DollarSign,
-        columns: ['Depositante', 'Saldo Palete', 'Saldo Peso (Kg)', 'Saldo Unidade', 'Vencimento Ciclo', 'Valor Acumulado'],
-        mockData: [
-            { id: 1, Depositante: 'VerticalParts Oficial', 'Saldo Palete': 450, 'Saldo Peso (Kg)': 1200, 'Saldo Unidade': 12500, 'Vencimento Ciclo': '05/03/2026', 'Valor Acumulado': 45850.22 },
-            { id: 2, Depositante: 'Danilo (Logística)', 'Saldo Palete': 1240, 'Saldo Peso (Kg)': 15000, 'Saldo Unidade': 48000, 'Vencimento Ciclo': '10/03/2026', 'Valor Acumulado': 92300.50 },
-        ]
-    }
+function cn(...i) { return twMerge(clsx(i)); }
+
+// ─── Utilitários ──────────────────────────────────────────────────────────────
+
+/** Exporta array de objetos como CSV e dispara download real */
+function exportCSV(filename, columns, rows) {
+  const header = columns.join(';');
+  const body = rows.map(row =>
+    columns.map(col => {
+      const val = row[col] ?? '';
+      return `"${String(val).replace(/"/g, '""')}"`;
+    }).join(';')
+  ).join('\n');
+  const blob = new Blob(['\uFEFF' + header + '\n' + body], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** Formata número conforme tipo semântico da coluna */
+function formatCell(col, value) {
+  if (typeof value !== 'number') return value ?? '—';
+  // Colunas monetárias: qualquer que contenha Valor, Custo, Saldo (financeiro), Diária
+  if (/valor|custo|saldo.*peso|saldo.*unid/i.test(col) === false && /valor|custo.*dia|billing/i.test(col)) {
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  }
+  if (/valor|acumulado/i.test(col)) {
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  }
+  if (/custo.*dia/i.test(col)) {
+    return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia`;
+  }
+  // Números inteiros: posições, qtd, saldo
+  return value.toLocaleString('pt-BR');
+}
+
+// ─── Dados Mock ───────────────────────────────────────────────────────────────
+// isoDate para filtros corretos; campos de exibição separados
+// Estrutura separada de configs + dados — fácil substituir por fetch() sem refator
+
+const REPORT_DATA = {
+  '/faturamento/embalagem': [
+    { id: 'emb-1', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Danilo (Supervisor)',  Setor: 'Segurança',    Local: 'A-10-01', 'Descrição do Produto': 'Barreira de Proteção Infravermelha', 'Qtd Unidade': 450 },
+    { id: 'emb-2', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Matheus (Expedição)', Setor: 'Peças',        Local: 'A-10-02', 'Descrição do Produto': 'Escova de Segurança Nylon 27mm',      'Qtd Unidade': 120 },
+    { id: 'emb-3', isoDate: '2026-02-22', Armazém: 'CD-02', Data: '22/02/2026', Depositante: 'Thiago (Logística)', Setor: 'Almoxarifado', Local: 'B-05-01', 'Descrição do Produto': 'Pallet de Aço Inox 1000mm',           'Qtd Unidade': 85  },
+  ],
+  '/faturamento/palete': [
+    { id: 'pal-1', isoDate: '2026-02-21', Armazém: 'CD-01', Depositante: 'Nestlé SA',  'Tipo Palete': 'PBR',  'Posições Ocupadas': 124, 'Setor de Alocação': 'Pulmão Secos', Vencimento: '30/06/2026' },
+    { id: 'pal-2', isoDate: '2026-02-20', Armazém: 'CD-01', Depositante: 'Coca-Cola',  'Tipo Palete': 'CHEP', 'Posições Ocupadas': 88,  'Setor de Alocação': 'Picking Frios', Vencimento: '15/05/2026' },
+  ],
+  '/faturamento/peso': [
+    { id: 'pes-1', isoDate: '2026-02-22', Armazém: 'CD-02', Depositante: 'Vale Metais', 'Peso Total (Kg)': 12500, 'Peso Médio/Palete': 850,  'Status Carga': 'Alocado',      Local: 'PÁTIO-A'   },
+    { id: 'pes-2', isoDate: '2026-02-21', Armazém: 'CD-02', Depositante: 'Gerdau',      'Peso Total (Kg)': 8400,  'Peso Médio/Palete': 1200, 'Status Carga': 'Processando',  Local: 'ENTRADA-1' },
+  ],
+  '/faturamento/endereco': [
+    { id: 'end-1', isoDate: '2026-02-22', Localização: 'A-10-01-01', 'Status Ocupação': '100%', 'Tempo Permanente': '12 Dias', 'Custo por Dia': 12.50, Identificador: 'LOC-552' },
+    { id: 'end-2', isoDate: '2026-02-22', Localização: 'A-10-01-02', 'Status Ocupação': '80%',  'Tempo Permanente': '4 Dias',  'Custo por Dia': 10.00, Identificador: 'LOC-553' },
+  ],
+  '/financeiro/calcular-diarias': [
+    { id: 'bil-1', isoDate: '2026-02-22', Depositante: 'VerticalParts Oficial', 'Saldo Palete': 450,  'Saldo Peso (Kg)': 1200,  'Saldo Unidade': 12500, 'Vencimento Ciclo': '05/03/2026', 'Valor Acumulado': 45850.22 },
+    { id: 'bil-2', isoDate: '2026-02-21', Depositante: 'Danilo (Logística)',     'Saldo Palete': 1240, 'Saldo Peso (Kg)': 15000, 'Saldo Unidade': 48000, 'Vencimento Ciclo': '10/03/2026', 'Valor Acumulado': 92300.50 },
+  ],
 };
 
+// Config de metadados apenas (sem mockData acoplado)
+const REPORT_CONFIGS = {
+  '/faturamento/embalagem':        { title: 'Armazenagem por Embalagem', icon: Box,          columns: ['Armazém','Data','Depositante','Setor','Local','Descrição do Produto','Qtd Unidade'] },
+  '/faturamento/palete':           { title: 'Armazenagem por Palete',    icon: Layers,        columns: ['Armazém','Depositante','Tipo Palete','Posições Ocupadas','Setor de Alocação','Vencimento'] },
+  '/faturamento/peso':             { title: 'Armazenagem por Peso',      icon: Package,       columns: ['Armazém','Depositante','Peso Total (Kg)','Peso Médio/Palete','Status Carga','Local'] },
+  '/faturamento/endereco':         { title: 'Armazenagem por Endereço',  icon: Monitor,       columns: ['Localização','Status Ocupação','Tempo Permanente','Custo por Dia','Identificador'] },
+  '/financeiro/calcular-diarias':  { title: 'Consulta para Cobrança (Billing)', icon: DollarSign, columns: ['Depositante','Saldo Palete','Saldo Peso (Kg)','Saldo Unidade','Vencimento Ciclo','Valor Acumulado'] },
+};
+
+const FALLBACK_ROUTE = '/faturamento/embalagem';
+
+// ─── Componente de célula formatada ──────────────────────────────────────────
+function Cell({ col, value }) {
+  const formatted = formatCell(col, value);
+  const isMonetary = typeof formatted === 'string' && formatted.startsWith('R$');
+  return (
+    <span className={cn(isMonetary && 'text-emerald-600 font-black tabular-nums')}>
+      {formatted}
+    </span>
+  );
+}
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
 export default function BillingReports() {
-    const location = useLocation();
-    const config = REPORT_CONFIGS[location.pathname] || REPORT_CONFIGS['/faturamento/embalagem'];
-    
-    const [showParams, setShowParams] = useState(true);
-    const [params, setParams] = useState({ start: '2026-02-01', end: '2026-02-28' });
-    const [groupColumn, setGroupColumn] = useState(null);
-    const [exporting, setExporting] = useState(false);
-    const [dataLoaded, setDataLoaded] = useState(false);
+  const location = useLocation();
 
-    // Força o modal de parâmetros se as datas não estiverem confirmadas
-    useEffect(() => {
-        setShowParams(true);
-        setDataLoaded(false);
-    }, [location.pathname]);
+  // Lookup seguro — sem fallback silencioso para rota errada
+  const routeKey = Object.keys(REPORT_CONFIGS).find(k => location.pathname.startsWith(k)) ?? FALLBACK_ROUTE;
+  const config   = REPORT_CONFIGS[routeKey];
+  const rawData  = REPORT_DATA[routeKey] ?? [];
 
-    const handleApply = () => {
-        setShowParams(false);
-        setDataLoaded(true);
-    };
+  // ── Estado de parâmetros — persiste por rota (não reseta ao renavegar) ────
+  // usamos um map para guardar params por rota, sem perder dados ao voltar
+  const [paramsMap, setParamsMap] = useState(() =>
+    Object.fromEntries(Object.keys(REPORT_CONFIGS).map(k => [k, { start: '2026-02-01', end: '2026-02-28' }]))
+  );
+  const params = paramsMap[routeKey];
+  const setParams = useCallback((newParams) => {
+    setParamsMap(m => ({ ...m, [routeKey]: newParams }));
+  }, [routeKey]);
 
-    const handleExport = () => {
-        setExporting(true);
-        setTimeout(() => {
-            setExporting(false);
-            alert('Relatório exportado com sucesso para Excel (XLSX)! Verifique sua pasta de downloads.');
-        }, 1500);
-    };
+  const [showParams,   setShowParams]   = useState(true);
+  const [dataLoaded,   setDataLoaded]   = useState(false);
+  const [exporting,    setExporting]    = useState(false);
+  const [groupColumn,  setGroupColumn]  = useState(null);
+  const [sortCol,      setSortCol]      = useState(null);
+  const [sortDir,      setSortDir]      = useState('asc'); // 'asc' | 'desc'
 
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-            {/* ====== CABEÇALHO ====== */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight flex items-center gap-3 italic">
-                        <config.icon className="w-8 h-8 text-secondary" /> {config.title}
-                    </h1>
-                    <p className="text-sm text-slate-500 font-medium italic">Relatório Analítico de Armazenagem e Bilhetagem</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {dataLoaded && (
-                        <div className="bg-white dark:bg-slate-800 px-6 py-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-end mr-4">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Período Selecionado</span>
-                            <span className="text-xs font-black text-primary leading-none">{params.start.split('-').reverse().join('/')} até {params.end.split('-').reverse().join('/')}</span>
-                        </div>
-                    )}
-                    <button 
-                        onClick={() => setShowParams(true)}
-                        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 p-4 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-                        title="Alterar Parâmetros"
-                    >
-                        <Filter className="w-5 h-5 text-slate-400" />
-                    </button>
-                    <button 
-                        onClick={handleExport}
-                        disabled={!dataLoaded || exporting}
-                        className={`bg-emerald-600 text-white p-4 rounded-xl shadow-xl shadow-emerald-600/20 group flex items-center gap-3 transition-all ${!dataLoaded || exporting ? 'opacity-40 grayscale pointer-events-none' : 'hover:scale-105 active:scale-95'}`}
-                    >
-                        {exporting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <FileSpreadsheet className="w-5 h-5 text-emerald-100 group-hover:scale-110 transition-transform" />}
-                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Exportar Excel</span>
-                    </button>
-                </div>
-            </div>
+  // ── Abre modal ao trocar de rota APENAS se dados ainda não foram carregados
+  // (não perde dados do usuário ao navegar)
+  const [loadedRoutes, setLoadedRoutes] = useState(new Set());
+  const [prevRoute, setPrevRoute] = useState(routeKey);
+  if (prevRoute !== routeKey) {
+    setPrevRoute(routeKey);
+    if (!loadedRoutes.has(routeKey)) {
+      setShowParams(true);
+      setDataLoaded(false);
+    }
+  }
 
-            {/* ====== DRAG TO GROUP AREA ====== */}
-            <div className="bg-primary/5 border-2 border-dashed border-primary/20 p-4 rounded-3xl flex items-center gap-4">
-                <div className="bg-primary p-3 rounded-2xl shadow-lg">
-                    <Layers className="w-5 h-5 text-secondary" />
-                </div>
-                <div className="flex-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Área de Agrupamento</p>
-                    <div className="flex items-center gap-2 mt-1 min-h-[40px]">
-                        {groupColumn ? (
-                            <div className="bg-secondary text-primary px-4 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-2 animate-in zoom-in-75 duration-300">
-                                <GripVertical className="w-3 h-3" /> {groupColumn}
-                                <button onClick={() => setGroupColumn(null)}><X className="w-3 h-3 hover:scale-125 transition-all"/></button>
-                            </div>
-                        ) : (
-                            <span className="text-[10px] font-bold text-slate-400 italic">Arraste uma coluna aqui para agrupar os dados do relatório...</span>
-                        )}
-                    </div>
-                </div>
-            </div>
+  // ── Filtro por data (ISO) ─────────────────────────────────────────────────
+  const filteredData = useMemo(() => {
+    if (!dataLoaded) return [];
+    const start = params.start ? new Date(params.start + 'T00:00:00') : null;
+    const end   = params.end   ? new Date(params.end   + 'T23:59:59') : null;
+    return rawData.filter(row => {
+      if (!row.isoDate) return true;
+      const d = new Date(row.isoDate);
+      if (start && d < start) return false;
+      if (end   && d > end)   return false;
+      return true;
+    });
+  }, [rawData, dataLoaded, params]);
 
-            {/* ====== GRID DINÂMICO ====== */}
-            <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden border-b-8 border-slate-100 dark:border-slate-700 relative">
-                {!dataLoaded && (
-                    <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-4">
-                        <Calendar className="w-12 h-12 opacity-10 animate-pulse" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em]">Aguardando definição de parâmetros obrigatórios</p>
-                    </div>
-                )}
-                
-                {dataLoaded && (
-                    <div className="overflow-x-auto">
-                        <div className="min-w-max">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                        {config.columns.map(col => (
-                                            <th key={col} className="px-8 py-5 cursor-move hover:text-primary transition-colors group">
-                                                <div className="flex items-center gap-2">
-                                                    {col}
-                                                    <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-100" />
-                                                    <button 
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setGroupColumn(col);
-                                                        }}
-                                                        className="ml-auto opacity-0 group-hover:opacity-100 hover:text-secondary"
-                                                        title="Agrupar por esta coluna"
-                                                    >
-                                                        <Layers className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                                    {config.mockData.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-all border-l-4 border-transparent hover:border-secondary">
-                                            {config.columns.map(col => (
-                                                <td key={col} className="px-8 py-5 font-bold">
-                                                    {typeof row[col] === 'number' && col.includes('Valor') ? (
-                                                        <span className="text-emerald-600">R$ {row[col].toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                                    ) : row[col]}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
-            </div>
+  // ── Ordenação ─────────────────────────────────────────────────────────────
+  const sortedData = useMemo(() => {
+    if (!sortCol) return filteredData;
+    return [...filteredData].sort((a, b) => {
+      const va = a[sortCol]; const vb = b[sortCol];
+      if (va === vb) return 0;
+      const cmp = va < vb ? -1 : 1;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredData, sortCol, sortDir]);
 
-            {/* ====== MODAL: PARÂMETROS OBRIGATÓRIOS ====== */}
-            {showParams && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-primary/20 backdrop-blur-xl animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[3.5rem] shadow-2xl relative overflow-hidden flex flex-col border border-white/20">
-                        <div className="p-8 border-b-8 border-secondary bg-primary text-white flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-secondary rounded-2xl shadow-lg">
-                                    <Filter className="w-6 h-6 text-primary" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-black italic">Filtros de Apuração</h3>
-                                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-0.5">Parâmetros Obrigatórios</p>
-                                </div>
-                            </div>
-                            {!dataLoaded ? null : (
-                                <button onClick={() => setShowParams(false)} className="p-2 hover:bg-white/10 rounded-full transition-all">
-                                    <X className="w-6 h-6 text-white" />
-                                </button>
-                            )}
-                        </div>
-                        
-                        <div className="p-10 space-y-8">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Data Início</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="date" 
-                                            value={params.start}
-                                            onChange={(e) => setParams({...params, start: e.target.value})}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-2xl py-3 px-4 text-xs font-black outline-none focus:border-secondary transition-all"
-                                        />
-                                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Data Término</label>
-                                    <div className="relative">
-                                        <input 
-                                            type="date" 
-                                            value={params.end}
-                                            onChange={(e) => setParams({...params, end: e.target.value})}
-                                            className="w-full bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-2xl py-3 px-4 text-xs font-black outline-none focus:border-secondary transition-all"
-                                        />
-                                        <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                                    </div>
-                                </div>
-                            </div>
+  // ── Agrupamento real ──────────────────────────────────────────────────────
+  const groupedData = useMemo(() => {
+    if (!groupColumn) return [{ groupKey: null, rows: sortedData }];
+    const map = new Map();
+    for (const row of sortedData) {
+      const key = String(row[groupColumn] ?? '(sem valor)');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(row);
+    }
+    return Array.from(map.entries()).map(([groupKey, rows]) => ({ groupKey, rows }));
+  }, [sortedData, groupColumn]);
 
-                            <button 
-                                onClick={handleApply}
-                                className="w-full py-5 bg-primary text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-primary/95 shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all"
-                            >
-                                <Play className="w-4 h-4 text-secondary fill-current" /> Carregar Relatório Analítico
-                            </button>
-                            
-                            <p className="text-[9px] text-center font-bold text-slate-400 italic px-4">
-                                * É necessário definir o intervalo de datas para calcular os saldos acumulados de armazenagem.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            )}
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleApply = () => {
+    setShowParams(false);
+    setDataLoaded(true);
+    setLoadedRoutes(s => new Set([...s, routeKey]));
+    setGroupColumn(null);
+    setSortCol(null);
+  };
+
+  const handleExport = () => {
+    if (exporting || !dataLoaded) return;
+    setExporting(true);
+    // Export real — CSV com os dados filtrados e ordenados
+    setTimeout(() => {
+      exportCSV(`${config.title.replace(/\s+/g, '_')}_${params.start}_${params.end}.csv`, config.columns, sortedData);
+      setExporting(false);
+    }, 400);
+  };
+
+  const handleSort = (col) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
+
+  // ── Drag and Drop real para área de agrupamento ───────────────────────────
+  const [draggedCol, setDraggedCol] = useState(null);
+
+  const onDragStart = (e, col) => {
+    e.dataTransfer.setData('col', col);
+    setDraggedCol(col);
+  };
+  const onDragEnd = () => setDraggedCol(null);
+
+  const onDropGroup = (e) => {
+    e.preventDefault();
+    const col = e.dataTransfer.getData('col');
+    if (col) setGroupColumn(col);
+    setDraggedCol(null);
+  };
+
+  // ── Formatação de período exibido ─────────────────────────────────────────
+  const fmtDate = (iso) => iso ? iso.split('-').reverse().join('/') : '—';
+
+  const ConfigIcon = config.icon;
+
+  return (
+    <div className="space-y-5 pb-20">
+
+      {/* ── Cabeçalho ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
+            <ConfigIcon className="w-7 h-7 text-slate-700 dark:text-slate-200" aria-hidden="true" />
+            {config.title}
+          </h1>
+          <p className="text-sm text-slate-400 font-medium">Relatório Analítico de Armazenagem e Bilhetagem</p>
         </div>
-    );
+
+        <div className="flex items-center gap-2">
+          {dataLoaded && (
+            <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-end">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Período</span>
+              <span className="text-xs font-black text-slate-700 dark:text-white">
+                {fmtDate(params.start)} → {fmtDate(params.end)}
+              </span>
+            </div>
+          )}
+          <button onClick={() => setShowParams(true)} title="Alterar Parâmetros" aria-label="Alterar parâmetros do relatório"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-3 rounded-xl hover:bg-slate-50 transition-all shadow-sm">
+            <Filter className="w-5 h-5 text-slate-500" aria-hidden="true" />
+          </button>
+          <button onClick={handleExport} disabled={!dataLoaded || exporting}
+            aria-label="Exportar relatório como CSV"
+            title={!dataLoaded ? 'Carregue o relatório primeiro' : `Exportar ${sortedData.length} linha(s) como CSV`}
+            className={cn('bg-emerald-600 text-white p-3 rounded-xl shadow-lg flex items-center gap-2 transition-all',
+              !dataLoaded || exporting ? 'opacity-40 cursor-not-allowed' : 'hover:bg-emerald-700 active:scale-95'
+            )}>
+            {exporting
+              ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+              : <FileSpreadsheet className="w-5 h-5" aria-hidden="true" />}
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+              {exporting ? 'Exportando...' : 'Exportar CSV'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Área de Agrupamento — Drop Zone real ───────────────────────────── */}
+      <div
+        role="region"
+        aria-label="Área de agrupamento — arraste uma coluna da tabela aqui"
+        onDragOver={e => e.preventDefault()}
+        onDrop={onDropGroup}
+        className={cn(
+          'border-2 border-dashed p-4 rounded-2xl flex items-center gap-4 transition-all',
+          draggedCol ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900'
+        )}>
+        <div className={cn('p-2.5 rounded-xl', draggedCol ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-700')}>
+          <Layers className={cn('w-4 h-4', draggedCol ? 'text-white' : 'text-slate-400')} aria-hidden="true" />
+        </div>
+        <div className="flex-1">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Área de Agrupamento</p>
+          <div className="flex items-center gap-2 mt-1 min-h-[32px]">
+            {groupColumn ? (
+              <div className="bg-slate-800 text-white px-3 py-1 rounded-lg text-[10px] font-black flex items-center gap-2">
+                <GripVertical className="w-3 h-3" aria-hidden="true" />
+                {groupColumn}
+                <button onClick={() => setGroupColumn(null)} aria-label={`Remover agrupamento por ${groupColumn}`}
+                  className="hover:text-red-300 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <span className="text-[10px] font-medium text-slate-400 italic">
+                {draggedCol
+                  ? `Solte aqui para agrupar por "${draggedCol}"`
+                  : 'Arraste o cabeçalho de uma coluna aqui para agrupar os dados...'}
+              </span>
+            )}
+          </div>
+        </div>
+        {groupColumn && (
+          <span className="text-[9px] font-bold text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded-lg">
+            {groupedData.length} grupo(s)
+          </span>
+        )}
+      </div>
+
+      {/* ── Tabela ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+        {!dataLoaded ? (
+          <div className="h-56 flex flex-col items-center justify-center text-slate-300 gap-3">
+            <Calendar className="w-10 h-10 opacity-30" aria-hidden="true" />
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Aguardando parâmetros obrigatórios</p>
+            <button onClick={() => setShowParams(true)}
+              className="mt-1 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-slate-700 transition-colors">
+              Definir Período
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse" role="grid">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  {config.columns.map(col => (
+                    <th
+                      key={col}
+                      draggable
+                      onDragStart={e => onDragStart(e, col)}
+                      onDragEnd={onDragEnd}
+                      className={cn(
+                        'px-6 py-4 cursor-grab select-none transition-colors whitespace-nowrap',
+                        draggedCol === col && 'opacity-40',
+                        'hover:text-slate-700 dark:hover:text-slate-200'
+                      )}>
+                      <div className="flex items-center gap-2">
+                        <GripVertical className="w-3 h-3 text-slate-300 shrink-0" aria-hidden="true" />
+                        <button onClick={() => handleSort(col)} className="flex items-center gap-1 hover:text-slate-700 transition-colors">
+                          {col}
+                          {sortCol === col
+                            ? sortDir === 'asc'
+                              ? <ChevronUp className="w-3 h-3 text-blue-500" aria-label="Ordenado crescente" />
+                              : <ChevronDown className="w-3 h-3 text-blue-500" aria-label="Ordenado decrescente" />
+                            : <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-40" aria-hidden="true" />}
+                        </button>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 dark:divide-slate-700 text-xs text-slate-600 dark:text-slate-300">
+                {groupedData.map(({ groupKey, rows }) => (
+                  <React.Fragment key={groupKey ?? '__ungrouped__'}>
+                    {/* Linha de grupo */}
+                    {groupKey !== null && (
+                      <tr className="bg-slate-100 dark:bg-slate-900/60">
+                        <td colSpan={config.columns.length} className="px-6 py-2">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                            {groupColumn}: <span className="text-slate-700 dark:text-slate-200">{groupKey}</span>
+                            <span className="ml-2 text-slate-400">({rows.length} registro{rows.length > 1 ? 's' : ''})</span>
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                    {/* Linhas de dados — key é o id único da row */}
+                    {rows.map(row => (
+                      <tr key={row.id}
+                        className="hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-colors border-l-4 border-transparent hover:border-blue-400">
+                        {config.columns.map(col => (
+                          <td key={col} className="px-6 py-4 font-medium whitespace-nowrap">
+                            <Cell col={col} value={row[col]} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {/* Subtotal numérico por grupo */}
+                    {groupKey !== null && (() => {
+                      const numCols = config.columns.filter(c => rows.some(r => typeof r[c] === 'number'));
+                      if (!numCols.length) return null;
+                      return (
+                        <tr className="bg-emerald-50/50 dark:bg-emerald-950/10 border-t border-emerald-100">
+                          {config.columns.map((col, ci) => {
+                            if (ci === 0) return <td key={col} className="px-6 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Subtotal</td>;
+                            if (!numCols.includes(col)) return <td key={col} className="px-6 py-2" />;
+                            const sum = rows.reduce((acc, r) => acc + (typeof r[col] === 'number' ? r[col] : 0), 0);
+                            return (
+                              <td key={col} className="px-6 py-2">
+                                <Cell col={col} value={sum} />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })()}
+                  </React.Fragment>
+                ))}
+                {sortedData.length === 0 && (
+                  <tr>
+                    <td colSpan={config.columns.length} className="px-6 py-10 text-center text-slate-400 text-sm">
+                      Nenhum registro no período {fmtDate(params.start)} → {fmtDate(params.end)}.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="px-6 py-2 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-[9px] text-slate-400 font-bold">
+              <span>{sortedData.length} registro(s) encontrado(s)</span>
+              {sortCol && <span>Ordenado por: {sortCol} ({sortDir === 'asc' ? '↑' : '↓'})</span>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modal de Parâmetros ─────────────────────────────────────────────── */}
+      {showParams && (
+        <div role="dialog" aria-modal="true" aria-labelledby="params-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-white/10">
+            {/* Header do modal */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-yellow-400 rounded-xl">
+                  <Filter className="w-5 h-5 text-black" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="params-title" className="text-base font-black">Filtros de Apuração</h3>
+                  <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Parâmetros obrigatórios</p>
+                </div>
+              </div>
+              {/* Botão fechar SEMPRE visível — usuário nunca fica preso */}
+              <button onClick={() => setShowParams(false)} aria-label="Fechar parâmetros"
+                className="p-2 hover:bg-white/10 rounded-full transition-all">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            <div className="p-7 space-y-5">
+              <div className="bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="param-start" className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                    Data Início
+                  </label>
+                  {/* Input sem ícone decorativo sobreposto — ícone nativo do browser é suficiente */}
+                  <input id="param-start" type="date"
+                    value={params.start}
+                    onChange={e => setParams({ ...params, start: e.target.value })}
+                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-300 transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="param-end" className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">
+                    Data Término
+                  </label>
+                  <input id="param-end" type="date"
+                    value={params.end}
+                    min={params.start}
+                    onChange={e => setParams({ ...params, end: e.target.value })}
+                    className="w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm font-bold outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-300 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Validação visual antes de carregar */}
+              {params.start && params.end && params.start > params.end && (
+                <p className="text-[10px] text-red-500 font-bold flex items-center gap-1">
+                  <X className="w-3 h-3" aria-hidden="true" /> Data início não pode ser maior que data término.
+                </p>
+              )}
+
+              <button onClick={handleApply}
+                disabled={!params.start || !params.end || params.start > params.end}
+                className="w-full py-4 bg-slate-900 hover:bg-slate-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
+                <Play className="w-4 h-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />
+                Carregar Relatório
+              </button>
+
+              <p className="text-[9px] text-center font-medium text-slate-400 italic">
+                * Intervalo de datas para calcular saldos acumulados de armazenagem.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
