@@ -32,14 +32,7 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// ====== MOCK DATA ======
 
-const MOCK_RECEIVING = [
-  { id: 'OR-55920', depositante: 'VerticalParts Matriz', tipo: 'Compra Nacional', status: 'Pendente', data: '22/02/2026', totalItens: 45, conferidos: 0 },
-  { id: 'OR-55921', depositante: 'VerticalParts Matriz', tipo: 'Devolução Cliente', status: 'Aguardando Alocação', data: '22/02/2026', totalItens: 12, conferidos: 12 },
-  { id: 'OR-55925', depositante: 'VParts Import Export', tipo: 'Importação Direta', status: 'Pendente', data: '21/02/2026', totalItens: 120, conferidos: 45 },
-  { id: 'OR-55890', depositante: 'VerticalParts Matriz', tipo: 'Compra Nacional', status: 'Finalizada', data: '20/02/2026', totalItens: 88, conferidos: 88 },
-];
 
 const STATUS_COLORS = {
   'Pendente': 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
@@ -78,11 +71,20 @@ const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled =
 
 export default function ReceivingManager() {
   const { companies } = useApp();
-  const [filterStatus, setFilterStatus] = useState('Pendente');
+  const [filterStatus, setFilterStatus] = useState('Todos');
   const [filterPeriod, setFilterPeriod] = useState('1 dia');
   const [selectedOR, setSelectedOR] = useState(null);
   const [showBlindModal, setShowBlindModal] = useState(false);
   const [showDamageModal, setShowDamageModal] = useState(false);
+  const [ordens, setOrdens] = useState([
+    { id: 'OR-55920', depositante: 'VerticalParts Matriz', tipo: 'Compra Nacional', status: 'Pendente', data: '22/02/2026', totalItens: 45, conferidos: 0, nf: 'NF-78901' },
+    { id: 'OR-55921', depositante: 'VerticalParts Matriz', tipo: 'Devolução Cliente', status: 'Aguardando Alocação', data: '22/02/2026', totalItens: 12, conferidos: 12, nf: 'NF-78845' },
+    { id: 'OR-55925', depositante: 'VParts Import Export', tipo: 'Importação Direta', status: 'Pendente', data: '21/02/2026', totalItens: 120, conferidos: 45, nf: 'NF-79100' },
+    { id: 'OR-55890', depositante: 'VerticalParts Matriz', tipo: 'Compra Nacional', status: 'Finalizada', data: '20/02/2026', totalItens: 88, conferidos: 88, nf: 'NF-78500' },
+  ]);
+  const [showNFModal, setShowNFModal] = useState(false);
+  const [showProductsModal, setShowProductsModal] = useState(false);
+  const [scanLog, setScanLog] = useState([]); // histórico de bips
   
   // Blind Check State
   const [barcode, setBarcode] = useState('');
@@ -104,6 +106,15 @@ export default function ReceivingManager() {
     setLastScan({ sku: 'VEPEL-BPI-174FX', desc: 'Kit de Pastilhas de Freio - VParts', barcode });
     setBarcode('');
     if (scanInputRef.current) scanInputRef.current.focus();
+
+    // Atualiza progresso da OR
+    setOrdens(prev => prev.map(o =>
+      o.id === selectedOR && o.conferidos < o.totalItens
+        ? {...o, conferidos: o.conferidos + quantity}
+        : o
+    ));
+    // Adiciona ao log
+    setScanLog(prev => [{sku: barcode, qty: quantity, ts: new Date().toLocaleTimeString('pt-BR')}, ...prev]);
   };
 
   return (
@@ -120,7 +131,7 @@ export default function ReceivingManager() {
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 p-1.5 rounded-2xl flex items-center shadow-sm">
-            {['Pendente', 'Aguardando Alocação', 'Finalizada'].map((s) => (
+            {['Todos', 'Pendente', 'Aguardando Alocação', 'Finalizada'].map((s) => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
@@ -162,9 +173,19 @@ export default function ReceivingManager() {
           <div className="space-y-3">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Grupo Controle</p>
             <div className="flex gap-3">
-              <ToolbarButton label="Nota Fiscal" icon={FileText} disabled={!selectedOR} />
-              <ToolbarButton label="Produtos" icon={Boxes} disabled={!selectedOR} />
-              <ToolbarButton label="Gerar Picking" icon={Zap} disabled={!selectedOR} />
+              <ToolbarButton label="Nota Fiscal" icon={FileText} disabled={!selectedOR}
+                onClick={() => setShowNFModal(true)} />
+              <ToolbarButton label="Produtos" icon={Boxes} disabled={!selectedOR}
+                onClick={() => setShowProductsModal(true)} />
+              <ToolbarButton label="Gerar Picking" icon={Zap} disabled={!selectedOR}
+                onClick={() => {
+                  const or = ordens.find(o => o.id === selectedOR);
+                  if (or?.status !== 'Aguardando Alocação') {
+                    alert('Finalize a conferência antes de gerar picking.');
+                    return;
+                  }
+                  alert('Picking gerado for ' + selectedOR + '! Acesse 1.10 Separar Pedidos.');
+                }} />
             </div>
           </div>
 
@@ -174,16 +195,42 @@ export default function ReceivingManager() {
           <div className="space-y-3">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Grupo Conferência</p>
             <div className="flex gap-3">
-              <ToolbarButton 
-                label="Conferência Cega" 
-                icon={Barcode} 
-                color="secondary" 
-                disabled={!selectedOR || filterStatus === 'Finalizada'} 
-                onClick={() => setShowBlindModal(true)}
-              />
-              <ToolbarButton label="Recontagem" icon={RotateCcw} disabled={!selectedOR} />
-              <ToolbarButton label="Divergência" icon={AlertTriangle} disabled={!selectedOR} badge="!" />
-              <ToolbarButton label="Finalizar" icon={CheckCircle2} color="secondary" disabled={!selectedOR} />
+              <ToolbarButton label="Conferência Cega" icon={Barcode} color="secondary"
+                disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status === 'Finalizada'}
+                onClick={() => setShowBlindModal(true)} />
+
+              <ToolbarButton label="Recontagem" icon={RotateCcw}
+                disabled={!selectedOR}
+                onClick={() => {
+                  setOrdens(prev => prev.map(o => o.id === selectedOR ? {...o, conferidos: 0} : o));
+                  setScanLog([]);
+                  alert('Recontagem iniciada. Conferidos resetados para 0.');
+                }} />
+
+              <ToolbarButton label="Divergência" icon={AlertTriangle} badge="!"
+                disabled={!selectedOR}
+                onClick={() => {
+                  const or = ordens.find(o => o.id === selectedOR);
+                  const diff = or ? or.totalItens - or.conferidos : 0;
+                  if (diff === 0) alert('Nenhuma divergência! Todos os itens conferidos.');
+                  else alert(`Divergência: ${diff} item(ns) ainda não conferido(s) em ${selectedOR}.`);
+                }} />
+
+              <ToolbarButton label="Finalizar" icon={CheckCircle2} color="secondary"
+                disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status !== 'Pendente'}
+                onClick={() => {
+                  const or = ordens.find(o => o.id === selectedOR);
+                  if (!or) return;
+                  if (or.conferidos < or.totalItens) {
+                    const confirmar = window.confirm(`Ainda há ${or.totalItens - or.conferidos} item(ns) não conferido(s). Finalizar com divergência?`);
+                    if (!confirmar) return;
+                  }
+                  setOrdens(prev => prev.map(o => o.id === selectedOR
+                    ? {...o, status: 'Aguardando Alocação', conferidos: o.totalItens}
+                    : o
+                  ));
+                  alert(selectedOR + ' finalizada! Status: Aguardando Alocação.');
+                }} />
             </div>
           </div>
 
@@ -193,9 +240,34 @@ export default function ReceivingManager() {
           <div className="space-y-3">
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Grupo Alocação</p>
             <div className="flex gap-3">
-              <ToolbarButton label="Gerar Alocação" icon={Truck} disabled={!selectedOR} />
-              <ToolbarButton label="Confirmar" icon={CheckCircle2} disabled={!selectedOR} />
-              <ToolbarButton label="Estornar" icon={RotateCcw} disabled={!selectedOR} />
+              <ToolbarButton label="Gerar Alocação" icon={Truck}
+                disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status !== 'Aguardando Alocação'}
+                onClick={() => {
+                  alert('Mapa de alocação gerado para ' + selectedOR + '!\nAcesse 1.6 Gerar Mapa de Alocação para confirmar os endereços.');
+                }} />
+
+              <ToolbarButton label="Confirmar" icon={CheckCircle2}
+                disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status !== 'Aguardando Alocação'}
+                onClick={() => {
+                  setOrdens(prev => prev.map(o => o.id === selectedOR
+                    ? {...o, status: 'Finalizada'}
+                    : o
+                  ));
+                  setSelectedOR(null);
+                  alert('Alocação confirmada! OR movida para Finalizada e estoque atualizado.');
+                }} />
+
+              <ToolbarButton label="Estornar" icon={RotateCcw}
+                disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status === 'Pendente'}
+                onClick={() => {
+                  const confirmar = window.confirm('Estornar alocação de ' + selectedOR + '? A OR voltará para Pendente.');
+                  if (!confirmar) return;
+                  setOrdens(prev => prev.map(o => o.id === selectedOR
+                    ? {...o, status: 'Pendente', conferidos: 0}
+                    : o
+                  ));
+                  alert('Alocação estornada. OR voltou para Pendente.');
+                }} />
             </div>
           </div>
 
@@ -217,7 +289,7 @@ export default function ReceivingManager() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-              {MOCK_RECEIVING.filter(or => or.status === filterStatus || filterStatus === 'Todos').map((or) => (
+              {ordens.filter(or => or.status === filterStatus || filterStatus === 'Todos').map((or) => (
                 <tr 
                   key={or.id}
                   onClick={() => setSelectedOR(or.id)}
@@ -435,6 +507,71 @@ export default function ReceivingManager() {
         </div>
       )}
 
+      {showNFModal && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
+      onClick={() => setShowNFModal(false)}>
+      <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-2">Nota Fiscal Vinculada</h3>
+        <p className="text-xs text-slate-400 mb-6">O.R.: <strong>{selectedOR}</strong></p>
+        {(() => {
+          const or = ordens.find(o => o.id === selectedOR);
+          return (
+            <div className="bg-slate-50 rounded-2xl p-5 space-y-3">
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400 font-bold">Número NF</span>
+                <span className="font-black text-secondary">{or?.nf || '—'}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400 font-bold">Depositante</span>
+                <span className="font-black">{or?.depositante}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400 font-bold">Tipo de Entrada</span>
+                <span className="font-black">{or?.tipo}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-400 font-bold">Total de Itens</span>
+                <span className="font-black">{or?.totalItens} SKUs</span>
+              </div>
+            </div>
+          );
+        })()}
+        <button onClick={() => setShowNFModal(false)}
+          className="w-full mt-6 py-3 bg-secondary text-primary rounded-2xl text-xs font-black uppercase tracking-widest">
+          Fechar
+        </button>
+      </div>
+    </div>
+  )}
+
+  {showProductsModal && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
+      onClick={() => setShowProductsModal(false)}>
+      <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
+        onClick={e => e.stopPropagation()}>
+        <h3 className="text-lg font-black mb-2">Produtos da O.R.</h3>
+        <p className="text-xs text-slate-400 mb-6">O.R.: <strong>{selectedOR}</strong></p>
+        <div className="space-y-2 max-h-72 overflow-y-auto">
+          {['VEPEL-BPI-174FX','VPER-ESS-NY-27MM','VPER-PAL-INO-1000','VPER-LUM-LED-VRD-24V','VPER-PNT-AL-22D'].map((sku, i) => (
+            <div key={sku} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              <div>
+                <p className="text-xs font-black text-secondary">{sku}</p>
+                <p className="text-[10px] text-slate-400">Peça para elevador · Lote VP-{2026+i}</p>
+              </div>
+              <span className="text-xs font-black bg-white border border-slate-200 px-2 py-1 rounded-lg">
+                {Math.ceil(Math.random()*20)} un
+              </span>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => setShowProductsModal(false)}
+          className="w-full mt-6 py-3 bg-secondary text-primary rounded-2xl text-xs font-black uppercase tracking-widest">
+          Fechar
+        </button>
+      </div>
+    </div>
+  )}
     </div>
   );
 }
