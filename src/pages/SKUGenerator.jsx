@@ -1,13 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
 import { 
-  Zap, Info, Copy, CheckCircle, Barcode, Trash2, 
+  Zap, Info, Copy, CheckCircle, QrCode, Trash2, 
   Settings, Layers, ChevronRight, Package, Scale, 
   Search, ShieldCheck, AlertCircle, RefreshCw, Save,
-  Maximize2, FileText
+  Maximize2, FileText, Download, Printer
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import BarcodeComponent from 'react-barcode';
+import { QRCodeCanvas } from 'qrcode.react';
 import copy from 'copy-to-clipboard';
 import { VP_TYPES, CATEGORIES, ATTRIBUTE_FIELDS, COMPATIBILITY } from '../constants/skuConstants';
 
@@ -22,7 +21,7 @@ export default function SKUGenerator() {
   const [selectedCompatibility, setSelectedCompatibility] = useState([]);
   const [manualSku, setManualSku] = useState('');
   const [manualReference, setManualReference] = useState('');
-  const [showBarcode, setShowBarcode] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [step, setStep] = useState(1);
 
@@ -71,14 +70,32 @@ export default function SKUGenerator() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const downloadQRCode = () => {
+    const canvas = document.getElementById('sku-qr-code');
+    if (canvas) {
+      const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pngUrl;
+      downloadLink.download = `SKU_${manualSku || 'QR'}.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   const resetForm = () => {
     setVpType('');
     setCategory('');
     setAttributes({});
     setSelectedCompatibility([]);
     setManualSku('');
-    setShowBarcode(false);
+    setShowQRCode(false);
     setStep(1);
+    setManualReference('');
   };
 
   const handleCompatibilityToggle = (value) => {
@@ -94,9 +111,9 @@ export default function SKUGenerator() {
   const activeCategory = CATEGORIES.find(c => c.value === category);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 flex flex-col gap-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 flex flex-col gap-6 print:bg-white print:p-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-amber-400 flex items-center justify-center shadow-lg shadow-amber-400/20">
             <Zap className="w-6 h-6 text-black" />
@@ -130,7 +147,7 @@ export default function SKUGenerator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Form */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="lg:col-span-8 flex flex-col gap-6 print:hidden">
           
           {/* Step 1: VP Type */}
           <section className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm overflow-hidden relative">
@@ -340,80 +357,90 @@ export default function SKUGenerator() {
         </div>
 
         {/* Right Column: Preview & Output */}
-        <div className="lg:col-span-4 flex flex-col gap-6 sticky top-8 h-fit">
+        <div className="lg:col-span-4 flex flex-col gap-6 sticky top-8 h-fit print:col-span-12 print:static">
           
           {/* Real-time SKU Display */}
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-900/40 relative overflow-hidden border-4 border-slate-800">
-             <div className="absolute top-0 right-0 p-8 opacity-10">
+          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-slate-900/40 relative overflow-hidden border-4 border-slate-800 print:bg-white print:text-black print:shadow-none print:border-none print:p-4">
+             <div className="absolute top-0 right-0 p-8 opacity-10 print:hidden">
                <Zap className="w-24 h-24 text-amber-500" />
              </div>
              
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">SKU Gerado</p>
+             <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 print:text-slate-400">SKU Gerado</p>
              
              <div className="relative group">
                <input 
                  value={manualSku}
                  onChange={e => setManualSku(e.target.value.toUpperCase())}
-                 className="w-full bg-transparent text-2xl md:text-3xl font-black font-mono tracking-tighter text-amber-400 outline-none pr-10"
+                 className="w-full bg-transparent text-2xl md:text-3xl font-black font-mono tracking-tighter text-amber-400 outline-none pr-10 print:text-black print:text-xl"
                  placeholder="AGUARDANDO..."
                />
                <button 
                  onClick={handleCopy}
-                 className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-lg transition-colors"
+                 className="absolute right-0 top-1/2 -translate-y-1/2 p-2 hover:bg-white/10 rounded-lg transition-colors print:hidden"
                  title="Copiar SKU"
                >
                  {isCopied ? <CheckCircle className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-slate-500" />}
                </button>
              </div>
              
-             <div className="mt-8 flex items-center justify-between border-t border-slate-800 pt-6">
+             <div className="mt-8 flex items-center justify-between border-t border-slate-800 pt-6 print:border-slate-100 print:mt-4">
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">Validação I.T. 600</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase print:text-slate-400">Validação I.T. 600</span>
                   <div className="flex items-center gap-1.5 mt-1">
                      <ShieldCheck className={cn("w-3.5 h-3.5", manualSku ? "text-green-500" : "text-slate-700")} />
-                     <span className={cn("text-[10px] font-black uppercase tracking-widest", manualSku ? "text-slate-300" : "text-slate-700")}>
+                     <span className={cn("text-[10px] font-black uppercase tracking-widest", manualSku ? "text-slate-300 print:text-black" : "text-slate-700")}>
                         {manualSku ? "VÁLIDO" : "PENDENTE"}
                      </span>
                   </div>
                 </div>
                 
                 <button 
-                  onClick={() => setShowBarcode(!showBarcode)}
+                  onClick={() => { setShowQRCode(!showQRCode); if (!showQRCode) setStep(3); }}
                   disabled={!manualSku}
                   className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg",
-                    showBarcode 
+                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg print:hidden",
+                    showQRCode 
                       ? "bg-amber-400 text-black" 
                       : "bg-slate-800 text-slate-400 hover:bg-slate-700 disabled:opacity-30 disabled:grayscale"
                   )}
-                  title="Gerar Código de Barras"
+                  title="Gerar QR Code"
                 >
-                  <Barcode className="w-6 h-6" />
+                  <QrCode className="w-6 h-6" />
                 </button>
              </div>
           </div>
 
-          {/* Barcode Output */}
-          {showBarcode && (
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 border-2 border-amber-300 dark:border-amber-900 shadow-xl animate-in zoom-in-95 duration-300">
-               <div className="p-4 bg-white rounded-2xl">
-                 <BarcodeComponent 
+          {/* QR Code Output */}
+          {showQRCode && (
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 flex flex-col items-center gap-6 border-2 border-amber-300 dark:border-amber-900 shadow-xl animate-in zoom-in-95 duration-300 print:border-none print:shadow-none print:p-2">
+               <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm print:border-none">
+                 <QRCodeCanvas 
+                   id="sku-qr-code"
                    value={manualSku || 'PENDENTE'} 
-                   width={1.5} 
-                   height={60} 
-                   fontSize={12}
-                   background="#ffffff"
-                   lineColor="#000000"
+                   size={200}
+                   level="H"
+                   includeMargin={true}
                  />
                </div>
-               <div className="flex gap-2 w-full">
-                 <button className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200">
+               <div className="flex gap-2 w-full print:hidden">
+                 <button 
+                   onClick={handlePrint}
+                   className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 flex items-center justify-center gap-2"
+                 >
+                   <Printer className="w-4 h-4" />
                    Imprimir
                  </button>
-                 <button className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black">
+                 <button 
+                   onClick={downloadQRCode}
+                   className="flex-1 py-3 bg-slate-900 text-white dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black flex items-center justify-center gap-2"
+                 >
+                   <Download className="w-4 h-4" />
                    Download
                  </button>
                </div>
+               <p className="text-[9px] text-slate-400 text-center uppercase tracking-widest font-black print:hidden">
+                  Aponte a câmera para ler o SKU
+               </p>
             </div>
           )}
 
