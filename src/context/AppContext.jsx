@@ -132,10 +132,10 @@ export function AppProvider({ children }) {
     const [users, setUsers] = useState(() => {
         const saved = localStorage.getItem('vparts_users');
         return saved ? JSON.parse(saved) : [
-            { id: 1, usuario: 'danilo.supervisor', nomeUsuario: 'Danilo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES', 'SUPERVISORES'], cargo: 'Supervisor' },
-            { id: 2, usuario: 'matheus.oper', nomeUsuario: 'Matheus', nivel: 'Operador', departamento: 'Expedição', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Operador' },
-            { id: 3, usuario: 'thiago.almox', nomeUsuario: 'Thiago', nivel: 'Operador', departamento: 'Almoxarifado', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Almox' },
-            { id: 4, usuario: 'gelson.estrat', nomeUsuario: 'Gelson', nivel: 'Administrador', departamento: 'Estratégia', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], cargo: 'Estratégias e Processos' },
+            { id: 1, usuario: 'danilo.supervisor', nomeUsuario: 'Danilo', email: 'danilo@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES', 'SUPERVISORES'], cargo: 'Supervisor', hasTransactions: true },
+            { id: 2, usuario: 'matheus.oper', nomeUsuario: 'Matheus', email: 'matheus@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Expedição', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Operador', hasTransactions: true },
+            { id: 3, usuario: 'thiago.almox', nomeUsuario: 'Thiago', email: 'thiago@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Almoxarifado', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Almox', hasTransactions: false },
+            { id: 4, usuario: 'gelson.estrat', nomeUsuario: 'Gelson', email: 'gelson@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Estratégia', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], cargo: 'Estratégias e Processos', hasTransactions: false },
         ];
     });
 

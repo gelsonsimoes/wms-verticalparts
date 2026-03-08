@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useId } from 'react';
 import { 
   PackageSearch, 
   MapPin, 
@@ -8,7 +8,9 @@ import {
   ArrowRight,
   ClipboardList,
   History,
-  Info
+  Info,
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -36,9 +38,22 @@ export default function StockAllocation() {
 
   // Alerta de Divergência
   const [showDivergenceAlert, setShowDivergenceAlert] = useState(false);
+  const allocId = useId();
 
   const itemInputRef = useRef(null);
   const addressInputRef = useRef(null);
+
+  // Toast System
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => () => { if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current); }, []);
 
   useEffect(() => {
     if (itemInputRef.current) itemInputRef.current.focus();
@@ -46,34 +61,55 @@ export default function StockAllocation() {
 
   const handleScanItem = (e) => {
     if (e.key === 'Enter') {
-      const task = tasks.find(t => t.lote === scannedItem || t.produto.includes(scannedItem.toUpperCase()));
+      const query = scannedItem.trim();
+      const task = tasks.find(t =>
+        t.lote.toLowerCase() === query.toLowerCase() ||
+        t.produto.toLowerCase().includes(query.toLowerCase())
+      );
       if (task) {
         setActiveTask(task);
         setSuggestedAddress(task.enderecoSugerido);
         setAllocatedQty(task.qtdTotal.toString());
         if (addressInputRef.current) addressInputRef.current.focus();
       } else {
-        alert("Lote ou Produto não encontrado na fila de alocação.");
+        showToast('Lote ou Produto não encontrado na fila de alocação.', 'error');
       }
     }
   };
 
+  // Confirmação normal (com verificação de divergência)
   const handleConfirmAllocation = () => {
-    if (!activeTask || !scannedAddress) {
-      alert("Identifique o produto e o endereço de destino.");
+    if (!activeTask || !scannedAddress.trim()) {
+      showToast('Identifique o produto e o endereço de destino.', 'error');
       return;
     }
-
-    if (scannedAddress.toUpperCase() !== suggestedAddress.toUpperCase() && !showDivergenceAlert) {
+    const qty = Number(allocatedQty);
+    if (!allocatedQty || isNaN(qty) || qty <= 0 || qty > activeTask.qtdTotal) {
+      showToast(`Quantidade inválida. Deve ser entre 1 e ${activeTask.qtdTotal}.`, 'error');
+      return;
+    }
+    if (scannedAddress.trim().toUpperCase() !== suggestedAddress.toUpperCase() && !showDivergenceAlert) {
       setShowDivergenceAlert(true);
       return;
     }
+    confirmAllocation();
+  };
 
-    // Finaliza alocação
-    const updatedTasks = tasks.map(t => 
-      t.id === activeTask.id ? { ...t, status: 'Finalizado', enderecoSugerido: scannedAddress.toUpperCase() } : t
+  // Confirmação forçada (após aceitar divergência)
+  const confirmForced = () => {
+    confirmAllocation();
+  };
+
+  // Núcleo da confirmação
+  const confirmAllocation = () => {
+    const qty = Number(allocatedQty);
+    const updatedTasks = tasks.map(t =>
+      t.id === activeTask.id
+        ? { ...t, qtdTotal: t.qtdTotal - qty, status: t.qtdTotal - qty <= 0 ? 'Finalizado' : 'Pendente', enderecoSugerido: scannedAddress.trim().toUpperCase() }
+        : t
     );
     setTasks(updatedTasks);
+    showToast('Alocação confirmada com sucesso!', 'success');
     resetPanel();
   };
 
@@ -88,7 +124,10 @@ export default function StockAllocation() {
   };
 
   const filteredTasks = tasks.filter(t => {
-    const matchesSearch = t.or.includes(searchQuery) || t.produto.includes(searchQuery.toUpperCase()) || t.lote.includes(searchQuery);
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = t.or.toLowerCase().includes(q) ||
+                          t.produto.toLowerCase().includes(q) ||
+                          t.lote.toLowerCase().includes(q);
     const matchesStatus = statusFilter === 'Pendentes' ? t.status === 'Pendente' : t.status === 'Finalizado';
     return matchesSearch && matchesStatus;
   });
@@ -99,24 +138,26 @@ export default function StockAllocation() {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <MapPin className="text-slate-950 w-6 h-6" />
+            <MapPin className="text-slate-950 w-6 h-6" aria-hidden="true" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Alocar Estoque (Put-away)</h1>
+            <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">2.8 Alocar Estoque</h1>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Movimentação de Guarda Definitiva</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar OR, Produto ou Lote..."
-              className="pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary/20 outline-none w-64"
-            />
-          </div>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+              <label htmlFor={`${allocId}-search`} className="sr-only">Buscar OR, Produto ou Lote</label>
+              <input
+                id={`${allocId}-search`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar OR, Produto ou Lote..."
+                className="pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary/20 outline-none w-64"
+              />
+            </div>
           <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
             <button 
               onClick={() => setStatusFilter('Pendentes')}
@@ -143,7 +184,7 @@ export default function StockAllocation() {
       {/* 2. PAINEL DE OPERAÇÃO / BIPAGEM */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         <div className="bg-slate-900 text-white rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity" aria-hidden="true">
             <PackageSearch className="w-40 h-40" />
           </div>
 
@@ -152,7 +193,7 @@ export default function StockAllocation() {
             <div className="lg:col-span-12 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-slate-800 pb-8">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center">
-                  <Info className="text-primary w-8 h-8" />
+                  <Info className="text-primary w-8 h-8" aria-hidden="true" />
                 </div>
                 <div>
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Endereço Sugerido pela Inteligência</p>
@@ -169,8 +210,9 @@ export default function StockAllocation() {
 
             {/* Inputs de Operação */}
             <div className="lg:col-span-4 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Bipar Lote / Produto</label>
-              <input 
+              <label htmlFor={`${allocId}-item`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">1. Bipar Lote / Produto</label>
+              <input
+                id={`${allocId}-item`}
                 ref={itemInputRef}
                 value={scannedItem}
                 onChange={(e) => setScannedItem(e.target.value)}
@@ -181,8 +223,9 @@ export default function StockAllocation() {
             </div>
 
             <div className="lg:col-span-4 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Bipar Endereço Destino</label>
-              <input 
+              <label htmlFor={`${allocId}-address`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">2. Bipar Endereço Destino</label>
+              <input
+                id={`${allocId}-address`}
                 ref={addressInputRef}
                 value={scannedAddress}
                 onChange={(e) => setScannedAddress(e.target.value)}
@@ -192,8 +235,9 @@ export default function StockAllocation() {
             </div>
 
             <div className="lg:col-span-2 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Qtd</label>
-              <input 
+              <label htmlFor={`${allocId}-qty`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Qtd</label>
+              <input
+                id={`${allocId}-qty`}
                 type="number"
                 value={allocatedQty}
                 onChange={(e) => setAllocatedQty(e.target.value)}
@@ -202,37 +246,39 @@ export default function StockAllocation() {
             </div>
 
             <div className="lg:col-span-2">
-              <button 
+              <button
                 onClick={handleConfirmAllocation}
                 className="w-full bg-primary text-slate-950 py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-primary/10 hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="w-5 h-5" /> Confirmar
+                <CheckCircle2 className="w-5 h-5" aria-hidden="true" /> Confirmar
               </button>
             </div>
           </div>
+
+          {/* Error Message is now handled via Toast */}
         </div>
 
         {/* 3. ALERTA DE DIVERGÊNCIA */}
         {showDivergenceAlert && (
-          <div className="bg-yellow-500/10 border-2 border-yellow-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4">
+          <div role="alertdialog" aria-labelledby="div-title" className="bg-yellow-500/10 border-2 border-yellow-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center shadow-lg shadow-yellow-500/20 shrink-0">
-                <AlertTriangle className="text-slate-950 w-6 h-6" />
+                <AlertTriangle className="text-slate-950 w-6 h-6" aria-hidden="true" />
               </div>
               <div className="text-left">
-                <h4 className="text-sm font-black text-yellow-600 uppercase tracking-widest">Divergência de Endereçamento</h4>
+                <h4 id="div-title" className="text-sm font-black text-yellow-600 uppercase tracking-widest">Divergência de Endereçamento</h4>
                 <p className="text-xs font-bold text-slate-600 dark:text-slate-400">Atenção: Guardando em endereço diferente do planejado. Deseja prosseguir?</p>
               </div>
             </div>
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={() => setShowDivergenceAlert(false)}
                 className="px-6 py-2 bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest"
               >
                 Não, Corrigir
               </button>
-              <button 
-                onClick={handleConfirmAllocation}
+              <button
+                onClick={confirmForced}
                 className="px-6 py-2 bg-yellow-500 text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-yellow-500/20"
               >
                 Sim, Confirmar
@@ -246,7 +292,7 @@ export default function StockAllocation() {
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm">
         <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ClipboardList className="text-slate-400 w-4 h-4" />
+            <ClipboardList className="text-slate-400 w-4 h-4" aria-hidden="true" />
             <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 italic">Fila de Alocação Pendente</h3>
           </div>
           <div className="flex bg-slate-200 dark:bg-slate-700/50 p-0.5 rounded-lg">
@@ -259,13 +305,13 @@ export default function StockAllocation() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-700 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] bg-slate-50/50 dark:bg-slate-900/20">
-                <th className="px-6 py-4">OR</th>
-                <th className="px-6 py-4">Depositante</th>
-                <th className="px-6 py-4">Produto</th>
-                <th className="px-6 py-4">Lote</th>
-                <th className="px-6 py-4 text-center">Qtd</th>
-                <th className="px-6 py-4">Ender. Sugerido</th>
-                <th className="px-6 py-4 text-right pr-6">Status</th>
+                <th scope="col" className="px-6 py-4">OR</th>
+                <th scope="col" className="px-6 py-4">Depositante</th>
+                <th scope="col" className="px-6 py-4">Produto</th>
+                <th scope="col" className="px-6 py-4">Lote</th>
+                <th scope="col" className="px-6 py-4 text-center">Qtd</th>
+                <th scope="col" className="px-6 py-4">Ender. Sugerido</th>
+                <th scope="col" className="px-6 py-4 text-right pr-6">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -295,12 +341,35 @@ export default function StockAllocation() {
           </table>
           {filteredTasks.length === 0 && (
             <div className="p-12 text-center">
-              <PackageSearch className="w-12 h-12 text-slate-200 dark:text-slate-700 mx-auto mb-4" />
+              <PackageSearch className="w-12 h-12 text-slate-200 dark:text-slate-700 mx-auto mb-4" aria-hidden="true" />
               <p className="text-sm font-bold text-slate-400">Nenhuma tarefa encontrada para os filtros aplicados.</p>
             </div>
           )}
         </div>
       </div>
+      {/* Toast Notification */}
+      {toast && (
+        <div 
+          className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300"
+          role="status"
+        >
+          <div className={cn(
+            "flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 text-white",
+            toast.type === 'success' ? 'bg-green-500 border-green-700' : 
+            toast.type === 'error'   ? 'bg-red-500 border-red-700' : 
+            'bg-blue-600 border-blue-800'
+          )}>
+            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" aria-hidden="true" /> : <AlertCircle className="w-5 h-5" aria-hidden="true" />}
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest opacity-70 leading-none mb-1">Notificação</p>
+              <p className="text-sm font-bold">{toast.message}</p>
+            </div>
+            <button onClick={() => setToast(null)} className="ml-4 p-1 hover:bg-black/10 rounded-full transition-colors" aria-label="Fechar notificação">
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,18 @@
+# VerticalParts WMS - Robots.txt
+# Este site é um sistema interno, não deve ser indexado por buscadores.
+
+User-agent: *
+Disallow: /
+
+# Bloquear todos os bots de IA e crawlers de conteúdo
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: CCBot
+Disallow: /

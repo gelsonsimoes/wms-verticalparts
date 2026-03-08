@@ -9,9 +9,7 @@ import {
   AlertCircle,
   Download,
   Printer,
-  FileText,
-  User,
-  ArrowUpRight
+  FileText
 } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import ActionPane from '../components/ui/ActionPane';
@@ -29,16 +27,16 @@ export default function OrderManagement() {
 
   const orderGroups = [
     [
-      { label: 'Novo Pedido', primary: true, icon: <Plus size={14}/>, onClick: () => {} },
-      { label: 'Liberar para WMS', icon: <CheckCircle2 size={14}/>, onClick: () => {} },
+      { label: 'Novo Pedido',       primary: true, icon: <Plus size={14}/>,         onClick: () => alert('Funcionalidade "Novo Pedido" em desenvolvimento.') },
+      { label: 'Liberar para WMS',              icon: <CheckCircle2 size={14}/>,   onClick: () => alert('Funcionalidade "Liberar para WMS" em desenvolvimento.') },
     ],
     [
-      { label: 'Bloquear Ordem', icon: <AlertCircle size={14}/>, onClick: () => {} },
-      { label: 'Cancelar', icon: <Clock size={14}/>, onClick: () => {} },
+      { label: 'Bloquear Ordem',               icon: <AlertCircle size={14}/>,    onClick: () => alert('Funcionalidade "Bloquear Ordem" em desenvolvimento.') },
+      { label: 'Cancelar',                      icon: <Clock size={14}/>,           onClick: () => alert('Funcionalidade "Cancelar Ordem" em desenvolvimento.') },
     ],
     [
-      { label: 'Imprimir Etiquetas', icon: <Printer size={14}/>, onClick: () => {} },
-      { label: 'Exportar XML/CSV', icon: <Download size={14}/>, onClick: () => {} },
+      { label: 'Imprimir Etiquetas',            icon: <Printer size={14}/>,         onClick: () => alert('Funcionalidade "Imprimir Etiquetas" em desenvolvimento.') },
+      { label: 'Exportar XML/CSV',              icon: <Download size={14}/>,        onClick: () => alert('Funcionalidade "Exportar XML/CSV" em desenvolvimento.') },
     ]
   ];
 
@@ -95,9 +93,9 @@ export default function OrderManagement() {
             <ShoppingCart className="text-[var(--vp-primary)]" size={20}/>
           </div>
           <div>
-            <h1 className="text-2xl font-black text-[var(--vp-text-data)] leading-tight tracking-tight uppercase">Gerenciamento de Pedidos</h1>
-            <p className="text-[10px] font-bold text-[var(--vp-text-label)] uppercase mt-1 tracking-widest flex items-center gap-2">
-              <FileText size={12}/> Controle de Carteira e Liberação de Ordens
+            <h1 className="text-2xl font-black text-[var(--vp-text)] leading-tight tracking-tight uppercase">2.22 Gerenciamento de Pedidos</h1>
+            <p className="text-[10px] font-bold text-[var(--vp-label)] uppercase mt-1 tracking-widest flex items-center gap-2">
+              <FileText size={12} aria-hidden="true"/> Controle de Carteira e Liberação de Ordens
             </p>
           </div>
         </div>
@@ -110,8 +108,11 @@ export default function OrderManagement() {
         <FastTab title="Carteira de Pedidos Ativos" defaultOpen={true}>
           <div className="mb-4 flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
+              {/* Label sr-only associa o campo sem texto visível */}
+              <label htmlFor="search-order" className="sr-only">Buscar pedidos por ordem, cliente ou status</label>
               <input 
+                id="search-order"
                 type="text" 
                 placeholder="Filtrar por Ordem, Cliente ou Status..." 
                 className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
@@ -119,8 +120,12 @@ export default function OrderManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="btn-secondary px-4 flex items-center gap-2">
-              <Filter size={16}/> <span className="text-[10px] font-bold uppercase">Filtros</span>
+            <button
+              className="btn-secondary px-4 flex items-center gap-2"
+              aria-label="Abrir filtros avançados de pedidos"
+              onClick={() => alert('Filtros avançados — funcionalidade em desenvolvimento.')}
+            >
+              <Filter size={16} aria-hidden="true"/> <span className="text-[10px] font-bold uppercase">Filtros</span>
             </button>
           </div>
           
@@ -128,7 +133,8 @@ export default function OrderManagement() {
             columns={orderColumns} 
             data={orderData.filter(o => 
               o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
-              o.customer.toLowerCase().includes(searchTerm.toLowerCase())
+              o.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              o.status.toLowerCase().includes(searchTerm.toLowerCase())
             )} 
           />
         </FastTab>
@@ -137,24 +143,24 @@ export default function OrderManagement() {
         <FastTab title="Indicadores de Performance da Carteira" defaultOpen={false}>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-t-4 border-t-[var(--vp-secondary)]">
-              <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Total em Aberto</label>
-              <div className="text-xl font-black text-[var(--vp-text-data)] mt-1">R$ 19.750,00</div>
+              <label className="text-[10px] font-black text-[var(--vp-label)] uppercase tracking-widest">Total em Aberto</label>
+              <div className="text-xl font-black text-[var(--vp-text)] mt-1">R$ 19.750,00</div>
               <div className="text-[10px] text-gray-400 font-bold mt-2 uppercase flex items-center gap-1">
-                <ArrowUpRight size={10}/> +5.2% vs ontem
+                +5.2% vs ontem
               </div>
             </div>
             <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-t-4 border-t-red-600">
-              <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Atraso de Separação</label>
+              <label className="text-[10px] font-black text-[var(--vp-label)] uppercase tracking-widest">Atraso de Separação</label>
               <div className="text-xl font-black text-red-600 mt-1">3 Ordens</div>
-              <div className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Ação imediata requerida</div>
+              <div className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Áção imediata requerida</div>
             </div>
             <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-t-4 border-t-green-600">
-              <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Taxa de Liberação</label>
+              <label className="text-[10px] font-black text-[var(--vp-label)] uppercase tracking-widest">Taxa de Liberação</label>
               <div className="text-xl font-black text-green-700 mt-1">92.5%</div>
               <div className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Dentro da meta</div>
             </div>
             <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-t-4 border-t-blue-600">
-              <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Tempo Médio (SLA)</label>
+              <label className="text-[10px] font-black text-[var(--vp-label)] uppercase tracking-widest">Tempo Médio (SLA)</label>
               <div className="text-xl font-black text-blue-600 mt-1">1.2 hrs</div>
               <div className="text-[10px] text-gray-400 font-bold mt-2 uppercase">Picking p/ Packing</div>
             </div>

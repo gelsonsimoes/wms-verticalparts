@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Package,
   Layers,
@@ -9,7 +9,6 @@ import {
   XCircle,
   Barcode,
   X,
-  ChevronRight,
   Zap,
   Hash,
   DollarSign,
@@ -18,6 +17,7 @@ import {
   Scissors,
   RefreshCcw,
 } from 'lucide-react';
+import { useApp } from '../context/AppContext';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -31,64 +31,96 @@ const KIT_RECIPES = {
     desc: 'Kit Completo de Freio Performance',
     valorKit: 485.00,
     componentes: [
-      { sku: 'VP-FR4429-X', desc: 'Pastilha de Freio Cerâmica', qtdExigida: 4 },
-      { sku: 'VP-DF882-M', desc: 'Disco de Freio Ventilado', qtdExigida: 2 },
-      { sku: 'VP-FL1', desc: 'Fluido de Freio DOT4 500mL', qtdExigida: 1 },
+      { sku: 'VP-FR4429-X', desc: 'Pastilha de Freio Cerâmica',    qtdExigida: 4 },
+      { sku: 'VP-DF882-M',  desc: 'Disco de Freio Ventilado',      qtdExigida: 2 },
+      { sku: 'VP-FL1',      desc: 'Fluido de Freio DOT4 500mL',    qtdExigida: 1 },
     ],
   },
   'VP-KIT-FILTROS-STD': {
     desc: 'Kit Filtros Standard (Revisão 10K)',
     valorKit: 210.00,
     componentes: [
-      { sku: 'VP-FL1', desc: 'Filtro de Óleo VP-FL1', qtdExigida: 1 },
-      { sku: 'VP-AIR-02', desc: 'Filtro de Ar Esportivo', qtdExigida: 1 },
-      { sku: 'VP-WPR-99', desc: 'Palheta Limpador Silicone 24"', qtdExigida: 2 },
+      { sku: 'VP-FL1',     desc: 'Filtro de Óleo VP-FL1',          qtdExigida: 1 },
+      { sku: 'VP-AIR-02',  desc: 'Filtro de Ar Esportivo',         qtdExigida: 1 },
+      { sku: 'VP-WPR-99',  desc: 'Palheta Limpador Silicone 24"',  qtdExigida: 2 },
     ],
   },
 };
 
 // ===== MODAL DE BIPAGEM DE COMPONENTE =====
-function ScannerModal({ onClose, onAdd, mode }) {
+function ScannerModal({ onClose, onAdd, mode, recipe }) {
   const [code, setCode] = useState('');
-  const [qty, setQty] = useState(1);
+  const [qty,  setQty]  = useState(1);
   const [error, setError] = useState('');
 
   // SKU lookup mock
   const SKU_MAP = {
-    'VP-FR4429-X': 'Pastilha de Freio Cerâmica',
-    'VP-DF882-M': 'Disco de Freio Ventilado',
-    'VP-FL1': mode === 'assembly' ? 'Fluido de Freio DOT4 500mL' : 'Filtro de Óleo VP-FL1',
-    'VP-AIR-02': 'Filtro de Ar Esportivo',
-    'VP-WPR-99': 'Palheta Limpador Silicone 24"',
-    'VEPEL-BPI-174FX': 'Barreira de Proteção Infravermelha',
-    'VPER-PAL-INO-1000': 'Pallet de Aço Inox (1000mm)',
+    'VP-FR4429-X':      'Pastilha de Freio Cerâmica',
+    'VP-DF882-M':       'Disco de Freio Ventilado',
+    'VP-FL1':           mode === 'assembly' ? 'Fluido de Freio DOT4 500mL' : 'Filtro de Óleo VP-FL1',
+    'VP-AIR-02':        'Filtro de Ar Esportivo',
+    'VP-WPR-99':        'Palheta Limpador Silicone 24"',
+    'VEPEL-BPI-174FX':  'Barreira de Proteção Infravermelha',
+    'VPER-PAL-INO-1000':'Pallet de Aço Inox (1000mm)',
   };
 
+  // Fechar com Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const handleAdd = () => {
-    if (!code.trim()) { setError('Informe o código de barras ou SKU.'); return; }
-    const desc = SKU_MAP[code.trim().toUpperCase()] || `Produto ${code.trim()}`;
-    onAdd({ sku: code.trim().toUpperCase(), desc, qty: parseInt(qty) || 1 });
+    if (!code.trim()) {
+      setError('Informe o código de barras ou SKU.');
+      return;
+    }
+    const upperCode = code.trim().toUpperCase();
+    const desc = SKU_MAP[upperCode] || `Produto ${upperCode}`;
+
+    // Valida se o SKU pertence à receita (apenas montagem com receita carregada)
+    if (mode === 'assembly' && recipe) {
+      const naReceita = recipe.componentes.some(c => c.sku.toUpperCase() === upperCode);
+      if (!naReceita) {
+        setError(`SKU "${upperCode}" não pertence à receita deste kit. Verifique e tente novamente.`);
+        return;
+      }
+    }
+
+    onAdd({ sku: upperCode, desc, qty: parseInt(qty) || 1 });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scanner-modal-title"
+      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="bg-secondary px-7 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Barcode className="w-5 h-5 text-primary" />
+              <Barcode className="w-5 h-5 text-primary" aria-hidden="true" />
             </div>
             <div>
               <p className="text-[9px] font-black text-primary/60 uppercase tracking-widest">
                 {mode === 'assembly' ? 'Montagem' : 'Desmontagem'}
               </p>
-              <h2 className="text-base font-black text-primary uppercase tracking-tight">Adicionar Componente</h2>
+              <h2 id="scanner-modal-title" className="text-base font-black text-primary uppercase tracking-tight">
+                Adicionar Componente
+              </h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-primary/50 hover:text-primary transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            aria-label="Fechar modal de bipagem"
+            className="text-primary/50 hover:text-primary transition-colors"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -98,10 +130,13 @@ function ScannerModal({ onClose, onAdd, mode }) {
           </p>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Código de Barras / SKU</label>
+            <label htmlFor="scanner-code" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Código de Barras / SKU
+            </label>
             <div className="relative">
-              <Barcode className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <Barcode className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
+                id="scanner-code"
                 autoFocus
                 type="text"
                 value={code}
@@ -114,8 +149,11 @@ function ScannerModal({ onClose, onAdd, mode }) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantidade</label>
+            <label htmlFor="scanner-qty" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              Quantidade
+            </label>
             <input
+              id="scanner-qty"
               type="number"
               min="1"
               value={qty}
@@ -129,8 +167,12 @@ function ScannerModal({ onClose, onAdd, mode }) {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atalhos Rápidos</p>
             <div className="flex flex-wrap gap-2">
               {Object.keys(SKU_MAP).slice(0, 5).map(s => (
-                <button key={s} onClick={() => setCode(s)}
-                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black text-slate-600 dark:text-slate-300 hover:bg-secondary hover:text-primary transition-all">
+                <button
+                  key={s}
+                  onClick={() => setCode(s)}
+                  aria-label={`Preencher código ${s}`}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black text-slate-600 dark:text-slate-300 hover:bg-secondary hover:text-primary transition-all"
+                >
                   {s}
                 </button>
               ))}
@@ -138,18 +180,24 @@ function ScannerModal({ onClose, onAdd, mode }) {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-2xl">
-              <AlertCircle className="w-4 h-4 text-danger shrink-0" />
-              <span className="text-xs font-bold text-danger">{error}</span>
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-2xl" role="alert">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />
+              <span className="text-xs font-bold text-red-600">{error}</span>
             </div>
           )}
 
           <div className="flex gap-3 pt-1">
-            <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all uppercase tracking-wider">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all uppercase tracking-wider"
+            >
               Cancelar
             </button>
-            <button onClick={handleAdd} className="flex-1 py-3 rounded-2xl bg-secondary text-primary text-sm font-black hover:opacity-90 active:scale-95 transition-all uppercase tracking-wider flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" /> Adicionar
+            <button
+              onClick={handleAdd}
+              className="flex-1 py-3 rounded-2xl bg-secondary text-primary text-sm font-black hover:opacity-90 active:scale-95 transition-all uppercase tracking-wider flex items-center justify-center gap-2"
+            >
+              <Plus className="w-4 h-4" aria-hidden="true" /> Adicionar
             </button>
           </div>
         </div>
@@ -161,16 +209,25 @@ function ScannerModal({ onClose, onAdd, mode }) {
 // ===== PAINEL DE ABA (Montagem ou Desmontagem) =====
 function KitPanel({ mode }) {
   const isAssembly = mode === 'assembly';
+  const { addToInventory, addReceiptLog } = useApp();
 
   const [codigoServico, setCodigoServico] = useState('');
-  const [kitSku, setKitSku] = useState('');
-  const [kitDesc, setKitDesc] = useState('');
-  const [valorKit, setValorKit] = useState('');
-  const [qtdKits, setQtdKits] = useState(1);
-  const [componentes, setComponentes] = useState([]);
-  const [showScanner, setShowScanner] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [recipe, setRecipe] = useState(null);
+  const [kitSku,        setKitSku]        = useState('');
+  const [kitDesc,       setKitDesc]       = useState('');
+  const [valorKit,      setValorKit]      = useState('');
+  const [qtdKits,       setQtdKits]       = useState(1);
+  const [componentes,   setComponentes]   = useState([]);
+  const [showScanner,   setShowScanner]   = useState(false);
+  const [showSuccess,   setShowSuccess]   = useState(false);
+  const [recipe,        setRecipe]        = useState(null);
+
+  // Ref para limpar timeout ao desmontar o componente (evita memory leak)
+  const timeoutRef = useRef(null);
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   // Lookup recipe ao digitar kit SKU
   const handleKitSearch = () => {
@@ -181,7 +238,8 @@ function KitPanel({ mode }) {
       setValorKit(found.valorKit.toFixed(2));
       if (isAssembly) {
         // Pré-carrega componentes da receita com qtd inserida = 0
-        setComponentes(found.componentes.map(c => ({ ...c, qtdInserida: 0, id: Math.random() })));
+        // crypto.randomUUID() evita colisões de IDs que Math.random() poderia gerar
+        setComponentes(found.componentes.map(c => ({ ...c, qtdInserida: 0, id: crypto.randomUUID() })));
       }
     } else {
       setRecipe(null);
@@ -195,11 +253,11 @@ function KitPanel({ mode }) {
     setComponentes(prev => {
       const idx = prev.findIndex(c => c.sku === sku);
       if (idx >= 0) {
-        // Incrementa qtd inserida na receita
+        // Incrementa qtd inserida na receita existente
         return prev.map((c, i) => i === idx ? { ...c, qtdInserida: (c.qtdInserida || 0) + qty } : c);
       }
-      // Novo componente (sem receita ou desmontagem)
-      return [...prev, { id: Math.random(), sku, desc, qtdExigida: qty, qtdInserida: qty }];
+      // Novo componente (sem receita ou desmontagem) — ID único via crypto.randomUUID()
+      return [...prev, { id: crypto.randomUUID(), sku, desc, qtdExigida: qty, qtdInserida: qty }];
     });
   };
 
@@ -207,13 +265,78 @@ function KitPanel({ mode }) {
     setComponentes(prev => prev.filter(c => c.id !== id));
   };
 
-  const allOk = componentes.length > 0 && componentes.every(c =>
-    (c.qtdInserida || 0) >= (c.qtdExigida || c.qtdInserida || 1)
-  );
+  const handleClearAll = () => {
+    if (componentes.length === 0) return;
+    if (!window.confirm('Deseja remover todos os componentes? Esta ação não pode ser desfeita.')) return;
+    setComponentes([]);
+  };
+
+  // Lógica clara separada por modo:
+  // - Montagem: exige qtdInserida >= qtdExigida (da receita)
+  // - Desmontagem: basta ter ao menos 1 unidade inserida
+  const allOk = componentes.length > 0 && componentes.every(comp => {
+    if (isAssembly) return (comp.qtdInserida || 0) >= comp.qtdExigida;
+    return (comp.qtdInserida || 0) > 0;
+  });
 
   const handleConsolidate = () => {
+    if (!kitSku || componentes.length === 0) return;
+
+    const dateString = new Date().toLocaleString();
+    const osId = Math.floor(Date.now() / 1000);
+
+    if (isAssembly) {
+      // MONTAGEM: dá entrada no kit formado
+      addToInventory([{
+        sku: kitSku,
+        ean: kitSku,
+        descricao: kitDesc || `Kit ${kitSku}`,
+        quantidade_recebida: qtdKits,
+        lote: `KIT-OS-${osId}`,
+        data_entrada: dateString,
+        operador: 'Operador Kit',
+        id_transacao: osId,
+        localizacao: 'ESTOQUE-KITS',
+      }]);
+      addReceiptLog({
+        id: osId,
+        date: dateString,
+        nf: `OS-${codigoServico || osId}`,
+        operator: 'Operador Kit',
+        items: componentes.length,
+        totalUnits: qtdKits,
+        status: 'KIT MONTADO',
+      });
+    } else {
+      // DESMONTAGEM: dá entrada nos componentes liberados
+      addToInventory(componentes.map(c => ({
+        sku: c.sku,
+        ean: c.sku,
+        descricao: c.desc,
+        quantidade_recebida: (c.qtdInserida || 0) * qtdKits,
+        lote: `DSM-OS-${osId}`,
+        data_entrada: dateString,
+        operador: 'Operador Kit',
+        id_transacao: osId,
+        localizacao: 'ESTOQUE-COMPONENTES',
+      })));
+      addReceiptLog({
+        id: osId,
+        date: dateString,
+        nf: `OS-${codigoServico || osId}`,
+        operator: 'Operador Kit',
+        items: componentes.length,
+        totalUnits: componentes.reduce((acc, c) => acc + (c.qtdInserida || 0), 0),
+        status: 'KIT DESMONTADO',
+      });
+    }
+
+    // Gera OS automático se não preenchido
+    if (!codigoServico) setCodigoServico(`OS-${osId}`);
+
     setShowSuccess(true);
-    setTimeout(() => {
+    // Timeout armazenado em ref → limpo no cleanup do useEffect acima (sem memory leak)
+    timeoutRef.current = setTimeout(() => {
       setShowSuccess(false);
       setComponentes([]);
       setKitSku('');
@@ -222,7 +345,7 @@ function KitPanel({ mode }) {
       setCodigoServico('');
       setQtdKits(1);
       setRecipe(null);
-    }, 2500);
+    }, 3000);
   };
 
   const totalValor = (parseFloat(valorKit) || 0) * qtdKits;
@@ -231,8 +354,12 @@ function KitPanel({ mode }) {
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Success banner */}
       {showSuccess && (
-        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-2xl animate-in slide-in-from-top duration-300">
-          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-2xl animate-in slide-in-from-top duration-300"
+        >
+          <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" aria-hidden="true" />
           <span className="text-sm font-black text-green-700 dark:text-green-300 uppercase tracking-wide">
             {isAssembly ? `Kit ${kitSku} consolidado com sucesso!` : `Desmontagem concluída — componentes liberados no estoque!`}
           </span>
@@ -245,12 +372,14 @@ function KitPanel({ mode }) {
           {isAssembly ? '⚙️ Parâmetros do Kit a Montar' : '✂️ Parâmetros do Kit a Desmontar'}
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+
           {/* Código Serviço */}
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Hash className="w-3 h-3" /> Código Serviço
+            <label htmlFor="kit-codigo-servico" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Hash className="w-3 h-3" aria-hidden="true" /> Código Serviço
             </label>
             <input
+              id="kit-codigo-servico"
               value={codigoServico}
               onChange={e => setCodigoServico(e.target.value)}
               placeholder="SRV-001..."
@@ -258,29 +387,37 @@ function KitPanel({ mode }) {
             />
           </div>
 
-          {/* Produto Kit */}
+          {/* SKU do Kit */}
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Package className="w-3 h-3" /> {isAssembly ? 'SKU do Kit Final' : 'SKU do Kit a Desmontar'}
+            <label htmlFor="kit-sku" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Package className="w-3 h-3" aria-hidden="true" /> {isAssembly ? 'SKU do Kit Final' : 'SKU do Kit a Desmontar'}
             </label>
             <div className="relative">
               <input
+                id="kit-sku"
                 value={kitSku}
                 onChange={e => setKitSku(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleKitSearch()}
                 placeholder="VP-KIT-..."
                 className="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
               />
-              <button onClick={handleKitSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-secondary transition-colors">
-                <Search className="w-3.5 h-3.5" />
+              <button
+                onClick={handleKitSearch}
+                aria-label="Buscar receita pelo SKU do kit"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-secondary transition-colors"
+              >
+                <Search className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>
 
           {/* Descrição */}
           <div className="space-y-1.5 md:col-span-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
+            <label htmlFor="kit-desc" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+              Descrição
+            </label>
             <input
+              id="kit-desc"
               value={kitDesc}
               onChange={e => setKitDesc(e.target.value)}
               placeholder="Ex: Kit Freio Completo..."
@@ -290,13 +427,16 @@ function KitPanel({ mode }) {
 
           {/* Valor por Kit */}
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <DollarSign className="w-3 h-3" /> Valor por Kit
+            <label htmlFor="kit-valor" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <DollarSign className="w-3 h-3" aria-hidden="true" /> Valor por Kit
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400" aria-hidden="true">R$</span>
               <input
+                id="kit-valor"
                 type="number"
+                min="0"
+                step="0.01"
                 value={valorKit}
                 onChange={e => setValorKit(e.target.value)}
                 placeholder="0,00"
@@ -307,12 +447,14 @@ function KitPanel({ mode }) {
 
           {/* Quantidade */}
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+            <label htmlFor="kit-qtd" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
               {isAssembly ? 'Qtd a Montar' : 'Qtd a Desmontar'}
             </label>
             <input
+              id="kit-qtd"
               type="number"
               min="1"
+              step="1"
               value={qtdKits}
               onChange={e => setQtdKits(parseInt(e.target.value) || 1)}
               className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
@@ -326,7 +468,7 @@ function KitPanel({ mode }) {
             <div className="flex items-center gap-4">
               {recipe && (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-green-600" aria-hidden="true" />
                   <span className="text-[10px] font-black text-green-700 dark:text-green-400">Receita: {recipe.componentes.length} componentes</span>
                 </div>
               )}
@@ -349,16 +491,17 @@ function KitPanel({ mode }) {
           onClick={() => setShowScanner(true)}
           className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-secondary text-primary text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-black/10"
         >
-          <Barcode className="w-4 h-4" />
+          <Barcode className="w-4 h-4" aria-hidden="true" />
           {isAssembly ? 'Adicionar Componente' : 'Bipar Componente do Kit'}
         </button>
 
         <button
           disabled={componentes.length === 0}
-          onClick={() => setComponentes([])}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-danger text-xs font-black uppercase tracking-wider hover:bg-red-50 disabled:opacity-30 transition-all"
+          onClick={handleClearAll}
+          aria-label="Limpar todos os componentes da lista"
+          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-red-600 text-xs font-black uppercase tracking-wider hover:bg-red-50 disabled:opacity-30 transition-all"
         >
-          <RefreshCcw className="w-4 h-4" /> Limpar Tudo
+          <RefreshCcw className="w-4 h-4" aria-hidden="true" /> Limpar Tudo
         </button>
 
         <div className="flex-1" />
@@ -366,13 +509,22 @@ function KitPanel({ mode }) {
         {/* Badge de status */}
         {componentes.length > 0 && (
           <div className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all",
+            'flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all',
             allOk
-              ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300"
-              : "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300"
+              ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
+              : 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300'
           )}>
-            {allOk ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-            {allOk ? 'Todos prontos — pode consolidar!' : `${componentes.filter(c => (c.qtdInserida || 0) < (c.qtdExigida || 1)).length} pendente(s)`}
+            {allOk
+              ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+              : <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
+            }
+            {allOk
+              ? 'Todos prontos — pode consolidar!'
+              : `${componentes.filter(c => isAssembly
+                  ? (c.qtdInserida || 0) < c.qtdExigida
+                  : (c.qtdInserida || 0) === 0
+                ).length} pendente(s)`
+            }
           </div>
         )}
       </div>
@@ -381,18 +533,45 @@ function KitPanel({ mode }) {
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Layers className="w-4 h-4 text-secondary" />
+            <Layers className="w-4 h-4 text-secondary" aria-hidden="true" />
             <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
               {isAssembly ? 'Componentes em Montagem' : 'Componentes a Separar'}
             </h3>
           </div>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{componentes.length} itens</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{componentes.length} itens</span>
+            {componentes.length > 0 && (
+              <div className="flex items-center gap-3 ml-2">
+                <div className="h-2 w-32 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={componentes.length} aria-valuenow={componentes.filter(c => isAssembly ? (c.qtdInserida || 0) >= c.qtdExigida : (c.qtdInserida || 0) > 0).length}>
+                  <div
+                    className="h-full bg-secondary transition-all duration-700 rounded-full"
+                    style={{
+                      width: `${Math.round(
+                        (componentes.filter(c =>
+                          isAssembly
+                            ? (c.qtdInserida || 0) >= c.qtdExigida
+                            : (c.qtdInserida || 0) > 0
+                        ).length / componentes.length) * 100
+                      )}%`
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] font-black text-slate-400">
+                  {componentes.filter(c =>
+                    isAssembly
+                      ? (c.qtdInserida || 0) >= c.qtdExigida
+                      : (c.qtdInserida || 0) > 0
+                  ).length}/{componentes.length}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {componentes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-300 dark:text-slate-700">
             <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <Barcode className="w-8 h-8" />
+              <Barcode className="w-8 h-8" aria-hidden="true" />
             </div>
             <p className="text-sm font-black uppercase tracking-widest">
               {isAssembly ? 'Bipe os componentes para iniciar a montagem' : 'Bipe o kit para iniciar a desmontagem'}
@@ -405,25 +584,29 @@ function KitPanel({ mode }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800">
-                <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU</th>
-                <th className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
-                <th className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU</th>
+                <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</th>
+                <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {isAssembly ? 'Qtd Exigida (Receita)' : 'Qtd no Kit'}
                 </th>
-                <th className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd Inserida</th>
-                <th className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="p-4 w-10"></th>
+                <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd Inserida</th>
+                <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                <th scope="col" className="p-4 w-10"><span className="sr-only">Remover</span></th>
               </tr>
             </thead>
             <tbody>
               {componentes.map((comp) => {
-                const ok = (comp.qtdInserida || 0) >= (comp.qtdExigida || 1);
-                const over = (comp.qtdInserida || 0) > (comp.qtdExigida || Infinity);
+                // Lógica clara e separada por modo (sem condições ambíguas)
+                const ok   = isAssembly
+                  ? (comp.qtdInserida || 0) >= comp.qtdExigida
+                  : (comp.qtdInserida || 0) > 0;
+                const over = isAssembly && (comp.qtdInserida || 0) > comp.qtdExigida;
+
                 return (
                   <tr key={comp.id} className={cn(
-                    "border-t border-slate-100 dark:border-slate-800 transition-all",
-                    ok && !over && "bg-green-50/50 dark:bg-green-900/10",
-                    over && "bg-amber-50/50 dark:bg-amber-900/10",
+                    'border-t border-slate-100 dark:border-slate-800 transition-all',
+                    ok && !over && 'bg-green-50/50 dark:bg-green-900/10',
+                    over && 'bg-amber-50/50 dark:bg-amber-900/10',
                   )}>
                     <td className="p-4">
                       <code className="text-xs font-black text-secondary px-2 py-0.5 bg-secondary/5 rounded-lg">{comp.sku}</code>
@@ -438,8 +621,8 @@ function KitPanel({ mode }) {
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
                         <span className={cn(
-                          "text-base font-black tabular-nums",
-                          ok && !over ? "text-green-600" : over ? "text-amber-600" : "text-danger"
+                          'text-base font-black tabular-nums',
+                          ok && !over ? 'text-green-600' : over ? 'text-amber-600' : 'text-red-600'
                         )}>
                           {comp.qtdInserida || 0}
                         </span>
@@ -449,24 +632,28 @@ function KitPanel({ mode }) {
                     <td className="p-4 text-center">
                       {ok && !over ? (
                         <div className="flex items-center justify-center gap-1.5">
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                          <CheckCircle2 className="w-5 h-5 text-green-500" aria-hidden="true" />
                           <span className="text-[9px] font-black text-green-600 uppercase tracking-wider">OK</span>
                         </div>
                       ) : over ? (
                         <div className="flex items-center justify-center gap-1.5">
-                          <AlertCircle className="w-5 h-5 text-amber-500" />
+                          <AlertCircle className="w-5 h-5 text-amber-500" aria-hidden="true" />
                           <span className="text-[9px] font-black text-amber-600 uppercase tracking-wider">Excesso</span>
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-1.5">
-                          <XCircle className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                          <XCircle className="w-5 h-5 text-slate-300 dark:text-slate-600" aria-hidden="true" />
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Pendente</span>
                         </div>
                       )}
                     </td>
                     <td className="p-4 text-center">
-                      <button onClick={() => handleRemove(comp.id)} className="text-slate-300 hover:text-danger transition-colors">
-                        <Trash2 className="w-4 h-4" />
+                      <button
+                        onClick={() => handleRemove(comp.id)}
+                        aria-label={`Remover componente ${comp.sku} da lista`}
+                        className="text-slate-300 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </td>
                   </tr>
@@ -482,22 +669,24 @@ function KitPanel({ mode }) {
         <button
           disabled={!allOk || !kitSku}
           onClick={handleConsolidate}
+          aria-label={isAssembly ? 'Consolidar montagem do kit' : 'Confirmar desmontagem do kit'}
           className={cn(
-            "flex items-center gap-3 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-xl",
+            'flex items-center gap-3 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-xl',
             allOk && kitSku
-              ? "bg-secondary text-primary hover:opacity-90 active:scale-95 shadow-black/20 animate-pulse"
-              : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none"
+              ? 'bg-secondary text-primary hover:opacity-90 active:scale-95 shadow-black/20 animate-pulse'
+              : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'
           )}
         >
-          <ClipboardCheck className="w-5 h-5" />
+          <ClipboardCheck className="w-5 h-5" aria-hidden="true" />
           {isAssembly ? 'Consolidar Montagem' : 'Confirmar Desmontagem'}
-          {allOk && kitSku && <Zap className="w-4 h-4 text-primary/60" />}
+          {allOk && kitSku && <Zap className="w-4 h-4 text-primary/60" aria-hidden="true" />}
         </button>
       </div>
 
       {showScanner && (
         <ScannerModal
           mode={mode}
+          recipe={recipe}
           onClose={() => setShowScanner(false)}
           onAdd={handleAddComponent}
         />
@@ -511,8 +700,8 @@ export default function KitStation() {
   const [activeTab, setActiveTab] = useState('assembly');
 
   const tabs = [
-    { id: 'assembly', label: 'Montagem de Kit', icon: Package, color: 'text-secondary' },
-    { id: 'disassembly', label: 'Desmontagem de Kit', icon: Scissors, color: 'text-danger' },
+    { id: 'assembly',    label: 'Montagem de Kit',    icon: Package,  color: 'text-secondary' },
+    { id: 'disassembly', label: 'Desmontagem de Kit', icon: Scissors, color: 'text-red-600'   },
   ];
 
   return (
@@ -522,14 +711,14 @@ export default function KitStation() {
       <div className="bg-white dark:bg-slate-900 rounded-[32px] border-2 border-slate-100 dark:border-slate-800 p-6 flex items-center gap-5 shadow-sm">
         <div className="relative">
           <div className="w-16 h-16 rounded-3xl bg-secondary flex items-center justify-center shadow-lg shadow-black/20">
-            <Package className="w-7 h-7 text-primary" />
+            <Package className="w-7 h-7 text-primary" aria-hidden="true" />
           </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center" aria-hidden="true">
             <Scissors className="w-3.5 h-3.5 text-secondary" />
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Operacional — Kits & Conjuntos</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Operacional — Kits &amp; Conjuntos</p>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
             Estação de Kits
           </h1>
@@ -538,7 +727,7 @@ export default function KitStation() {
 
         {/* Indicador de aba ativa */}
         <div className="ml-auto hidden md:flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">
-          <div className={cn("w-2 h-2 rounded-full", activeTab === 'assembly' ? "bg-secondary" : "bg-danger")} />
+          <div className={cn('w-2 h-2 rounded-full', activeTab === 'assembly' ? 'bg-secondary' : 'bg-red-600')} aria-hidden="true" />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
             {activeTab === 'assembly' ? 'Modo Montagem' : 'Modo Desmontagem'}
           </span>
@@ -546,21 +735,23 @@ export default function KitStation() {
       </div>
 
       {/* TABS */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 p-2 flex gap-2 shadow-sm w-fit">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 p-2 flex gap-2 shadow-sm w-fit" role="tablist">
         {tabs.map(tab => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "flex items-center gap-2.5 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
+              'flex items-center gap-2.5 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200',
               activeTab === tab.id
                 ? tab.id === 'assembly'
-                  ? "bg-secondary text-primary shadow-lg shadow-black/10"
-                  : "bg-danger text-white shadow-lg shadow-danger/20"
-                : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  ? 'bg-secondary text-primary shadow-lg shadow-black/10'
+                  : 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
             )}
           >
-            <tab.icon className="w-4 h-4" />
+            <tab.icon className="w-4 h-4" aria-hidden="true" />
             {tab.label}
           </button>
         ))}

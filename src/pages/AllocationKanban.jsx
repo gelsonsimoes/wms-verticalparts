@@ -1,313 +1,719 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  GripVertical, 
-  MapPin, 
-  CheckCircle2, 
-  ArrowRight,
+import {
+  GripVertical,
+  MapPin,
+  CheckCircle2,
   LayoutDashboard,
   X,
   Package,
   Clock,
   ChevronRight,
-  AlertCircle,
-  Zap
+  Zap,
+  Plus,
+  AlertTriangle,
+  TrendingUp,
+  Info,
+  Loader2,
 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { supabase } from '../services/supabaseClient';
 
-// Design System / Utils
-const cn = (...classes) => classes.filter(Boolean).join(' ');
+// ─── Utils ───────────────────────────────────────────────────────────────────
+function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-const INITIAL_TASKS = [
-  { 
-    id: 'ALOC-1029', 
-    sku: 'VPER-PNT-AL-22D-202X145-CT', 
-    desc: 'Pente de Alumínio - 22 Dentes (202x145mm)',
-    qtd: 2, 
-    enderecoSugerido: 'R1_PP1_CL001_N001',
-    prioridade: 'Alta',
-    tempoEspera: '15 min',
-    status: 'ground' 
-  },
-  { 
-    id: 'ALOC-1030', 
-    sku: 'VPER-ESS-NY-27MM', 
-    desc: 'Escova de Segurança (Nylon - Base 27mm)',
-    qtd: 10, 
-    enderecoSugerido: 'R2_PP3_CL005_N002',
-    prioridade: 'Normal',
-    tempoEspera: '5 min',
-    status: 'ground' 
-  },
-  { 
-    id: 'ALOC-1031', 
-    sku: 'VPER-PAL-INO-1000', 
-    desc: 'Pallet de Aço Inox (1000mm)',
-    qtd: 5, 
-    enderecoSugerido: 'R3_PP1_CL001_N001',
-    prioridade: 'Alta',
-    tempoEspera: '22 min',
-    status: 'moving' 
-  },
-  { 
-    id: 'ALOC-1032', 
-    sku: 'VPER-LUM-LED-VRD-24V', 
-    desc: 'Luminária em LED Verde 24V',
-    qtd: 12, 
-    enderecoSugerido: 'R1_PP2_CL012_N001',
-    prioridade: 'Urgente',
-    tempoEspera: '2 min',
-    status: 'ground' 
-  },
-  { 
-    id: 'ALOC-1035', 
-    sku: 'VPER-INC-ESQ', 
-    desc: 'InnerCap (Esquerdo) - Ref.: VERTICALPARTS',
-    qtd: 8, 
-    enderecoSugerido: 'R1_PP1_CL001_N004',
-    prioridade: 'Normal',
-    tempoEspera: '10 min',
-    status: 'moving' 
-  }
-];
+// Padrão válido de endereço: R[1-3]_PP[1-5]_CL\d{3}_N\d{3}
+const ADDRESS_REGEX = /^[A-Z0-9_]+$/;
+
+// Calcula tempo decorrido.
+function formatElapsed(isoTimestamp) {
+  if (!isoTimestamp) return '—';
+  const diffMs = Date.now() - new Date(isoTimestamp).getTime();
+  if (diffMs < 0) return '0 min';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h${mins % 60}m`;
+}
+
+// ─── Constantes de Domínio ────────────────────────────────────────────────────
+const PRIORIDADES = ['Urgente', 'Alta', 'Normal'];
 
 const COLUMNS = {
-  ground: { 
-    title: 'No Chão (Doca)', 
-    subtitle: 'Aguardando Início',
-    color: 'border-slate-200 bg-slate-100/50 text-slate-600',
-    accent: 'bg-slate-400'
-  },
-  moving: { 
-    title: 'Em Movimentação', 
-    subtitle: 'Operador em Trânsito',
-    color: 'border-primary/30 bg-primary/10 text-primary',
-    accent: 'bg-primary'
-  },
-  allocated: { 
-    title: 'Alocado (Concluído)', 
-    subtitle: 'Confirmação Final', 
-    color: 'border-green-500/30 bg-green-500/10 text-green-600',
-    accent: 'bg-green-500'
-  }
+  ground:    { title: 'No Chão (Doca)',      subtitle: 'Aguardando Início',     accent: 'bg-slate-400',   border: 'border-slate-300',   headerBg: 'bg-slate-50' },
+  moving:    { title: 'Em Movimentação',     subtitle: 'Operador em Trânsito',  accent: 'bg-yellow-400',  border: 'border-yellow-300',  headerBg: 'bg-yellow-50' },
+  allocated: { title: 'Alocado (Concluído)', subtitle: 'Confirmação Final',     accent: 'bg-green-500',   border: 'border-green-300',   headerBg: 'bg-green-50' },
 };
 
+const mapStatusToKanban = (status) => {
+    if (status === 'pendente') return 'ground';
+    if (status === 'em_andamento') return 'moving';
+    if (status === 'concluida') return 'allocated';
+    return 'ground';
+};
+
+const mapKanbanToStatus = (status) => {
+    if (status === 'ground') return 'pendente';
+    if (status === 'moving') return 'em_andamento';
+    if (status === 'allocated') return 'concluida';
+    return 'pendente';
+};
+
+const PRIORITY_CFG = {
+  Urgente: { cls: 'bg-red-100 text-red-700 border border-red-200',    icon: <AlertTriangle className="w-2.5 h-2.5" aria-hidden="true" /> },
+  Alta:    { cls: 'bg-amber-100 text-amber-700 border border-amber-200', icon: <TrendingUp className="w-2.5 h-2.5" aria-hidden="true" /> },
+  Normal:  { cls: 'bg-slate-100 text-slate-500 border border-slate-200', icon: null },
+};
+
+// ─── Badge de Prioridade ──────────────────────────────────────────────────────
+function PrioridadeBadge({ prioridade }) {
+  const cfg = PRIORITY_CFG[prioridade] || PRIORITY_CFG.Normal;
+  if (prioridade === 'Normal') return null; // Normal não precisa de badge
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide', cfg.cls)}>
+      {cfg.icon} {prioridade}
+    </span>
+  );
+}
+
+// ─── Componentes Auxiliares ───────────────────────────────────────────────────
+const Field = ({ label, error, children }) => (
+  <div>
+    <label className="block text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">{label}</label>
+    {children}
+    {error && <p className="mt-1 text-[9px] text-red-500 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3" />{error}</p>}
+  </div>
+);
+
+const inputCls = (errors, field) => cn(
+  'w-full border rounded-sm px-3 py-2 text-xs font-bold outline-none transition-all bg-gray-50',
+  errors[field] ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/30'
+);
+
+// ─── Modal de Nova Tarefa ─────────────────────────────────────────────────────
+function NovaTarefaModal({ onClose, onSave }) {
+  const [form, setForm] = useState({
+    sku: '', desc: '', qtd: 1, enderecoSugerido: '', prioridade: 'Normal',
+  });
+  const [errors, setErrors] = useState({});
+  const skuRef = useRef(null);
+  useEffect(() => { skuRef.current?.focus(); }, []);
+
+  const validate = () => {
+    const errs = {};
+    if (!form.sku.trim())  errs.sku  = 'SKU obrigatório';
+    if (!form.desc.trim()) errs.desc = 'Descrição obrigatória';
+    if (form.qtd < 1)      errs.qtd  = 'Mínimo 1 unidade';
+    if (!ADDRESS_REGEX.test(form.enderecoSugerido.trim().toUpperCase()))
+      errs.enderecoSugerido = 'Formato inválido. Use ex: PP1_A01';
+    return errs;
+  };
+
+  const handleSave = async () => {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    
+    try {
+      // 1. Buscar o ID do produto pelo SKU
+      let { data: prod } = await supabase
+        .from('produtos')
+        .select('id')
+        .eq('sku', form.sku.trim().toUpperCase())
+        .single();
+
+      // Se não existe, cria um básico para não travar o fluxo
+      if (!prod) {
+        const { data: newProd } = await supabase
+          .from('produtos')
+          .insert({ 
+            sku: form.sku.trim().toUpperCase(), 
+            descricao: form.desc.trim(),
+            unidade: 'UN'
+          })
+          .select()
+          .single();
+        prod = newProd;
+      }
+
+      // 2. Criar a Tarefa
+      const { data: tarefa, error: tErr } = await supabase
+        .from('tarefas')
+        .insert({
+          tipo: 'alocacao',
+          prioridade: form.prioridade,
+          status: 'pendente'
+        })
+        .select()
+        .single();
+
+      if (tErr) throw tErr;
+
+      // 3. Criar o Item da Tarefa
+      const { error: iErr } = await supabase
+        .from('itens_tarefa')
+        .insert({
+          tarefa_id: tarefa.id,
+          produto_id: prod.id,
+          sku: form.sku.trim().toUpperCase(),
+          descricao: form.desc.trim(),
+          sequencia: 1, // Sequência inicial
+          quantidade_esperada: Number(form.qtd),
+          endereco_id: form.enderecoSugerido.trim().toUpperCase()
+        });
+
+      if (iErr) throw iErr;
+
+      onSave(); // Recarrega a lista
+      onClose();
+    } catch (err) {
+      console.error('[Kanban] Error creating task:', err);
+      setErrors({ sku: `Erro: ${err.message || 'Falha na comunicação com o banco.'}` });
+    }
+  };
+
+
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="nova-tarefa-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-white border border-gray-200 rounded-sm w-full max-w-lg shadow-2xl overflow-hidden">
+
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 id="nova-tarefa-title" className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
+            <Plus size={14} className="text-yellow-500" aria-hidden="true" /> Nova Tarefa de Alocação
+          </h2>
+          <button onClick={onClose} aria-label="Fechar modal" className="text-gray-400 hover:text-black transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <Field label="SKU" error={errors.sku}>
+            <input 
+              ref={skuRef} 
+              value={form.sku} 
+              onChange={async e => {
+                const val = e.target.value.toUpperCase();
+                setForm(f => ({ ...f, sku: val }));
+                if (val.length > 3) {
+                  const { data } = await supabase.from('produtos').select('descricao').eq('sku', val).single();
+                  if (data) setForm(f => ({ ...f, desc: data.descricao }));
+                }
+              }} 
+              className={inputCls(errors, 'sku')} 
+              placeholder="VPER-XXX-YYY" 
+            />
+          </Field>
+          <Field label="Descrição do Produto" error={errors.desc}>
+            <input value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))} className={inputCls(errors, 'desc')} placeholder="Nome completo do produto" />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Quantidade (UN)" error={errors.qtd}>
+              <input type="number" min="1" value={form.qtd} onChange={e => setForm(f => ({ ...f, qtd: parseInt(e.target.value) || 1 }))} className={inputCls(errors, 'qtd')} />
+            </Field>
+            <Field label="Prioridade">
+              <select value={form.prioridade} onChange={e => setForm(f => ({ ...f, prioridade: e.target.value }))} className={inputCls(errors, 'prioridade')}>
+                {PRIORIDADES.map(p => <option key={p}>{p}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="Endereço Sugerido (Ex: PP1_A01)" error={errors.enderecoSugerido}>
+            <input
+              value={form.enderecoSugerido}
+              onChange={e => setForm(f => ({ ...f, enderecoSugerido: e.target.value.toUpperCase() }))}
+              className={cn(inputCls(errors, 'enderecoSugerido'), 'font-mono tracking-wider')}
+              placeholder="Ex: PP1_A01"
+            />
+          </Field>
+        </div>
+
+        <div className="bg-gray-50 px-6 py-4 flex gap-2 justify-end border-t border-gray-100">
+          <button onClick={onClose} className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider border border-gray-300 rounded-sm text-gray-600 hover:bg-gray-100 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={handleSave} className="px-5 py-2 text-[11px] font-bold uppercase tracking-wider bg-yellow-400 hover:bg-yellow-300 text-black rounded-sm flex items-center gap-2 transition-colors">
+            <Plus size={13} aria-hidden="true" /> Criar Tarefa
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Modal de Detalhes ────────────────────────────────────────────────────────
+function DetalhesModal({ task, onClose }) {
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="detalhes-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-white border border-gray-200 rounded-sm w-full max-w-md shadow-2xl overflow-hidden">
+
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 id="detalhes-title" className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
+            <Info size={14} aria-hidden="true" /> Detalhes — {task.id}
+          </h2>
+          <button onClick={onClose} aria-label="Fechar detalhes" className="text-gray-400 hover:text-black transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: 'SKU',         value: task.sku,              mono: true },
+              { label: 'Prioridade',  value: task.prioridade },
+              { label: 'Status',      value: COLUMNS[task.status]?.title || task.status },
+              { label: 'Volume',      value: `${task.qtd} UN` },
+              { label: 'Destino',     value: task.enderecoSugerido, mono: true },
+              { label: 'Tempo Espera',value: formatElapsed(task.createdAt) },
+            ].map(({ label, value, mono }) => (
+              <div key={label}>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
+                <p className={cn('text-xs font-black text-black', mono && 'font-mono')}>{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Descrição</p>
+            <p className="text-xs font-medium text-gray-600">{task.desc}</p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Modal de Confirmação de Alocação ─────────────────────────────────────────
+function ConfirmModal({ task, tasks, onClose, onConfirm }) {
+  const [endereco, setEndereco] = useState(task.enderecoSugerido);
+  const [addrError, setAddrError] = useState('');
+
+  const handleConfirm = () => {
+    const val = endereco.trim().toUpperCase();
+    if (!ADDRESS_REGEX.test(val)) {
+      setAddrError('Formato inválido. Padrão: PP1_A01');
+      return;
+    }
+    // Verifica se endereço já está ocupado por outra tarefa alocada
+    const ocupado = tasks.find(t => t.id !== task.id && t.status === 'allocated' && t.enderecoSugerido === val);
+    if (ocupado) {
+      setAddrError(`Endereço já ocupado por ${ocupado.id}`);
+      return;
+    }
+    setAddrError('');
+    onConfirm(task.id, val);
+  };
+
+  const isValid = ADDRESS_REGEX.test(endereco.trim().toUpperCase());
+
+  return (
+    <div role="dialog" aria-modal="true" aria-labelledby="confirm-title"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-white border border-gray-200 rounded-sm w-full max-w-lg shadow-2xl overflow-hidden">
+
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 id="confirm-title" className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-green-600" aria-hidden="true" /> Confirmar Alocação Final
+          </h2>
+          <button onClick={onClose} aria-label="Cancelar alocação" className="text-gray-400 hover:text-black transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Resumo completo da tarefa no modal */}
+          <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">SKU</p>
+              <p className="text-xs font-black text-black font-mono">{task.sku}</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Quantidade</p>
+              <p className="text-xs font-black text-black">{task.qtd} UN</p>
+            </div>
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Prioridade</p>
+              <PrioridadeBadge prioridade={task.prioridade} />
+              {task.prioridade === 'Normal' && <span className="text-xs font-bold text-gray-500">Normal</span>}
+            </div>
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Tempo Aguardando</p>
+              <p className="text-xs font-black text-amber-600">{formatElapsed(task.createdAt)}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Descrição</p>
+              <p className="text-xs font-medium text-gray-600">{task.desc}</p>
+            </div>
+          </div>
+
+          {/* Input controlado com validação */}
+          <div className="space-y-1.5">
+            <label htmlFor="field-endereco" className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
+              <MapPin size={12} className="text-yellow-500" aria-hidden="true" /> Confirmar Endereço Físico
+            </label>
+            <input
+              id="field-endereco"
+              autoFocus
+              value={endereco}
+              onChange={e => { setEndereco(e.target.value.toUpperCase()); setAddrError(''); }}
+              className={cn(
+                'w-full border rounded-sm px-4 py-3 text-lg font-black font-mono text-black outline-none transition-all uppercase tracking-widest',
+                addrError
+                  ? 'border-red-400 bg-red-50 focus:border-red-500'
+                  : isValid
+                  ? 'border-green-400 bg-green-50 focus:border-green-500'
+                  : 'border-gray-200 bg-gray-50 focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400/30'
+              )}
+              placeholder="Ex: PP1_A01"
+              aria-invalid={!!addrError}
+              aria-describedby={addrError ? 'addr-error' : undefined}
+            />
+            {addrError && (
+              <p id="addr-error" className="text-[9px] text-red-500 font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" aria-hidden="true" />{addrError}
+              </p>
+            )}
+            {isValid && !addrError && (
+              <p className="text-[9px] text-green-600 font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" aria-hidden="true" /> Endereço válido
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-gray-50 px-6 py-4 flex gap-2 justify-end border-t border-gray-100">
+          <button onClick={onClose} className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider border border-gray-300 rounded-sm text-gray-600 hover:bg-gray-100 transition-colors">
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} className="px-6 py-2 text-[11px] font-bold uppercase tracking-wider bg-yellow-400 hover:bg-yellow-300 text-black rounded-sm flex items-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-yellow-500 outline-none">
+            <Zap size={14} aria-hidden="true" /> Finalizar Guarda
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+import { useSearchParams } from 'react-router-dom';
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
 export default function AllocationKanban() {
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-  const [confirmModal, setConfirmModal] = useState(null);
-  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [tasks,          setTasks]          = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [confirmModal,   setConfirmModal]   = useState(null);
+  const [detalhesModal,  setDetalhesModal]  = useState(null);
+  const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);
+  const [draggedTaskId,  setDraggedTaskId]  = useState(null);
+
+  const fetchTasks = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tarefas')
+        .select(`
+          id, status, prioridade, created_at,
+          itens:itens_tarefa (
+             quantidade_esperada,
+             endereco_id,
+             sku,
+             descricao
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const mapped = data.map(t => ({
+        id: t.id,
+        sku: t.itens?.[0]?.sku || 'N/A',
+        desc: t.itens?.[0]?.descricao || 'Sem descrição',
+        qtd: t.itens?.[0]?.quantidade_esperada || 0,
+        enderecoSugerido: t.itens?.[0]?.endereco_id || 'N/A',
+        prioridade: t.prioridade,
+        status: mapStatusToKanban(t.status),
+        createdAt: t.created_at
+      }));
+      setTasks(mapped);
+
+      // Auto-abrir detalhes se vier via busca global
+      const taskId = searchParams.get('id');
+      if (taskId) {
+        const t = mapped.find(item => String(item.id) === taskId);
+        if (t) setDetalhesModal(t);
+      }
+    } catch (err) {
+      console.error('[Kanban] Error fetching tasks:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTasks();
+
+    // Subscribe to changes
+    const channel = supabase
+      .channel('tasks_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas' }, () => {
+        fetchTasks();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'itens_tarefa' }, () => {
+        fetchTasks();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Re-render a cada 30s para atualizar tempos de espera
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(p => p + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const onDragStart = (e, taskId) => {
     e.dataTransfer.setData('taskId', taskId);
     setDraggedTaskId(taskId);
   };
+  const onDragEnd = () => setDraggedTaskId(null);
 
-  const onDragEnd = () => {
-    setDraggedTaskId(null);
-  };
-
-  const onDrop = (e, newStatus) => {
+  const onDrop = async (e, newStatus) => {
     e.preventDefault();
     const taskId = e.dataTransfer.getData('taskId');
     const task = tasks.find(t => t.id === taskId);
-    
     if (!task) return;
 
     if (newStatus === 'allocated') {
       setConfirmModal(task);
     } else {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+      // Update Supabase
+      const supabaseStatus = mapKanbanToStatus(newStatus);
+      const { error } = await supabase
+        .from('tarefas')
+        .update({ status: supabaseStatus })
+        .eq('id', taskId);
+      
+      if (error) {
+        console.error('[Kanban] Error updating status:', error);
+      }
     }
     setDraggedTaskId(null);
   };
 
-  const handleConfirm = () => {
-    setTasks(prev => prev.filter(t => t.id !== confirmModal.id));
-    setConfirmModal(null);
+  const handleConfirm = async (taskId, enderecoFinal) => {
+    try {
+      // 1. Atualiza o endereço no item_tarefa se mudou
+      await supabase
+        .from('itens_tarefa')
+        .update({ endereco_id: enderecoFinal })
+        .eq('tarefa_id', taskId);
+
+      // 2. Finaliza a tarefa
+      const { error } = await supabase
+        .from('tarefas')
+        .update({ status: 'concluida' })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      
+      setConfirmModal(null);
+      fetchTasks();
+    } catch (err) {
+      console.error('[Kanban] Error confirming task:', err);
+    }
   };
 
+  const handleAddTask = () => {
+      fetchTasks(); // Reload after adding
+  };
+
+  const pendingCount = tasks.filter(t => t.status !== 'allocated').length;
+  const completedCount = tasks.filter(t => t.status === 'allocated').length;
+
   return (
-    <div className="min-h-screen bg-white text-[var(--vp-text)] p-4 font-sans selection:bg-primary/30">
-      
-      {/* HEADER - D365 STYLE */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b border-[var(--vp-border)]">
+    <div className="min-h-screen bg-white p-4 font-sans select-none">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div className="flex items-center gap-3">
           <div className="p-1.5 bg-black rounded-sm border border-black shadow-inner">
-            <LayoutDashboard className="w-4 h-4 text-[var(--vp-primary)]" />
+            <LayoutDashboard className="w-4 h-4 text-yellow-400" aria-hidden="true" />
           </div>
           <div>
             <h1 className="text-sm font-black tracking-tight text-black uppercase">
               1.9 Kanban de Alocação
             </h1>
-            <p className="text-[10px] text-[var(--vp-text-label)] font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
-              <Zap className="w-3 h-3 text-[var(--vp-primary)]" /> VPARMZ - CD Central Guarulhos
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center gap-1.5 mt-0.5">
+              <Zap className="w-3 h-3 text-yellow-400" aria-hidden="true" /> VPARMZ — CD Central Guarulhos
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="bg-[var(--vp-bg-alt)] px-4 py-1.5 border border-[var(--vp-border)] rounded-sm flex items-center gap-3 shadow-sm">
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Total Ativo:</span>
-            <span className="text-sm font-black text-black leading-none">{tasks.length}</span>
+        <div className="flex items-center gap-2 mt-3 md:mt-0">
+          {/* KPIs separados: Pendentes vs Concluídos */}
+          <div className="bg-gray-50 px-4 py-1.5 border border-gray-200 rounded-sm flex items-center gap-3 shadow-sm">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pendentes:</span>
+            <span className="text-sm font-black text-black leading-none">{pendingCount}</span>
           </div>
-          <button className="btn-primary px-4 py-2 flex items-center gap-2 text-[11px] uppercase tracking-wider">
-            <Zap size={14} className="fill-current" />
+          <div className="bg-green-50 px-4 py-1.5 border border-green-200 rounded-sm flex items-center gap-3 shadow-sm">
+            <span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Concluídos:</span>
+            <span className="text-sm font-black text-green-700 leading-none">{completedCount}</span>
+          </div>
+          <button
+            onClick={() => setNovaTarefaOpen(true)}
+            className="bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-2 flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold rounded-sm transition-colors focus-visible:ring-2 focus-visible:ring-yellow-500 outline-none"
+            aria-label="Criar nova tarefa de alocação"
+          >
+            <Plus size={14} aria-hidden="true" />
             Nova Tarefa
           </button>
         </div>
       </div>
 
-      {/* KANBAN BOARD - HIGH DENSITY */}
+      {/* ── Kanban Board ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-140px)] min-h-[600px]">
-        {Object.entries(COLUMNS).map(([status, config]) => (
-          <div 
-            key={status}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => onDrop(e, status)}
-            className={cn(
-               "flex flex-col bg-[var(--vp-bg-alt)] border border-[var(--vp-border)] rounded-sm transition-all duration-200 min-h-0",
-               draggedTaskId && "border-[var(--vp-primary)]"
-            )}
-          >
-            <div className="p-3 flex items-center justify-between border-b border-[var(--vp-border)] bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <div className={cn("w-2 h-2 rounded-full", config.accent)} />
-                <h2 className="text-[11px] font-black uppercase tracking-wider text-black">
-                  {config.title}
-                </h2>
-              </div>
-              <span className="bg-white px-2 py-0.5 rounded-sm text-[10px] font-black border border-[var(--vp-border)] text-gray-500">
-                {tasks.filter(t => t.status === status).length}
-              </span>
-            </div>
+        {Object.entries(COLUMNS).map(([status, config]) => {
+          // "allocated" mostra os concluídos (histórico), não tasks ativas
+          const colTasks = tasks.filter(t => t.status === status);
 
-            <div className="flex-1 p-3 overflow-y-auto space-y-3 no-scrollbar">
-              {tasks.filter(t => t.status === status).map(task => (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={(e) => onDragStart(e, task.id)}
-                  onDragEnd={onDragEnd}
-                  className={cn(
-                    "bg-white border border-[var(--vp-border)] rounded-sm p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-[var(--vp-primary)] transition-colors relative",
-                    draggedTaskId === task.id && "opacity-30 grayscale"
-                  )}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="badge-tech badge-info">
-                        {task.id}
-                      </span>
-                      {task.prioridade === 'Urgente' && (
-                        <span className="badge-tech badge-error">
-                          Urgente
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-gray-400">
-                       <Clock className="w-3 h-3" />
-                       <span className="text-[10px] font-bold">{task.tempoEspera}</span>
-                    </div>
-                  </div>
+          const isDragTarget = !!draggedTaskId;
 
-                  <h3 className="text-[11px] font-black text-black mb-1 font-mono tracking-tight uppercase">
-                    {task.sku}
-                  </h3>
-                  <p className="text-[10px] text-[var(--vp-text-label)] font-medium line-clamp-1 truncate mb-3 border-l-2 border-gray-100 pl-2">
-                    {task.desc}
-                  </p>
-
-                  <div className="grid grid-cols-2 gap-2 bg-[var(--vp-bg-alt)] p-2 border border-[var(--vp-border)] rounded-sm">
-                    <div className="flex flex-col">
-                       <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Volume</span>
-                       <span className="text-[11px] font-black text-black">{task.qtd} UN</span>
-                    </div>
-                    <div className="flex flex-col">
-                       <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Destino</span>
-                       <span className="text-[10px] font-black text-[var(--vp-primary)] font-mono">{task.enderecoSugerido}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                       Status: <span className="text-gray-600">Posicionado</span>
-                    </span>
-                    <button className="text-[9px] font-black text-[var(--vp-primary)] uppercase flex items-center gap-1 hover:underline">
-                       Detalhes <ChevronRight className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              
-              {tasks.filter(t => t.status === status).length === 0 && (
-                <div className="flex flex-col items-center justify-center h-20 border border-dashed border-[var(--vp-border)] rounded-sm opacity-50 bg-white/50">
-                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Vazio</p>
-                </div>
+          return (
+            <div
+              key={status}
+              role="region"
+              aria-label={`Coluna: ${config.title}`}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => onDrop(e, status)}
+              className={cn(
+                'flex flex-col border rounded-sm transition-all duration-200 min-h-0 bg-gray-50',
+                config.border,
+                isDragTarget && status !== 'ground' && 'ring-2 ring-yellow-400/50'
               )}
+            >
+              {/* Header da coluna — subtitle agora renderizado */}
+              <div className={cn('p-3 flex items-center justify-between border-b shrink-0', config.border, config.headerBg)}>
+                <div className="flex items-center gap-2">
+                  <div className={cn('w-2 h-2 rounded-full shrink-0', config.accent)} aria-hidden="true" />
+                  <div>
+                    <h2 className="text-[11px] font-black uppercase tracking-wider text-black">
+                      {config.title}
+                    </h2>
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
+                      {config.subtitle}
+                    </p>
+                  </div>
+                </div>
+                <span className="bg-white px-2 py-0.5 rounded-sm text-[10px] font-black border border-gray-200 text-gray-500">
+                  {colTasks.length}
+                </span>
+              </div>
+
+              {/* Cards com scrollbar visível */}
+              <div className="flex-1 p-3 overflow-y-auto space-y-3 min-h-0 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                <AnimatePresence mode="popLayout">
+                  {colTasks.map(task => (
+                    <motion.div
+                      key={task.id}
+                      layout
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      draggable={status !== 'allocated'}
+                      onDragStart={e => onDragStart(e, task.id)}
+                      onDragEnd={onDragEnd}
+                      className={cn(
+                        'bg-white border border-gray-200 rounded-sm p-3 shadow-sm hover:border-yellow-400 transition-colors relative',
+                        status !== 'allocated' && 'cursor-grab active:cursor-grabbing',
+                        draggedTaskId === task.id && 'opacity-30 grayscale'
+                      )}
+                      aria-label={`Tarefa ${task.id}: ${task.sku}`}
+                    >
+                      {/* Linha 1: ID + badges de prioridade + tempo */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200 rounded-full text-[9px] font-black uppercase tracking-tight">
+                            {task.id}
+                          </span>
+                          <PrioridadeBadge prioridade={task.prioridade} />
+                        </div>
+                        <div className="flex items-center gap-1 text-gray-400 shrink-0">
+                          <Clock className="w-3 h-3" aria-hidden="true" />
+                          <span className="text-[10px] font-bold" title={`Criado em ${new Date(task.createdAt).toLocaleString('pt-BR')}`}>
+                            {formatElapsed(task.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* SKU e descrição (sem conflito line-clamp + truncate) */}
+                      <h3 className="text-[11px] font-black text-black mb-1 font-mono tracking-tight uppercase">
+                        {task.sku}
+                      </h3>
+                      <p className="text-[10px] text-gray-400 font-medium line-clamp-1 mb-3 border-l-2 border-gray-100 pl-2">
+                        {task.desc}
+                      </p>
+
+                      {/* Grid Volume + Destino */}
+                      <div className="grid grid-cols-2 gap-2 bg-gray-50 p-2 border border-gray-100 rounded-sm">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Volume</span>
+                          <span className="text-[11px] font-black text-black">{task.qtd} UN</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Destino</span>
+                          <span className="text-[10px] font-black text-yellow-600 font-mono">{task.enderecoSugerido}</span>
+                        </div>
+                      </div>
+
+                      {/* Rodapé: status real + botão Detalhes funcional */}
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                          Status: <span className="text-gray-600">{COLUMNS[task.status]?.title || task.status}</span>
+                        </span>
+                        <button
+                          onClick={() => setDetalhesModal(task)}
+                          aria-label={`Ver detalhes de ${task.id}`}
+                          className="text-[9px] font-black text-yellow-600 uppercase flex items-center gap-1 hover:underline focus-visible:ring-1 focus-visible:ring-yellow-400 outline-none rounded"
+                        >
+                          Detalhes <ChevronRight className="w-2.5 h-2.5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {colTasks.length === 0 && (
+                  <div className="flex flex-col items-center justify-center h-20 border border-dashed border-gray-200 rounded-sm opacity-50 bg-white/50">
+                    <Package className="w-5 h-5 text-gray-300 mb-1" aria-hidden="true" />
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">
+                      {isDragTarget && status !== 'ground' ? 'Solte aqui' : 'Vazio'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* CONFIRMATION MODAL - D365 STYLE */}
-      <AnimatePresence>
+      {/* ── Modais ─────────────────────────────────────────────────────── */}
+      <AnimatePresence mode="wait">
+        {novaTarefaOpen && (
+          <NovaTarefaModal key="nova" onClose={() => setNovaTarefaOpen(false)} onSave={handleAddTask} />
+        )}
         {confirmModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setConfirmModal(null)} />
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative bg-white border border-[var(--vp-border)] rounded-sm w-full max-w-lg shadow-2xl overflow-hidden"
-            >
-              <div className="bg-[var(--vp-bg-alt)] px-6 py-4 border-b border-[var(--vp-border)] flex items-center justify-between">
-                <h2 className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
-                   <CheckCircle2 size={16} className="text-green-600" /> Confirmar Alocação Final
-                </h2>
-                <button onClick={() => setConfirmModal(null)} className="text-gray-400 hover:text-black transition-colors">
-                  <X size={18} />
-                </button>
-              </div>
-              
-              <div className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-6 pb-4 border-b border-gray-100">
-                   <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">SKU</p>
-                      <p className="text-xs font-black text-black font-mono">{confirmModal.sku}</p>
-                   </div>
-                   <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Quantidade</p>
-                      <p className="text-xs font-black text-black">{confirmModal.qtd} UN</p>
-                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
-                     <MapPin size={12} className="text-[var(--vp-primary)]" /> Confirmar Endereço Físico
-                  </label>
-                  <input 
-                     autoFocus
-                     defaultValue={confirmModal.enderecoSugerido}
-                     className="w-full bg-[var(--vp-bg-alt)] border border-[var(--vp-border)] rounded-sm px-4 py-3 text-lg font-black font-mono text-black focus:border-[var(--vp-primary)] focus:ring-1 focus:ring-[var(--vp-primary)] outline-none transition-all uppercase"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-gray-50 px-6 py-4 flex gap-2 justify-end">
-                <button 
-                  onClick={() => setConfirmModal(null)}
-                  className="btn-secondary px-6 py-2 text-[11px] uppercase tracking-wider"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleConfirm}
-                  className="btn-primary px-6 py-2 text-[11px] uppercase tracking-wider flex items-center gap-2"
-                >
-                  <Zap size={14} className="fill-current" /> Finalizar Guarda
-                </button>
-              </div>
-            </motion.div>
-          </div>
+          <ConfirmModal key="confirm" task={confirmModal} tasks={tasks} onClose={() => setConfirmModal(null)} onConfirm={handleConfirm} />
+        )}
+        {detalhesModal && (
+          <DetalhesModal key="detalhes" task={detalhesModal} onClose={() => setDetalhesModal(null)} />
         )}
       </AnimatePresence>
     </div>

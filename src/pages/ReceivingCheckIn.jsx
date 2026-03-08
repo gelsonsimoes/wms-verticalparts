@@ -4,8 +4,8 @@ import { OmieApi } from '../services/omieApi';
 import {
     FileText, Search, Scan, Plus, Printer, Trash2, CheckCircle2,
     AlertCircle, Package, Truck, History, Zap, ArrowRight, X,
-    QrCode, Check, Database, Edit2, ListFilter, Calendar,
-    User as UserIcon, ShoppingBag, RefreshCw, ScanBarcode, BarChart3
+    QrCode, Check, Database, ListFilter, Calendar,
+    User as UserIcon, RefreshCw, ScanBarcode, BarChart3
 } from 'lucide-react';
 
 const INITIAL_ITEMS = [
@@ -29,11 +29,62 @@ export default function ReceivingCheckIn() {
     const [showResetModal, setShowResetModal] = useState(false);
     const [showPrintModal, setShowPrintModal] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showDivergenceModal, setShowDivergenceModal] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [scanError, setScanError] = useState(null);
     const [lastScannedId, setLastScannedId] = useState(null);
     const [manualInputId, setManualInputId] = useState(null);
-    const eanInputRef = useRef(null);
+    const [lotModal, setLotModal] = useState(null); // { product } quando aberto
+    const [lotInput, setLotInput] = useState('');
+    const eanInputRef   = useRef(null);
+    const scanErrRef    = useRef(null);
+    const lastScanRef   = useRef(null);
+
+    // Cleanup de todos os timeouts ao desmontar
+    useEffect(() => () => {
+        if (scanErrRef.current)  clearTimeout(scanErrRef.current);
+        if (lastScanRef.current) clearTimeout(lastScanRef.current);
+    }, []);
+
+    // Escape — Modal Histórico
+    useEffect(() => {
+        if (!showHistoryModal) return;
+        const fn = (e) => { if (e.key === 'Escape') setShowHistoryModal(false); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [showHistoryModal]);
+
+    // Escape — Modal Reset
+    useEffect(() => {
+        if (!showResetModal) return;
+        const fn = (e) => { if (e.key === 'Escape') setShowResetModal(false); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [showResetModal]);
+
+    // Escape — Modal Etiqueta
+    useEffect(() => {
+        if (!showPrintModal) return;
+        const fn = (e) => { if (e.key === 'Escape') setShowPrintModal(false); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [showPrintModal]);
+
+    // Escape — Modal Divergência
+    useEffect(() => {
+        if (!showDivergenceModal) return;
+        const fn = (e) => { if (e.key === 'Escape') setShowDivergenceModal(false); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [showDivergenceModal]);
+
+    // Escape — Modal Lote (listener global além do onKeyDown do input)
+    useEffect(() => {
+        if (!lotModal) return;
+        const fn = (e) => { if (e.key === 'Escape') setLotModal(null); };
+        document.addEventListener('keydown', fn);
+        return () => document.removeEventListener('keydown', fn);
+    }, [lotModal]);
 
     const [items, setItems] = useState(() => {
         const saved = localStorage.getItem('vparts_receiving_temp');
@@ -43,10 +94,10 @@ export default function ReceivingCheckIn() {
     useEffect(() => { localStorage.setItem('vparts_receiving_temp', JSON.stringify(items)); }, [items]);
 
     useEffect(() => {
-        if (eanInputRef.current && !manualInputId && !showHistoryModal && !showFinishedModal && !showResetModal) {
+        if (eanInputRef.current && !manualInputId && !showHistoryModal && !showFinishedModal && !showResetModal && !lotModal && !showDivergenceModal) {
             eanInputRef.current.focus();
         }
-    }, [showFinishedModal, showResetModal, showPrintModal, showHistoryModal, scanError, items.length, manualInputId]);
+    }, [showFinishedModal, showResetModal, showPrintModal, showHistoryModal, scanError, items.length, manualInputId, lotModal, showDivergenceModal]);
 
     useEffect(() => {
         const totalExpected = items.reduce((acc, item) => acc + item.expected, 0);
@@ -75,25 +126,40 @@ export default function ReceivingCheckIn() {
     };
 
     const handleSelectProduct = (product) => {
+        // Abre modal para coletar lote antes de confirmar
+        setLotModal(product);
+        setLotInput('');
+        setScanValue('');
+        setSuggestions([]);
+    };
+
+    const confirmarBipagem = (product, lote) => {
         const itemIndex = items.findIndex(item => item.ean === product.ean);
         if (itemIndex !== -1) {
             const newItems = [...items];
-            newItems[itemIndex].counted += 1;
+            newItems[itemIndex] = {
+                ...newItems[itemIndex],
+                counted: newItems[itemIndex].counted + 1,
+                lot: lote || newItems[itemIndex].lot
+            };
             setItems(newItems);
             setLastScannedId(newItems[itemIndex].id);
         } else {
             const newItem = {
-                id: Date.now(), sku: product.sku, desc: product.desc, ean: product.ean,
-                expected: product.expected || 0, counted: 1, unit: product.unit || 'UN',
-                lot: product.lot || 'LOT-NEW', recorded: false, isNew: true
+                id: Date.now(), sku: product.sku, desc: product.desc,
+                ean: product.ean, expected: product.expected || 0,
+                counted: 1, unit: product.unit || 'UN',
+                lot: lote || product.lot || 'S/L',
+                recorded: false, isNew: true
             };
             setItems(prev => [...prev, newItem]);
             setLastScannedId(newItem.id);
         }
-        setScanValue('');
-        setSuggestions([]);
+        setLotModal(null);
+        setLotInput('');
         setScanError(null);
-        setTimeout(() => setLastScannedId(null), 800);
+        if (lastScanRef.current) clearTimeout(lastScanRef.current);
+        lastScanRef.current = setTimeout(() => setLastScannedId(null), 800);
     };
 
     const handleScan = (e) => {
@@ -105,7 +171,8 @@ export default function ReceivingCheckIn() {
             else if (suggestions.length > 0) { handleSelectProduct(suggestions[0]); }
             else {
                 setScanError(`Produto ou EAN "${ean}" não identificado.`);
-                setTimeout(() => setScanError(null), 3000);
+                if (scanErrRef.current) clearTimeout(scanErrRef.current);
+                scanErrRef.current = setTimeout(() => setScanError(null), 3000);
                 setScanValue('');
             }
         }
@@ -123,31 +190,25 @@ export default function ReceivingCheckIn() {
         setShowResetModal(false);
     };
 
-    const handleFinalize = async () => {
-        const totalCounted = items.reduce((acc, i) => acc + i.counted, 0);
-        if (totalCounted === 0) {
-            setScanError('Nenhum item foi contado para finalizar.');
-            setTimeout(() => setScanError(null), 3000);
-            return;
-        }
-        const hasPendent = items.some(item => item.counted < item.expected);
-        if (hasPendent && !window.confirm('Existem itens com contagem pendente. Deseja finalizar o recebimento assim mesmo?')) return;
-
+    const executarGravacao = async () => {
         setSyncing(true);
         try {
             await new Promise(resolve => setTimeout(resolve, 1500));
             const transactionId = Math.floor(Date.now() / 1000);
             const dateString = new Date().toLocaleString();
             const receivedItems = items.filter(i => i.counted > 0).map(i => ({
-                sku: i.sku, ean: i.ean, descricao: i.desc, quantidade_recebida: i.counted,
-                lote: i.lot, data_entrada: dateString, operador: 'João Silva',
+                sku: i.sku, ean: i.ean, descricao: i.desc,
+                quantidade_recebida: i.counted, lote: i.lot,
+                data_entrada: dateString, operador: 'João Silva',
                 id_transacao: transactionId, localizacao: 'DOCA-RECEBIMENTO'
             }));
             await OmieApi.recordReceiptInOmie({ nf: 'NF-8842', items: receivedItems });
             addToInventory(receivedItems);
             addReceiptLog({
-                id: transactionId, date: dateString, nf: 'NF-8842', operator: 'João Silva',
-                items: receivedItems.length, totalUnits: totalCounted, status: 'CONCLUÍDO'
+                id: transactionId, date: dateString, nf: 'NF-8842',
+                operator: 'João Silva', items: receivedItems.length,
+                totalUnits: items.reduce((acc, i) => acc + i.counted, 0),
+                status: 'CONCLUÍDO'
             });
             setSyncing(false);
             setShowFinishedModal(true);
@@ -157,6 +218,22 @@ export default function ReceivingCheckIn() {
         }
     };
 
+    const handleFinalize = async () => {
+        const totalCounted = items.reduce((acc, i) => acc + i.counted, 0);
+        if (totalCounted === 0) {
+            setScanError('Nenhum item foi contado para finalizar.');
+            if (scanErrRef.current) clearTimeout(scanErrRef.current);
+            scanErrRef.current = setTimeout(() => setScanError(null), 3000);
+            return;
+        }
+        const hasPendent = items.some(item => item.counted < item.expected);
+        if (hasPendent) {
+            setShowDivergenceModal(true);
+            return;
+        }
+        await executarGravacao();
+    };
+
     const finalizeAndReset = () => {
         setItems(INITIAL_ITEMS);
         localStorage.removeItem('vparts_receiving_temp');
@@ -164,14 +241,18 @@ export default function ReceivingCheckIn() {
     };
 
     const getStatusInfo = (item) => {
-        if (item.counted === 0) return { label: 'PENDENTE', color: 'text-slate-400', bg: 'bg-slate-100', bar: 'bg-slate-300' };
-        if (item.counted >= item.expected && item.expected > 0) return { label: 'CONCLUÍDO', color: 'text-success', bg: 'bg-success/10', bar: 'bg-success' };
-        return { label: 'EM CURSO', color: 'text-primary', bg: 'bg-primary/10', bar: 'bg-primary' };
+        if (item.counted === 0)
+            return { label: 'PENDENTE',  color: 'text-slate-400',  bg: 'bg-slate-100 dark:bg-slate-800',      bar: 'bg-slate-300' };
+        if (item.expected > 0 && item.counted > item.expected)
+            return { label: 'EXCESSO',   color: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-950/20',        bar: 'bg-red-500' };
+        if (item.counted >= item.expected && item.expected > 0)
+            return { label: 'CONCLUÍDO', color: 'text-green-700',  bg: 'bg-green-50 dark:bg-green-950/20',   bar: 'bg-green-500' };
+        return     { label: 'EM CURSO',  color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-950/20',     bar: 'bg-blue-500' };
     };
 
     const getRowHighlight = (item) => {
-        if (lastScannedId === item.id) return 'ring-2 ring-success ring-inset bg-success/10';
-        if (item.isNew) return 'bg-warning/5';
+        if (lastScannedId === item.id) return 'ring-2 ring-green-400 ring-inset bg-green-50 dark:bg-green-950/20';
+        if (item.isNew) return 'bg-amber-50/50 dark:bg-amber-950/10';
         return '';
     };
 
@@ -184,7 +265,7 @@ export default function ReceivingCheckIn() {
             {/* ====== CABEÇALHO ====== */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight">Recebimento — Check-in</h1>
+                    <h1 className="text-2xl font-black tracking-tight">2.13 Recebimento (Check-in)</h1>
                     <p className="text-sm text-slate-500 font-medium">Conferência física de mercadorias na entrada</p>
                 </div>
                 <div className="flex gap-2">
@@ -216,15 +297,15 @@ export default function ReceivingCheckIn() {
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-xl bg-warning/10 flex items-center justify-center"><Package className="w-4 h-4 text-warning" /></div>
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center" aria-hidden="true"><Package className="w-4 h-4 text-amber-600" /></div>
                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">SKUs</p>
                     </div>
                     <p className="text-lg font-black">{skusProcessados}<span className="text-slate-300 font-bold"> / {items.length}</span></p>
-                    <p className="text-[9px] font-bold text-success">{skusConcluidos} concluídos</p>
+                    <p className="text-[9px] font-bold text-green-600">{skusConcluidos} concluídos</p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 rounded-xl bg-success/10 flex items-center justify-center"><BarChart3 className="w-4 h-4 text-success" /></div>
+                        <div className="w-8 h-8 rounded-xl bg-green-50 flex items-center justify-center" aria-hidden="true"><BarChart3 className="w-4 h-4 text-green-600" /></div>
                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Total Conferido</p>
                     </div>
                     <p className="text-lg font-black">{totalUnitsScanned} <span className="text-xs font-bold text-slate-400">un</span></p>
@@ -249,7 +330,9 @@ export default function ReceivingCheckIn() {
                         <ScanBarcode className="w-6 h-6 text-secondary" />
                     </div>
                     <div className="flex-1 relative">
+                        <label htmlFor="barcode-input" className="sr-only">Código de barras do produto — bipe ou digite para pesquisar</label>
                         <input
+                            id="barcode-input"
                             ref={eanInputRef}
                             type="text"
                             value={scanValue}
@@ -257,11 +340,11 @@ export default function ReceivingCheckIn() {
                             onKeyDown={handleScan}
                             disabled={syncing}
                             placeholder="Bipe o código de barras ou digite o nome do produto..."
-                            className={`w-full bg-slate-50 dark:bg-slate-900 border-2 ${scanError ? 'border-danger' : 'border-slate-200 dark:border-slate-700'} rounded-xl py-3.5 px-5 pr-28 text-sm font-bold focus:border-secondary focus:ring-4 focus:ring-secondary/10 outline-none transition-all placeholder:text-slate-300`}
+                            className={`w-full bg-slate-50 dark:bg-slate-900 border-2 ${scanError ? 'border-red-400' : 'border-slate-200 dark:border-slate-700'} rounded-xl py-3.5 px-5 pr-28 text-sm font-bold focus:border-secondary focus:ring-4 focus:ring-secondary/10 outline-none transition-all placeholder:text-slate-300`}
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                             <span className="text-[7px] font-black text-slate-300 uppercase tracking-widest">ENTER ↵</span>
-                            <div className={`w-2 h-2 rounded-full ${syncing ? 'bg-warning animate-pulse' : 'bg-success animate-pulse'}`} />
+                            <div className={`w-2 h-2 rounded-full ${syncing ? 'bg-amber-400 animate-pulse' : 'bg-green-500 animate-pulse'}`} aria-hidden="true" />
                         </div>
 
                         {/* Sugestões */}
@@ -287,8 +370,8 @@ export default function ReceivingCheckIn() {
                     </div>
                 </div>
                 {scanError && (
-                    <div className="mt-3 flex items-center gap-2 text-danger text-xs font-black">
-                        <AlertCircle className="w-4 h-4" /> {scanError}
+                    <div role="alert" className="mt-3 flex items-center gap-2 text-red-600 text-xs font-black">
+                        <AlertCircle className="w-4 h-4" aria-hidden="true" /> {scanError}
                     </div>
                 )}
             </div>
@@ -307,12 +390,12 @@ export default function ReceivingCheckIn() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-[9px] uppercase font-black tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                                <th className="px-6 py-4">Produto</th>
-                                <th className="px-6 py-4">EAN</th>
-                                <th className="px-6 py-4 text-center">Previsto</th>
-                                <th className="px-6 py-4 text-center">Contado</th>
-                                <th className="px-6 py-4 text-center">Progresso</th>
-                                <th className="px-6 py-4 text-right">Status</th>
+                                <th scope="col" className="px-6 py-4">Produto</th>
+                                <th scope="col" className="px-6 py-4">EAN</th>
+                                <th scope="col" className="px-6 py-4 text-center">Previsto</th>
+                                <th scope="col" className="px-6 py-4 text-center">Contado</th>
+                                <th scope="col" className="px-6 py-4 text-center">Progresso</th>
+                                <th scope="col" className="px-6 py-4 text-right">Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
@@ -323,12 +406,12 @@ export default function ReceivingCheckIn() {
                                     <tr key={item.id} className={`${getRowHighlight(item)} transition-all duration-500 hover:bg-slate-50/50`}>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.isNew ? 'bg-warning/10 border border-warning/20' : 'bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800'}`}>
-                                                    <Package className={`w-4 h-4 ${item.isNew ? 'text-warning' : 'text-slate-400'}`} />
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${item.isNew ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800'}`} aria-hidden="true">
+                                                    <Package className={`w-4 h-4 ${item.isNew ? 'text-amber-600' : 'text-slate-400'}`} />
                                                 </div>
                                                 <div>
                                                     <p className="font-black text-xs">{item.desc}</p>
-                                                    <p className="text-[9px] font-bold text-slate-400">{item.sku} {item.isNew && <span className="text-warning ml-1">• NOVO</span>}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400">{item.sku} {item.isNew && <span className="text-amber-600 ml-1">• NOVO</span>}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -367,16 +450,27 @@ export default function ReceivingCheckIn() {
             {/* ====== MODAL HISTÓRICO ====== */}
             {showHistoryModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-3xl max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="history-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-3xl max-h-[80vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+                    >
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><History className="w-5 h-5 text-primary" /></div>
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center" aria-hidden="true"><History className="w-5 h-5 text-primary" /></div>
                                 <div>
-                                    <h3 className="text-base font-black">Histórico de Recebimento</h3>
+                                    <h2 id="history-modal-title" className="text-base font-black">Histórico de Recebimento</h2>
                                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Transações registradas</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowHistoryModal(false)} className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" /></button>
+                            <button
+                                onClick={() => setShowHistoryModal(false)}
+                                aria-label="Fechar histórico"
+                                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                                <X className="w-5 h-5" aria-hidden="true" />
+                            </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
                             {receiptHistory.length > 0 ? (
@@ -384,13 +478,13 @@ export default function ReceivingCheckIn() {
                                     {receiptHistory.map((log) => (
                                         <div key={log.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center">
-                                                    <CheckCircle2 className="w-5 h-5 text-success" />
+                                                <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-200 flex items-center justify-center" aria-hidden="true">
+                                                    <CheckCircle2 className="w-5 h-5 text-green-600" />
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-0.5">
                                                         <span className="font-black text-sm">#{log.id}</span>
-                                                        <span className="px-2 py-0.5 bg-success/10 text-success text-[8px] font-black rounded uppercase">Concluído</span>
+                                                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[8px] font-black rounded uppercase">Concluído</span>
                                                     </div>
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> {log.date}</span>
@@ -426,17 +520,22 @@ export default function ReceivingCheckIn() {
             {/* ====== MODAL RESET ====== */}
             {showResetModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5 text-center">
-                        <div className="w-14 h-14 bg-danger/10 rounded-2xl flex items-center justify-center mx-auto">
-                            <Trash2 className="w-7 h-7 text-danger" />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="reset-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5 text-center"
+                    >
+                        <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto" aria-hidden="true">
+                            <Trash2 className="w-7 h-7 text-red-600" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-black">Limpar Conferência?</h3>
+                            <h2 id="reset-modal-title" className="text-lg font-black">Limpar Conferência?</h2>
                             <p className="text-xs text-slate-500 mt-1">Todo progresso será apagado. Esta ação é irreversível.</p>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <button onClick={() => setShowResetModal(false)} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                            <button onClick={handleReset} className="py-3 bg-danger text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-danger/90 transition-all">Sim, Limpar</button>
+                            <button onClick={handleReset} className="py-3 bg-red-600 text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-red-700 transition-all">Sim, Limpar</button>
                         </div>
                     </div>
                 </div>
@@ -445,22 +544,27 @@ export default function ReceivingCheckIn() {
             {/* ====== MODAL SUCESSO ====== */}
             {showFinishedModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-sm p-8 rounded-3xl shadow-2xl text-center space-y-5">
-                        <div className="w-20 h-20 rounded-full bg-success/10 border-4 border-success/20 flex items-center justify-center mx-auto">
-                            <CheckCircle2 className="w-10 h-10 text-success" />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="success-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-sm p-8 rounded-3xl shadow-2xl text-center space-y-5"
+                    >
+                        <div className="w-20 h-20 rounded-full bg-green-50 border-4 border-green-100 flex items-center justify-center mx-auto" aria-hidden="true">
+                            <CheckCircle2 className="w-10 h-10 text-green-600" aria-hidden="true" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-black">Recebido & Gravado!</h2>
+                            <h2 id="success-modal-title" className="text-xl font-black">Recebido & Gravado!</h2>
                             <p className="text-xs text-slate-500 mt-2">
                                 {totalUnitsScanned} unidades integradas ao estoque VerticalParts via ERP Omie.
                             </p>
                         </div>
                         <div className="p-3 bg-secondary/5 border border-secondary/20 rounded-xl text-left flex items-start gap-2">
-                            <Database className="w-4 h-4 text-secondary shrink-0 mt-0.5" />
+                            <Database className="w-4 h-4 text-secondary shrink-0 mt-0.5" aria-hidden="true" />
                             <p className="text-[10px] font-bold text-slate-600">Lote consolidado na <span className="font-black text-secondary">DOCA-RECEBIMENTO</span>.</p>
                         </div>
                         <button onClick={finalizeAndReset} className="w-full py-3.5 bg-secondary text-primary rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2">
-                            Novo Recebimento <ArrowRight className="w-4 h-4" />
+                            Novo Recebimento <ArrowRight className="w-4 h-4" aria-hidden="true" />
                         </button>
                     </div>
                 </div>
@@ -469,21 +573,142 @@ export default function ReceivingCheckIn() {
             {/* ====== MODAL ETIQUETA ====== */}
             {showPrintModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="print-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5"
+                    >
                         <div className="flex items-center justify-between">
-                            <h3 className="text-base font-black">Etiqueta de Palete</h3>
-                            <button onClick={() => setShowPrintModal(false)} className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" /></button>
+                            <h2 id="print-modal-title" className="text-base font-black">Etiqueta de Palete</h2>
+                            <button
+                                onClick={() => setShowPrintModal(false)}
+                                aria-label="Fechar etiqueta"
+                                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                                <X className="w-5 h-5" aria-hidden="true" />
+                            </button>
                         </div>
                         <div className="border-4 border-black p-5 space-y-4 font-black uppercase text-center text-black bg-white rounded-xl">
                             <p className="text-lg border-b-2 border-black pb-2">VerticalParts WMS</p>
-                            <QrCode className="w-20 h-20 mx-auto" />
+                            <QrCode className="w-20 h-20 mx-auto" aria-label="QR Code da etiqueta de palete" />
                             <div className="space-y-1 border-y-2 border-dashed border-black py-3">
                                 <p className="text-[10px] tracking-widest">LOCAL: DOCA-RECEBIMENTO</p>
-                                <p className="text-xl">PALET-0042</p>
+                                <p className="text-xl">
+                                    PALET-{String(Math.floor(Date.now() / 1000) % 10000).padStart(4, '0')}
+                                </p>
                                 <p className="text-[9px] mt-1">{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
                             </div>
                         </div>
                         <button onClick={() => setShowPrintModal(false)} className="w-full py-3 bg-secondary text-primary rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all">Fechar</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ====== MODAL DIVERGÊNCIA ====== */}
+            {showDivergenceModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="divergence-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5 text-center"
+                    >
+                        <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto" aria-hidden="true">
+                            <AlertCircle className="w-7 h-7 text-amber-600" aria-hidden="true" />
+                        </div>
+                        <div>
+                            <h2 id="divergence-modal-title" className="text-lg font-black">Recebimento com Divergência</h2>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Existem itens com contagem abaixo do previsto na OR.
+                                Deseja finalizar e registrar a divergência?
+                            </p>
+                            <div className="mt-3 space-y-1">
+                                {items.filter(i => i.counted < i.expected).map(i => (
+                                    <div key={i.id}
+                                         className="flex items-center justify-between px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-left">
+                                        <span className="text-[10px] font-black text-slate-600 truncate max-w-[200px]">{i.desc}</span>
+                                        <span className="text-[10px] font-black text-amber-700 ml-2 shrink-0">
+                                            {i.counted}/{i.expected}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setShowDivergenceModal(false)}
+                                className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowDivergenceModal(false);
+                                    await executarGravacao();
+                                }}
+                                className="py-3 bg-amber-500 text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-amber-600 transition-all"
+                            >
+                                Finalizar com Divergência
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ====== MODAL LOTE INDÚSTRIA ====== */}
+            {lotModal && (
+                <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="lot-modal-title"
+                        className="bg-white dark:bg-slate-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-5"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center shrink-0" aria-hidden="true">
+                                <Package className="w-5 h-5 text-secondary" aria-hidden="true" />
+                            </div>
+                            <div>
+                                <p id="lot-modal-title" className="font-black text-sm">{lotModal.desc}</p>
+                                <p className="text-[9px] text-slate-400 font-bold">{lotModal.sku}</p>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label htmlFor="lot-input" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                Lote Indústria
+                            </label>
+                            <input
+                                id="lot-input"
+                                autoFocus
+                                type="text"
+                                value={lotInput}
+                                onChange={e => setLotInput(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') confirmarBipagem(lotModal, lotInput || lotModal.lot);
+                                    if (e.key === 'Escape') setLotModal(null);
+                                }}
+                                placeholder={`Ex: ${lotModal.lot || 'LOT-2026A'}`}
+                                className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-sm font-bold outline-none focus:border-secondary focus:ring-4 focus:ring-secondary/10 transition-all"
+                            />
+                            <p className="text-[9px] text-slate-400">
+                                Pressione Enter para confirmar ou Esc para cancelar
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setLotModal(null)}
+                                className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => confirmarBipagem(lotModal, lotInput || lotModal.lot)}
+                                className="py-3 bg-secondary text-primary rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all"
+                            >
+                                Confirmar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

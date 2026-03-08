@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Settings2, 
   Database, 
@@ -84,13 +84,26 @@ export default function GeneralSettings() {
     printer: 'Zebra ZD220 (DOCA-01)'
   });
 
+  const [saveFeedback, setSaveFeedback] = useState(null); // { type: 'ok'|'err', msg }
+
   const handleSave = () => {
     setSaving(true);
+    // ⚠️ INTEGRAÇãO NECESSÁRIA: PUT /api/settings — sem persistência real no momento.
     setTimeout(() => {
       setSaving(false);
-      alert('Configurações salvas com sucesso!');
+      setSaveFeedback({ type: 'ok', msg: 'Configurações salvas com sucesso!' });
+      setTimeout(() => setSaveFeedback(null), 3500);
     }, 1200);
   };
+
+  // Fechar modal com Escape
+  const closeModal = useCallback(() => setShowConnectorModal(false), []);
+  useEffect(() => {
+    if (!showConnectorModal) return;
+    const onKey = (e) => { if (e.key === 'Escape') closeModal(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showConnectorModal, closeModal]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
@@ -98,7 +111,7 @@ export default function GeneralSettings() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <Settings2 className="w-8 h-8 text-secondary" /> Configuração Geral do Sistema
+            <Settings2 className="w-8 h-8 text-secondary" aria-hidden="true" /> 10.1 Ajustar Configurações
           </h1>
           <p className="text-sm text-slate-500 font-medium italic">Ambiente de segurança e parâmetros globais do WMS</p>
         </div>
@@ -111,6 +124,19 @@ export default function GeneralSettings() {
           {saving ? <Zap className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? 'Gravando...' : 'Salvar Alterações'}
         </button>
+        {/* Banner de feedback inline — substitui alert() bloqueante */}
+        {saveFeedback && (
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold ${
+            saveFeedback.type === 'ok'
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            {saveFeedback.type === 'ok'
+              ? <Check className="w-4 h-4" aria-hidden="true" />
+              : <X className="w-4 h-4" aria-hidden="true" />}
+            {saveFeedback.msg}
+          </div>
+        )}
       </div>
 
       {/* ====== TABS NAVIGATION ====== */}
@@ -201,7 +227,6 @@ export default function GeneralSettings() {
         )}
 
         {/* TAB: INTEGRAÇÃO */}
-        {activeTab === 'integracao'}
         {activeTab === 'integracao' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
             <ConfigSection title="Bloco de Entrada (Inbound)" icon={Share2}>
@@ -316,9 +341,10 @@ export default function GeneralSettings() {
                       className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-xl py-3 px-4 text-sm font-bold focus:border-secondary outline-none transition-all font-mono"
                     />
                   </Field>
-                  <div className="flex items-center gap-2 p-3 bg-success/5 border border-success/10 rounded-xl">
-                    <Check className="w-4 h-4 text-success" />
-                    <span className="text-[10px] font-black text-success uppercase">Conexão Estabelecida com Cluster Prod-01</span>
+                  {/* success → green-600 (token 'success' não definido no CSS) */}
+                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-100 rounded-xl">
+                    <Check className="w-4 h-4 text-green-600" aria-hidden="true" />
+                    <span className="text-[10px] font-black text-green-700 uppercase">Conexão Estabelecida com Cluster Prod-01</span>
                   </div>
                </div>
             </ConfigSection>
@@ -327,15 +353,15 @@ export default function GeneralSettings() {
                <div className="flex flex-col gap-6 pt-2">
                   <div className="p-6 bg-slate-50 dark:bg-slate-900 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl flex flex-col items-center text-center space-y-4">
                      <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center">
-                        <Printer className="w-8 h-8 text-secondary" />
+                        <Printer className="w-8 h-8 text-secondary" aria-hidden="true" />
                      </div>
                      <div>
                         <p className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tight">Impressora Ativa para a Sessão</p>
                         <p className="text-[11px] font-mono font-bold text-slate-400 mt-1">{config.printer}</p>
                      </div>
-                     <button 
+                     <button
                        onClick={() => setShowConnectorModal(true)}
-                       className="px-6 py-2.5 bg-primary text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-black/10"
+                       className="px-6 py-2.5 bg-primary text-secondary rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg shadow-black/10"
                      >
                        verticalPerts WMS Connector
                      </button>
@@ -351,11 +377,11 @@ export default function GeneralSettings() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-800 w-full max-w-md p-8 rounded-[40px] shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-secondary to-primary" />
-            
+
             <div className="flex flex-col items-center text-center space-y-6">
               <div className="w-20 h-20 rounded-full bg-primary/5 flex items-center justify-center relative">
                  <div className="absolute inset-0 bg-secondary/20 rounded-full animate-ping opacity-20" />
-                 <Cpu className="w-10 h-10 text-primary relative z-10" />
+                 <Cpu className="w-10 h-10 text-primary relative z-10" aria-hidden="true" />
               </div>
 
               <div>
@@ -370,36 +396,36 @@ export default function GeneralSettings() {
                       { name: 'Zebra ZD220 (DOCA-01)', type: 'Térmica (Etiquetas)' },
                       { name: 'HP LaserJet CD-MG (AD-02)', type: 'Laser (Relatórios)' },
                       { name: 'Xerox CD-MG-RECEP', type: 'Multifuncional' }
-                    ].map((p, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => { setConfig({...config, printer: p.name}); setShowConnectorModal(false); }}
+                    ].map((p) => (
+                      <button
+                        key={p.name}
+                        onClick={() => { setConfig({...config, printer: p.name}); closeModal(); }}
                         className={cn(
                           "w-full p-4 rounded-2xl border-2 text-left flex items-center justify-between transition-all hover:scale-[1.02]",
                           config.printer === p.name ? "border-secondary bg-secondary/5" : "border-slate-100 dark:border-slate-800 hover:border-slate-200"
                         )}
                       >
                          <div className="flex items-center gap-3">
-                            <Printer className={cn("w-5 h-5", config.printer === p.name ? "text-secondary" : "text-slate-300")} />
+                            <Printer className={cn("w-5 h-5", config.printer === p.name ? "text-secondary" : "text-slate-300")} aria-hidden="true" />
                             <div>
                                <p className="text-xs font-black">{p.name}</p>
                                <p className="text-[9px] font-bold text-slate-400 uppercase">{p.type}</p>
                             </div>
                          </div>
-                         {config.printer === p.name && <CheckCircle2 className="w-5 h-5 text-secondary" />}
+                         {config.printer === p.name && <CheckCircle2 className="w-5 h-5 text-secondary" aria-hidden="true" />}
                       </button>
                     ))}
                  </div>
               </div>
 
-              <button 
+              <button
                 onClick={() => setShowConnectorModal(false)}
                 className="w-full py-4 bg-slate-900 dark:bg-white dark:text-slate-900 text-white rounded-2xl font-black text-[10px] tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2"
               >
                 Conectar & Validar Porta LPT1/USB
               </button>
 
-              <button onClick={() => setShowConnectorModal(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-danger hover:underline transition-all">Cancelar</button>
+              <button onClick={closeModal} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-red-500 hover:underline transition-all">Cancelar</button>
             </div>
           </div>
         </div>

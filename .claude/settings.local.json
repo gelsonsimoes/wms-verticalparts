@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push origin master)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(git add src/components/chat/ChatAssistant.jsx)",
+      "Bash(git commit:*)",
+      "Bash(git add src/pages/Login.jsx src/App.jsx src/components/layout/Header.jsx)"
+    ]
+  }
+}

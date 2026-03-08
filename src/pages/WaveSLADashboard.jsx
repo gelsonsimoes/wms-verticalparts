@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Waves, 
-  Search, 
   Filter, 
   Clock, 
   AlertTriangle, 
@@ -9,15 +8,15 @@ import {
   XCircle, 
   ChevronRight,
   TrendingUp,
-  History,
   Activity,
   Zap,
-  ShoppingCart
+  ShoppingCart,
+  Monitor,
+  Tv
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useApp } from '../context/AppContext';
-import { Monitor, Tv, Eye } from 'lucide-react';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -127,7 +126,7 @@ export default function WaveSLADashboard() {
             "font-black tracking-tight flex items-center gap-3",
             isTvMode ? "text-6xl mb-4" : "text-2xl"
           )}>
-            <Activity className={cn("text-secondary", isTvMode ? "w-16 h-16" : "w-8 h-8")} /> Acompanhamento de Ondas (SLA)
+            <Activity className={cn("text-secondary", isTvMode ? "w-16 h-16" : "w-8 h-8")} aria-hidden="true" /> Acompanhamento de Ondas (SLA)
           </h1>
           <p className={cn("text-slate-500 font-medium italic", isTvMode ? "text-2xl" : "text-sm")}>
             Monitoramento tático de gargalos e tempos de processo
@@ -136,7 +135,7 @@ export default function WaveSLADashboard() {
 
         <div className="flex items-center gap-3">
           <div className="relative group">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-secondary transition-colors" />
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-secondary transition-colors" aria-hidden="true" />
             <select 
               className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 py-3 pl-11 pr-8 rounded-2xl text-xs font-black uppercase tracking-widest outline-none focus:border-secondary transition-all appearance-none cursor-pointer shadow-sm"
               value={filter}
@@ -156,7 +155,7 @@ export default function WaveSLADashboard() {
                 : "bg-primary text-white hover:bg-primary/90"
             )}
           >
-            {isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />}
+            {isTvMode ? <Monitor className="w-4 h-4" aria-hidden="true" /> : <Tv className="w-4 h-4" aria-hidden="true" />}
             {isTvMode ? "Sair do Modo TV" : "Modo TV"}
           </button>
 
@@ -173,14 +172,14 @@ export default function WaveSLADashboard() {
       {isTvMode && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
            <div className="bg-danger p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
-              <AlertTriangle className="w-24 h-24 text-white animate-bounce" />
+              <AlertTriangle className="w-24 h-24 text-white animate-bounce" aria-hidden="true" />
               <div>
                 <p className="text-white text-5xl font-black italic uppercase leading-tight">3 Ondas Críticas</p>
                 <p className="text-white/80 text-2xl font-bold uppercase tracking-widest">Atraso na Separação</p>
               </div>
            </div>
            <div className="bg-warning p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
-              <Zap className="w-24 h-24 text-primary animate-pulse" />
+              <Zap className="w-24 h-24 text-primary animate-pulse" aria-hidden="true" />
               <div>
                 <p className="text-primary text-5xl font-black italic uppercase leading-tight">5 Reabastecimentos</p>
                 <p className="text-primary/60 text-2xl font-bold uppercase tracking-widest">Pendentes no Chão</p>
@@ -196,17 +195,32 @@ export default function WaveSLADashboard() {
           { label: 'Média de SLA (Etapas)', value: '18m', icon: Clock, color: 'secondary' },
           { label: 'Ondas em Alerta', value: '03', icon: AlertTriangle, color: 'danger' },
           { label: 'Reabast. Pendentes', value: '05', icon: Zap, color: 'warning' },
-        ].map((card, i) => (
-          <div key={i} className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-${card.color}/10 border border-${card.color}/20`}>
-              <card.icon className={`w-6 h-6 text-${card.color}`} />
+        ].map((card, i) => {
+          const colorMap = {
+            primary: 'bg-primary/10 border-primary/20 text-primary',
+            secondary: 'bg-secondary/10 border-secondary/20 text-secondary',
+            danger: 'bg-red-500/10 border-red-500/20 text-red-600',
+            warning: 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+          };
+          const iconColorMap = {
+            primary: 'text-primary',
+            secondary: 'text-secondary',
+            danger: 'text-red-500',
+            warning: 'text-amber-500'
+          };
+          
+          return (
+            <div key={i} className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center border", colorMap[card.color])}>
+                <card.icon className={cn("w-6 h-6", iconColorMap[card.color])} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{card.label}</p>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">{card.value}</h3>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{card.label}</p>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white">{card.value}</h3>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ====== MONITORING GRID ====== */}
@@ -215,10 +229,10 @@ export default function WaveSLADashboard() {
           <table className="w-full border-collapse min-w-[1100px]">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] w-48">Identificação</th>
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] w-32 text-center">Reabast.</th>
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fluxo de SLA / Etapas</th>
-                <th className="p-6 text-right w-20"></th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] w-48">Identificação</th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] w-32 text-center">Reabast.</th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fluxo de SLA / Etapas</th>
+                <th scope="col" className="p-6 text-right w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -242,14 +256,14 @@ export default function WaveSLADashboard() {
                       {wave.reabastecimento ? (
                         <div className="flex flex-col items-center gap-1 group/alert">
                           <div className="w-10 h-10 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center border-2 border-red-200 dark:border-red-800 text-red-600 animate-pulse transition-transform hover:scale-110">
-                            <XCircle className="w-6 h-6" />
+                            <XCircle className="w-6 h-6" aria-hidden="true" />
                           </div>
                           <span className="text-[8px] font-black text-red-500 uppercase tracking-widest animate-pulse">Pendente</span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-1 group/ok">
                           <div className="w-10 h-10 rounded-2xl bg-green-50 dark:bg-green-900/20 flex items-center justify-center border border-green-200 dark:border-green-800 text-green-500">
-                            <CheckCircle2 className="w-5 h-5" />
+                            <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
                           </div>
                           <span className="text-[8px] font-black text-green-400 uppercase tracking-widest opacity-50">OK</span>
                         </div>
@@ -274,8 +288,11 @@ export default function WaveSLADashboard() {
                   </td>
 
                   <td className="p-6 text-right">
-                    <button className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-secondary hover:border-secondary transition-all shadow-sm">
-                      <ChevronRight className="w-5 h-5" />
+                    <button 
+                      aria-label="Detalhes da onda"
+                      className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-secondary hover:border-secondary transition-all shadow-sm"
+                    >
+                      <ChevronRight className="w-5 h-5" aria-hidden="true" />
                     </button>
                   </td>
                 </tr>

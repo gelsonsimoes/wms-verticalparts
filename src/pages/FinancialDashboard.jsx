@@ -24,11 +24,14 @@ import {
 } from 'lucide-react';
 
 // ====== DADOS MOCKADOS (VERTICALPARTS) ======
+// isPositiveChange: semântica contextual.
+// Receita subindo = bom. Custo diminuindo = bom.
+// trend !== isPositiveChange para métricas de custo.
 const kpiData = [
-    { label: 'Receita do Mês', value: 'R$ 1.258.450,00', change: '+12.5%', trend: 'up', icon: DollarSign, color: '#FFD700' },
-    { label: 'Custo Armazenagem', value: 'R$ 485.200,00', change: '-2.4%', trend: 'down', icon: Wallet, color: '#000000' },
-    { label: 'Diárias Pendentes', value: '1.240', change: '+156', trend: 'up', icon: Clock, color: '#FFD700' },
-    { label: 'Contratos Ativos', value: '42', change: '+3', trend: 'up', icon: FileText, color: '#000000' },
+    { label: 'Receita do Mês',     value: 'R$ 1.258.450,00', change: '+12.5%', trend: 'up',   isPositiveChange: true,  icon: DollarSign, color: '#FFD700' },
+    { label: 'Custo Armazenagem',  value: 'R$ 485.200,00',   change: '-2.4%',  trend: 'down', isPositiveChange: true,  icon: Wallet,     color: '#000000' }, // custo caindo = bom
+    { label: 'Diárias Pendentes',  value: '1.240',           change: '+156',   trend: 'up',   isPositiveChange: false, icon: Clock,      color: '#FFD700' }, // mais pendentes = ruim
+    { label: 'Contratos Ativos',   value: '42',              change: '+3',     trend: 'up',   isPositiveChange: true,  icon: FileText,   color: '#000000' },
 ];
 
 const billingHistory = [
@@ -75,7 +78,7 @@ export default function FinancialDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight text-secondary italic flex items-center gap-3">
-                        <TrendingUp className="w-10 h-10 text-primary" /> Dashboard Financeiro
+                        <TrendingUp className="w-10 h-10 text-primary" aria-hidden="true" /> 8.1 Dashboard Financeiro
                     </h1>
                     <p className="text-sm text-slate-500 font-medium italic mt-1">Análise de Receita, Custos e Performance Financeira - VerticalParts</p>
                 </div>
@@ -90,14 +93,19 @@ export default function FinancialDashboard() {
 
             {/* ====== KPI CARDS ====== */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {kpiData.map((kpi, idx) => (
-                    <div key={idx} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
+                {kpiData.map((kpi) => (
+                    <div key={kpi.label} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
                         <div className="flex justify-between items-start mb-6">
-                            <div className={`p-4 rounded-2xl ${idx % 2 === 0 ? 'bg-primary/10 text-primary' : 'bg-secondary/5 text-secondary'} group-hover:scale-110 transition-transform`}>
-                                <kpi.icon className="w-6 h-6" />
+                            <div className={`p-4 rounded-2xl ${kpi.color === '#FFD700' ? 'bg-primary/10 text-primary' : 'bg-secondary/5 text-secondary'} group-hover:scale-110 transition-transform`}>
+                                <kpi.icon className="w-6 h-6" aria-hidden="true" />
                             </div>
-                            <div className={`flex items-center gap-1 text-[10px] font-black px-3 py-1.5 rounded-full ${kpi.trend === 'up' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {kpi.trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                            {/* Badge usa isPositiveChange (semântico), não trend (direcional) */}
+                            <div className={`flex items-center gap-1 text-[10px] font-black px-3 py-1.5 rounded-full ${
+                                kpi.isPositiveChange ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                            }`}>
+                                {kpi.trend === 'up'
+                                    ? <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+                                    : <ArrowDownRight className="w-3 h-3" aria-hidden="true" />}
                                 {kpi.change}
                             </div>
                         </div>
@@ -186,10 +194,10 @@ export default function FinancialDashboard() {
                     </div>
 
                     <div className="mt-8 space-y-3 relative z-10">
-                        {serviceDistribution.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between">
+                        {serviceDistribution.map((item) => (
+                            <div key={item.name} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx] }}></div>
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[serviceDistribution.indexOf(item)] }} aria-hidden="true" />
                                     <span className="text-[11px] font-black text-white/70 uppercase tracking-wider">{item.name}</span>
                                 </div>
                                 <span className="text-[11px] font-black text-primary">{item.value}%</span>
@@ -197,8 +205,8 @@ export default function FinancialDashboard() {
                         ))}
                     </div>
 
-                    {/* Watermark decotativa */}
-                    <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none">
+                    {/* Watermark decorativa */}
+                    <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none" aria-hidden="true">
                         <CreditCard className="w-48 h-48 text-white" />
                     </div>
                 </div>
@@ -208,13 +216,17 @@ export default function FinancialDashboard() {
             <div className="bg-slate-50 border border-slate-100 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white rounded-2xl shadow-sm">
-                        <TrendingUp className="w-5 h-5 text-emerald-500" />
+                        <TrendingUp className="w-5 h-5 text-emerald-500" aria-hidden="true" />
                     </div>
                     <p className="text-[11px] font-bold text-slate-500">
                         Os dados refletem o faturamento consolidado de peças (ex: <span className="text-secondary font-black italic">VPER-ESS-NY-27MM</span>) e serviços logísticos prestados a depositantes como <span className="text-secondary font-black italic">Danilo Simões</span> e <span className="text-secondary font-black italic">Matheus Expedição</span>.
                     </p>
                 </div>
-                <button className="bg-secondary text-primary px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-secondary/20">
+                <button
+                    disabled
+                    title="Exportação CFO em desenvolvimento"
+                    className="bg-secondary text-primary px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                     Exportar Relatório CFO
                 </button>
             </div>

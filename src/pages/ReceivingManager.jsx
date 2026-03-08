@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   PackageSearch, 
   Filter, 
@@ -10,17 +10,11 @@ import {
   AlertCircle, 
   Plus, 
   RotateCcw, 
-  BarChart3, 
-  ChevronRight, 
   Barcode, 
   Hash, 
   X, 
-  Save, 
-  Lock, 
   Zap,
-  MoreVertical,
   ClipboardList,
-  History,
   AlertTriangle,
   Camera,
   Search
@@ -70,7 +64,7 @@ const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled =
 // ====== COMPONENTE PRINCIPAL ======
 
 export default function ReceivingManager() {
-  const { companies } = useApp();
+  const { } = useApp(); // useApp mantido para futura expansão
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [filterPeriod, setFilterPeriod] = useState('1 dia');
   const [selectedOR, setSelectedOR] = useState(null);
@@ -84,19 +78,56 @@ export default function ReceivingManager() {
   ]);
   const [showNFModal, setShowNFModal] = useState(false);
   const [showProductsModal, setShowProductsModal] = useState(false);
-  const [scanLog, setScanLog] = useState([]); // histórico de bips
+  // Histórico de bips (mantido para futura exibição no modal)
+  // const [scanLog, setScanLog] = useState([]);
   
   // Blind Check State
   const [barcode, setBarcode] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [lastScan, setLastScan] = useState(null);
+  const [damageType, setDamageType] = useState(null); // radio de tipo de dano
   const scanInputRef = useRef(null);
+
+  // Quantidades mockadas estáveis (evita flutuação a cada render)
+  const mockQtys = useMemo(() => [8, 14, 3, 20, 11], []);
 
   useEffect(() => {
     if (showBlindModal && scanInputRef.current) {
       scanInputRef.current.focus();
     }
   }, [showBlindModal]);
+
+  // Escape — Modal Conferência Cega
+  useEffect(() => {
+    if (!showBlindModal) return;
+    const fn = (e) => { if (e.key === 'Escape') setShowBlindModal(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [showBlindModal]);
+
+  // Escape — Modal Avaria
+  useEffect(() => {
+    if (!showDamageModal) return;
+    const fn = (e) => { if (e.key === 'Escape') setShowDamageModal(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [showDamageModal]);
+
+  // Escape — Modal NF
+  useEffect(() => {
+    if (!showNFModal) return;
+    const fn = (e) => { if (e.key === 'Escape') setShowNFModal(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [showNFModal]);
+
+  // Escape — Modal Produtos
+  useEffect(() => {
+    if (!showProductsModal) return;
+    const fn = (e) => { if (e.key === 'Escape') setShowProductsModal(false); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [showProductsModal]);
 
   const handleScan = (e) => {
     e.preventDefault();
@@ -107,14 +138,12 @@ export default function ReceivingManager() {
     setBarcode('');
     if (scanInputRef.current) scanInputRef.current.focus();
 
-    // Atualiza progresso da OR
+    // Atualiza progresso da OR — limita ao máximo de totalItens
     setOrdens(prev => prev.map(o =>
       o.id === selectedOR && o.conferidos < o.totalItens
-        ? {...o, conferidos: o.conferidos + quantity}
+        ? { ...o, conferidos: Math.min(o.conferidos + quantity, o.totalItens) }
         : o
     ));
-    // Adiciona ao log
-    setScanLog(prev => [{sku: barcode, qty: quantity, ts: new Date().toLocaleTimeString('pt-BR')}, ...prev]);
   };
 
   return (
@@ -124,7 +153,7 @@ export default function ReceivingManager() {
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
         <div>
           <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-            <PackageSearch className="w-8 h-8 text-secondary" /> Gerenciador de Recebimento
+            <PackageSearch className="w-8 h-8 text-secondary" /> 2.4 Gerenciar Recebimento
           </h1>
           <p className="text-sm text-slate-500 font-medium italic">Chão de fábrica: Conferência cega e alocação dinâmica</p>
         </div>
@@ -177,6 +206,11 @@ export default function ReceivingManager() {
                 onClick={() => setShowNFModal(true)} />
               <ToolbarButton label="Produtos" icon={Boxes} disabled={!selectedOR}
                 onClick={() => setShowProductsModal(true)} />
+              <ToolbarButton label="Etiquetas" icon={Tag} color="secondary" disabled={!selectedOR}
+                onClick={() => {
+                  const or = ordens.find(o => o.id === selectedOR);
+                  alert(`Enviando lote de etiquetas da OR ${selectedOR} (${or?.totalItens} itens) para a impressora térmica...`);
+                }} />
               <ToolbarButton label="Gerar Picking" icon={Zap} disabled={!selectedOR}
                 onClick={() => {
                   const or = ordens.find(o => o.id === selectedOR);
@@ -184,7 +218,7 @@ export default function ReceivingManager() {
                     alert('Finalize a conferência antes de gerar picking.');
                     return;
                   }
-                  alert('Picking gerado for ' + selectedOR + '! Acesse 1.10 Separar Pedidos.');
+                  alert('Picking gerado for ' + selectedOR + '! Acesse 2.10 Separar Pedidos.');
                 }} />
             </div>
           </div>
@@ -243,7 +277,7 @@ export default function ReceivingManager() {
               <ToolbarButton label="Gerar Alocação" icon={Truck}
                 disabled={!selectedOR || ordens.find(o=>o.id===selectedOR)?.status !== 'Aguardando Alocação'}
                 onClick={() => {
-                  alert('Mapa de alocação gerado para ' + selectedOR + '!\nAcesse 1.6 Gerar Mapa de Alocação para confirmar os endereços.');
+                  alert('Mapa de alocação gerado para ' + selectedOR + '!\nAcesse 2.6 Gerar Mapa de Alocação para confirmar os endereços.');
                 }} />
 
               <ToolbarButton label="Confirmar" icon={CheckCircle2}
@@ -280,21 +314,25 @@ export default function ReceivingManager() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">O.R. / Recebimento</th>
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Depositante</th>
-                <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipo de Entrada</th>
-                <th className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data</th>
-                <th className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                <th className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progresso</th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">O.R. / Recebimento</th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Depositante</th>
+                <th scope="col" className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipo de Entrada</th>
+                <th scope="col" className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data</th>
+                <th scope="col" className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                <th scope="col" className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Progresso</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
               {ordens.filter(or => or.status === filterStatus || filterStatus === 'Todos').map((or) => (
                 <tr 
                   key={or.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedOR(or.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOR(or.id); } }}
+                  aria-pressed={selectedOR === or.id}
                   className={cn(
-                    "group cursor-pointer transition-all",
+                    "group cursor-pointer transition-all outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-inset",
                     selectedOR === or.id ? "bg-secondary/5" : "hover:bg-slate-50 dark:hover:bg-slate-800/30"
                   )}
                 >
@@ -350,7 +388,12 @@ export default function ReceivingManager() {
       {/* ====== MODAL: CONFERÊNCIA CEGA ====== */}
       {showBlindModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="blind-modal-title"
+            className="bg-white dark:bg-slate-800 w-full max-w-2xl rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]"
+          >
             <div className="absolute top-0 left-0 w-full h-3 bg-secondary" />
             
             {/* Header Modal */}
@@ -363,15 +406,16 @@ export default function ReceivingManager() {
                   <Barcode className="w-8 h-8 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black tracking-tight uppercase">Execução de Conferência Cega</h3>
+                  <h2 id="blind-modal-title" className="text-xl font-black tracking-tight uppercase">Execução de Conferência Cega</h2>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">O.R. Selecionada: <span className="text-secondary">{selectedOR}</span></p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowBlindModal(false)}
+                aria-label="Fechar conferência cega"
                 className="w-12 h-12 flex items-center justify-center bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-100 dark:border-slate-800 text-slate-400 hover:text-danger transition-all hover:scale-110"
               >
-                <X className="w-6 h-6" />
+                <X className="w-6 h-6" aria-hidden="true" />
               </button>
             </div>
 
@@ -380,12 +424,13 @@ export default function ReceivingManager() {
               
               {/* SCANNER INPUT AREA */}
               <form onSubmit={handleScan} className="space-y-4">
-                <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Aguardando Bipagem de Produto...</label>
+                <label htmlFor="blind-scan-input" className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Aguardando Bipagem de Produto...</label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none" aria-hidden="true">
                     <Search className="w-6 h-6 text-secondary group-focus-within:text-primary transition-colors" />
                   </div>
                   <input 
+                    id="blind-scan-input"
                     ref={scanInputRef}
                     type="text" 
                     placeholder="ESCANEIE O CÓDIGO DE BARRAS / SKU"
@@ -393,7 +438,7 @@ export default function ReceivingManager() {
                     onChange={(e) => setBarcode(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-900 border-4 border-slate-100 dark:border-slate-800 rounded-[24px] py-8 pl-16 pr-8 text-2xl font-black text-secondary placeholder:text-slate-300 focus:border-secondary focus:bg-white outline-none transition-all shadow-inner tracking-widest uppercase"
                   />
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 flex items-center gap-2" aria-hidden="true">
                      <span className="px-3 py-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg text-[10px] font-black text-slate-500 tracking-tighter shadow-sm border border-slate-300/50">USB / BT SCANNER READY</span>
                   </div>
                 </div>
@@ -402,16 +447,28 @@ export default function ReceivingManager() {
               {/* QUANTITY & ACTIONS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                   <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade Contada</label>
+                   <label htmlFor="blind-qty-input" className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantidade Contada</label>
                    <div className="flex items-center gap-2">
-                      <button onClick={() => setQuantity(q => Math.max(1, q-1))} className="w-16 h-16 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all">-</button>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => Math.max(1, q-1))}
+                        aria-label="Diminuir quantidade"
+                        className="w-16 h-16 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all"
+                      >-</button>
                       <input 
+                        id="blind-qty-input"
                         type="number" 
                         value={quantity}
-                        onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                        min={1}
+                        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
                         className="flex-1 h-16 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-center text-xl font-black text-primary outline-none focus:border-primary"
                       />
-                      <button onClick={() => setQuantity(q => q+1)} className="w-16 h-16 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all">+</button>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(q => q+1)}
+                        aria-label="Aumentar quantidade"
+                        className="w-16 h-16 rounded-2xl border-2 border-slate-100 bg-slate-50 text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-all"
+                      >+</button>
                    </div>
                    <p className="text-[10px] text-slate-400 font-medium italic mt-1 ml-1">Padrão: Conferência por Unidade (Bip=1)</p>
                 </div>
@@ -444,8 +501,20 @@ export default function ReceivingManager() {
                     </div>
                   </div>
                   <div className="flex gap-3 relative z-10">
-                    <button onClick={() => setLastScan(null)} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all">Ignorar</button>
-                    <button className="px-8 py-3 bg-secondary text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-black/20 hover:scale-105 transition-all">Confirmar (1)</button>
+                    <button
+                      type="button"
+                      onClick={() => setLastScan(null)}
+                      className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all"
+                    >Ignorar</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // já foi processado no handleScan; apenas descarta o feedback
+                        setLastScan(null);
+                        if (scanInputRef.current) scanInputRef.current.focus();
+                      }}
+                      className="px-8 py-3 bg-secondary text-primary rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-black/20 hover:scale-105 transition-all"
+                    >Confirmar (1)</button>
                   </div>
                 </div>
               )}
@@ -461,9 +530,20 @@ export default function ReceivingManager() {
                 Suspender
               </button>
               <button 
+                onClick={() => {
+                  // Finaliza a conferência da OR selecionada e fecha o modal
+                  const or = ordens.find(o => o.id === selectedOR);
+                  if (or && or.status === 'Pendente') {
+                    setOrdens(prev => prev.map(o => o.id === selectedOR
+                      ? { ...o, status: 'Aguardando Alocação', conferidos: o.totalItens }
+                      : o
+                    ));
+                  }
+                  setShowBlindModal(false);
+                }}
                 className="px-10 py-3 bg-secondary text-primary rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-black/10 hover:scale-105 transition-all flex items-center gap-2"
               >
-                <CheckCircle2 className="w-4 h-4" /> Finalizar Conferência
+                <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Finalizar Conferência
               </button>
             </div>
           </div>
@@ -473,46 +553,77 @@ export default function ReceivingManager() {
       {/* ====== MODAL: DETALHE DE AVARIA ====== */}
       {showDamageModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in zoom-in-95 duration-200">
-           <div className="bg-white dark:bg-slate-800 w-full max-w-lg p-8 rounded-[40px] shadow-2xl relative border-t-8 border-danger">
+           <div
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="damage-modal-title"
+             className="bg-white dark:bg-slate-800 w-full max-w-lg p-8 rounded-[40px] shadow-2xl relative border-t-8 border-danger"
+           >
               <div className="flex items-center gap-4 mb-8">
-                 <div className="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center">
+                 <div className="w-12 h-12 rounded-2xl bg-danger/10 flex items-center justify-center" aria-hidden="true">
                     <AlertTriangle className="w-6 h-6 text-danger" />
                  </div>
-                 <h3 className="text-xl font-black uppercase tracking-tight">Registro de Avaria</h3>
+                 <h2 id="damage-modal-title" className="text-xl font-black uppercase tracking-tight">Registro de Avaria</h2>
               </div>
 
               <div className="space-y-6">
                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Dano / Defeito</label>
-                    <div className="grid grid-cols-2 gap-3 mt-2">
+                    <p id="damage-type-label" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Tipo de Dano / Defeito</p>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="damage-type-label"
+                      className="grid grid-cols-2 gap-3 mt-2"
+                    >
                        {['Caixa Amassada', 'Produto Rasgado', 'Item Molhado', 'Lacre Violado', 'Outros'].map((d) => (
-                         <button key={d} className="p-4 rounded-xl border-2 border-slate-100 hover:border-danger hover:bg-danger/5 text-xs font-bold text-slate-600 transition-all text-left">{d}</button>
+                         <button
+                           key={d}
+                           type="button"
+                           role="radio"
+                           aria-checked={damageType === d}
+                           onClick={() => setDamageType(d)}
+                           className={`p-4 rounded-xl border-2 text-xs font-bold text-left transition-all ${
+                             damageType === d
+                               ? 'border-danger bg-danger/10 text-danger'
+                               : 'border-slate-100 hover:border-danger hover:bg-danger/5 text-slate-600'
+                           }`}
+                         >{d}</button>
                        ))}
                     </div>
                  </div>
 
-                 <div className="p-10 border-4 border-dashed border-slate-100 rounded-[32px] flex flex-col items-center justify-center text-center space-y-3 hover:border-secondary/30 transition-all cursor-pointer group">
-                    <div className="w-16 h-16 rounded-full bg-slate-50 group-hover:bg-secondary/10 flex items-center justify-center transition-all">
+                 <button
+                   type="button"
+                   aria-label="Anexar foto da avaria"
+                   className="w-full p-10 border-4 border-dashed border-slate-100 rounded-[32px] flex flex-col items-center justify-center text-center space-y-3 hover:border-secondary/30 transition-all cursor-pointer group"
+                 >
+                    <div className="w-16 h-16 rounded-full bg-slate-50 group-hover:bg-secondary/10 flex items-center justify-center transition-all" aria-hidden="true">
                        <Camera className="w-8 h-8 text-slate-300 group-hover:text-secondary" />
                     </div>
                     <p className="text-xs font-black text-slate-400 uppercase">Anexar Foto da Avaria</p>
-                 </div>
+                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mt-8">
-                 <button onClick={() => setShowDamageModal(false)} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest">Descartar</button>
-                 <button onClick={() => setShowDamageModal(false)} className="py-4 bg-danger text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-danger/20">Salvar Avaria</button>
+                 <button onClick={() => { setShowDamageModal(false); setDamageType(null); }} className="py-4 bg-slate-100 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest">Descartar</button>
+                 <button onClick={() => { setShowDamageModal(false); setDamageType(null); }} className="py-4 bg-danger text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-danger/20">Salvar Avaria</button>
               </div>
            </div>
         </div>
       )}
 
       {showNFModal && (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
-      onClick={() => setShowNFModal(false)}>
-      <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
-        onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-black mb-2">Nota Fiscal Vinculada</h3>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
+      onClick={() => setShowNFModal(false)}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nf-modal-title"
+        className="bg-white dark:bg-slate-800 w-full max-w-md rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="nf-modal-title" className="text-lg font-black mb-2">Nota Fiscal Vinculada</h2>
         <p className="text-xs text-slate-400 mb-6">O.R.: <strong>{selectedOR}</strong></p>
         {(() => {
           const or = ordens.find(o => o.id === selectedOR);
@@ -546,11 +657,18 @@ export default function ReceivingManager() {
   )}
 
   {showProductsModal && (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
-      onClick={() => setShowProductsModal(false)}>
-      <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
-        onClick={e => e.stopPropagation()}>
-        <h3 className="text-lg font-black mb-2">Produtos da O.R.</h3>
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl"
+      onClick={() => setShowProductsModal(false)}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="products-modal-title"
+        className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-[32px] p-8 shadow-2xl border-t-4 border-secondary"
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 id="products-modal-title" className="text-lg font-black mb-2">Produtos da O.R.</h2>
         <p className="text-xs text-slate-400 mb-6">O.R.: <strong>{selectedOR}</strong></p>
         <div className="space-y-2 max-h-72 overflow-y-auto">
           {['VEPEL-BPI-174FX','VPER-ESS-NY-27MM','VPER-PAL-INO-1000','VPER-LUM-LED-VRD-24V','VPER-PNT-AL-22D'].map((sku, i) => (
@@ -560,7 +678,7 @@ export default function ReceivingManager() {
                 <p className="text-[10px] text-slate-400">Peça para elevador · Lote VP-{2026+i}</p>
               </div>
               <span className="text-xs font-black bg-white border border-slate-200 px-2 py-1 rounded-lg">
-                {Math.ceil(Math.random()*20)} un
+                {mockQtys[i]} un
               </span>
             </div>
           ))}

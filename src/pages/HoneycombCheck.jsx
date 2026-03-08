@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, ScanBarcode, Package, Lock, X, CheckCircle2, AlertTriangle, Eye, ListChecks, BoxSelect } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ArrowLeft, ScanBarcode, Package, Lock, X, AlertTriangle, Eye, ListChecks, BoxSelect } from 'lucide-react';
 
 // ========== CORES DAS COLMEIAS ==========
 const CORES_COLMEIA = [
@@ -17,16 +17,16 @@ const CORES_COLMEIA = [
 
 // ========== SIMULAÇÃO DE PEDIDOS POR COR ==========
 const PEDIDOS_SIM = {
-    BEGE:     { produto: 'BOLSA CARMEN STEFFENS', total: 20, separados: 4 },
-    ROXA:     { produto: 'CINTO COURO LEGÍTIMO', total: 15, separados: 2 },
-    VERDE:    { produto: 'CARTEIRA FEMININA PREMIUM', total: 25, separados: 9 },
-    VERMELHA: { produto: 'MOCHILA EXECUTIVA VP', total: 18, separados: 6 },
-    AZUL:     { produto: 'NECESSAIRE VIAGEM', total: 12, separados: 0 },
-    AMARELA:  { produto: 'PORTA-DOCUMENTOS COURO', total: 10, separados: 3 },
-    LARANJA:  { produto: 'BOLSA TIRACOLO CASUAL', total: 22, separados: 8 },
-    BRANCA:   { produto: 'CLUTCH FESTA', total: 8, separados: 1 },
-    PRETA:    { produto: 'PASTA NOTEBOOK 15"', total: 16, separados: 5 },
-    ROSA:     { produto: 'MOCHILA INFANTIL', total: 14, separados: 3 },
+    BEGE:     { produto: 'PASTILHA DE FREIO CERÂMICA VP-FR4429', total: 20, separados: 4 },
+    ROXA:     { produto: 'CABO DE FREIO INOX 2.5MM', total: 15, separados: 2 },
+    VERDE:    { produto: 'GUIA DE ELEVADOR BST 18KG/M', total: 25, separados: 9 },
+    VERMELHA: { produto: 'LIMITADOR DE VELOCIDADE MONARCH', total: 18, separados: 6 },
+    AZUL:     { produto: 'PAINEL DE COMANDO THYSSENKRUPP', total: 12, separados: 0 },
+    AMARELA:  { produto: 'SENSOR DE PORTA DE PAVIMENTO BST', total: 10, separados: 3 },
+    LARANJA:  { produto: 'CORREIA DENTADA OTIS ESCADA ROLANTE', total: 22, separados: 8 },
+    BRANCA:   { produto: 'BATENTE DE CABINA PVC 90MM', total: 8, separados: 1 },
+    PRETA:    { produto: 'SISTEMA DE RESGATE AUTOMÁTICO SR-200', total: 16, separados: 5 },
+    ROSA:     { produto: 'QUADRO ELÉTRICO DE MANOBRA VP-QM-01', total: 14, separados: 3 },
 };
 
 // ========== STATUS DOS ESCANINHOS ==========
@@ -36,6 +36,7 @@ const STATUS = {
     COM_PRODUTO:   'com_produto',       // amarelo
     COLOCANDO:     'colocando',         // laranja piscando
     FINALIZADO:    'finalizado',        // verde
+    AGUARDANDO:    'aguardando',        // roxo — aguardando conferência total do pedido
 };
 
 const STATUS_CONFIG = {
@@ -44,6 +45,7 @@ const STATUS_CONFIG = {
     [STATUS.COM_PRODUTO]:   { bg: '#EAB308', border: '#CA8A04', label: 'Com produto' },
     [STATUS.COLOCANDO]:     { bg: '#F97316', border: '#EA580C', label: 'Colocando...' },
     [STATUS.FINALIZADO]:    { bg: '#22C55E', border: '#16A34A', label: 'Finalizado' },
+    [STATUS.AGUARDANDO]:    { bg: '#8B5CF6', border: '#7C3AED', label: 'Aguard. conferência' },
 };
 
 // ========== COMPONENTE ESCANINHO ==========
@@ -70,6 +72,7 @@ function Escaninho({ numero, status, qtd, onClick, onContextMenu }) {
                     {status === STATUS.COLOCANDO && '← AQUI'}
                     {status === STATUS.VAZIO && 'vazio'}
                     {status === STATUS.FINALIZADO && '✓ ok'}
+                    {status === STATUS.AGUARDANDO && 'aguardando'}
                 </span>
             )}
             {isPiscando && (
@@ -82,19 +85,27 @@ function Escaninho({ numero, status, qtd, onClick, onContextMenu }) {
 // ========== MODAL SUPERVISOR ==========
 function SupervisorModal({ onConfirm, onClose }) {
     const [senha, setSenha] = useState('');
+
+    // Fechar com Escape
+    useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="supervisor-modal-title" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-5" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-danger/10 rounded-xl flex items-center justify-center"><Lock className="w-6 h-6 text-danger" /></div>
+                    <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center"><Lock className="w-6 h-6 text-red-500" aria-hidden="true" /></div>
                     <div>
-                        <h3 className="text-base font-black">Autorização Supervisor</h3>
+                        <h3 id="supervisor-modal-title" className="text-base font-black">Autorização Supervisor</h3>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Escaninho Cheio</p>
                     </div>
                 </div>
-                <div className="p-4 bg-warning/5 border border-warning/20 rounded-xl flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
-                    <p className="text-[10px] font-bold text-warning">Marcar escaninho como cheio interrompe a alocação neste slot. Um supervisor deve autorizar.</p>
+                <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-[10px] font-bold text-amber-700">Marcar escaninho como cheio interrompe a alocação neste slot. Um supervisor deve autorizar.</p>
                 </div>
                 <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha do Supervisor</label>
@@ -102,7 +113,8 @@ function SupervisorModal({ onConfirm, onClose }) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                     <button onClick={onClose} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                    <button onClick={() => { if (senha.length >= 3) onConfirm(); }} disabled={senha.length < 3} className="py-3 bg-danger text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-danger/90 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"><Lock className="w-3.5 h-3.5" /> Autorizar</button>
+                    {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: validar senha contra API de supervisores */}
+                    <button onClick={() => { if (senha.length >= 3) onConfirm(); }} disabled={senha.length < 3} className="py-3 bg-red-500 text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-red-600 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"><Lock className="w-3.5 h-3.5" aria-hidden="true" /> Autorizar</button>
                 </div>
             </div>
         </div>
@@ -119,13 +131,13 @@ function ContextMenu({ x, y, escaninho, onConteudo, onRestante, onEscaninhoCheio
         return () => document.removeEventListener('click', handleClick);
     }, [onClose]);
 
-    // Ajustar posição para não sair da tela
-    const adjustedStyle = {
+    // Posicionamento defensivo: impede que o menu saia da viewport
+    const adjustedStyle = useMemo(() => ({
         position: 'fixed',
-        top: y,
-        left: x,
+        top:  Math.min(y, window.innerHeight - 160),
+        left: Math.min(x, window.innerWidth  - 220),
         zIndex: 95,
-    };
+    }), [x, y]);
 
     return (
         <div ref={menuRef} style={adjustedStyle} className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
@@ -134,14 +146,14 @@ function ContextMenu({ x, y, escaninho, onConteudo, onRestante, onEscaninhoCheio
             </div>
             <div className="p-1.5 space-y-0.5">
                 <button onClick={onConteudo} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all text-left">
-                    <Eye className="w-4 h-4" /> Conteúdo
+                    <Eye className="w-4 h-4" aria-hidden="true" /> Conteúdo
                 </button>
-                <button onClick={onRestante} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-warning/10 hover:text-warning transition-all text-left">
-                    <ListChecks className="w-4 h-4" /> Restante
+                <button onClick={onRestante} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-amber-50 hover:text-amber-600 transition-all text-left">
+                    <ListChecks className="w-4 h-4" aria-hidden="true" /> Restante
                 </button>
-                <div className="mx-3 my-1 border-t border-slate-100 dark:border-slate-800" />
-                <button onClick={onEscaninhoCheio} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black text-danger hover:bg-danger/10 transition-all text-left">
-                    <BoxSelect className="w-4 h-4" /> Escaninho Cheio
+                <div className="mx-3 my-1 border-t border-slate-100 dark:border-slate-800" aria-hidden="true" />
+                <button onClick={onEscaninhoCheio} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black text-red-500 hover:bg-red-50 transition-all text-left">
+                    <BoxSelect className="w-4 h-4" aria-hidden="true" /> Escaninho Cheio
                 </button>
             </div>
         </div>
@@ -155,7 +167,7 @@ function InfoModal({ title, items, onClose }) {
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                     <h3 className="text-base font-black">{title}</h3>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} aria-label="Fechar painel" className="p-2 text-slate-400 hover:text-red-500 transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                     {items.length > 0 ? items.map((item, i) => (
@@ -187,27 +199,46 @@ export default function HoneycombCheck() {
     const [showSupervisor, setShowSupervisor] = useState(false);
     const [supervisorTarget, setSupervisorTarget] = useState(null);
     const [infoModal, setInfoModal] = useState(null);
-    const inputRef = useRef(null);
+    const [ultimos, setUltimos] = useState([]);
+    const [ultimoBipado, setUltimoBipado] = useState(null);
+    const inputRef    = useRef(null);
+    const timeoutsRef = useRef([]);  // Guarda IDs de setTimeout para cleanup
+
+    // Cleanup de todos os timeouts pendentes ao desmontar
+    useEffect(() => {
+        return () => {
+            timeoutsRef.current.forEach(clearTimeout);
+            timeoutsRef.current = [];
+        };
+    }, []);
 
     // Inicializar escaninhos ao selecionar cor
     const selecionarCor = useCallback((cor) => {
+        // Limpa timeouts pendentes da cor anterior antes de trocar
+        timeoutsRef.current.forEach(clearTimeout);
+        timeoutsRef.current = [];
+
         setCorSelecionada(cor);
         const ped = PEDIDOS_SIM[cor.nome] || { produto: 'PRODUTO GENÉRICO', total: 25, separados: 0 };
         setPedido(ped);
         setRestam(ped.total - ped.separados);
 
-        // Gerar grid 5x5
+        // Gerar grid 5×5: distribui qtd de forma que a soma seja exatamente ped.separados
         const grid = [];
+        let restantesParaDistribuir = ped.separados;
         for (let i = 1; i <= 25; i++) {
             let status = STATUS.NAO_UTILIZADO;
             let qtd = 0;
 
-            // Simular: os primeiros 'total' escaninhos são usáveis
             if (i <= ped.total) {
                 if (i <= ped.separados) {
-                    // Já com produto
+                    // Último escaninho já preenchido recebe o que sobrar — garante soma exata
+                    const eUltimo = i === ped.separados;
+                    qtd = eUltimo
+                        ? restantesParaDistribuir
+                        : Math.min(restantesParaDistribuir, Math.floor(Math.random() * 3) + 1);
+                    restantesParaDistribuir -= qtd;
                     status = STATUS.COM_PRODUTO;
-                    qtd = Math.ceil(Math.random() * 3) + 1;
                 } else {
                     status = STATUS.VAZIO;
                 }
@@ -225,24 +256,59 @@ export default function HoneycombCheck() {
         }
     }, [corSelecionada]);
 
-    // Simular bipagem de código de barras
     const handleBip = (e) => {
         if (e.key !== 'Enter' || !inputCode.trim()) return;
 
-        // Encontrar o primeiro escaninho vazio
-        const idx = escaninhos.findIndex(e => e.status === STATUS.VAZIO);
-        if (idx === -1) return; // Todos ocupados
-
-        // Marcar como "colocando" (pisca laranja)
-        setEscaninhos(prev => prev.map((esc, i) => i === idx ? { ...esc, status: STATUS.COLOCANDO } : esc));
-
-        // Após 2.5s, mudar para "com_produto"
-        setTimeout(() => {
-            setEscaninhos(prev => prev.map((esc, i) => i === idx ? { ...esc, status: STATUS.COM_PRODUTO, qtd: (esc.qtd || 0) + 1, items: [...esc.items, { nome: pedido?.produto || 'PRODUTO', qtd: 1 }] } : esc));
-            setRestam(r => Math.max(0, r - 1));
-        }, 2500);
-
+        const codigo = inputCode.trim();
         setInputCode('');
+
+        // 1. Existe escaninho já em COLOCANDO? → incrementa ele e muda para COM_PRODUTO
+        const idxColocando = escaninhos.findIndex(e => e.status === STATUS.COLOCANDO);
+        if (idxColocando !== -1) {
+            setEscaninhos(prev => prev.map((esc, i) =>
+                i === idxColocando
+                    ? { ...esc,
+                        status: STATUS.COM_PRODUTO,   // fecha o slot piscante
+                        qtd:   (esc.qtd || 0) + 1,
+                        items: [...esc.items, { nome: pedido?.produto || codigo, qtd: 1 }] }
+                    : esc
+            ));
+            setRestam(r => Math.max(0, r - 1));
+            setUltimos(prev => [{ code: codigo, nome: pedido?.produto || codigo, ts: Date.now() }, ...prev].slice(0, 5));
+            setUltimoBipado({ code: codigo, nome: pedido?.produto || codigo });
+            return;
+        }
+
+        // 2. Pega próximo escaninho VAZIO
+        const idxVazio = escaninhos.findIndex(e => e.status === STATUS.VAZIO);
+        if (idxVazio === -1) return; // Nenhum slot disponível
+
+        // 3. Incrementa imediatamente + sinaliza COLOCANDO (pisca laranja)
+        //    O timeout só muda o status visual para COM_PRODUTO — sem alterar qtd/restam novamente.
+        setEscaninhos(prev => prev.map((esc, i) =>
+            i === idxVazio
+                ? { ...esc,
+                    status: STATUS.COLOCANDO,
+                    qtd:    (esc.qtd || 0) + 1,
+                    items:  [...esc.items, { nome: pedido?.produto || codigo, qtd: 1 }] }
+                : esc
+        ));
+        setRestam(r => Math.max(0, r - 1));
+
+        // 4. Após 1.2s apenas confirma visualmente (sem dupla contagem)
+        const tid = setTimeout(() => {
+            setEscaninhos(prev => prev.map((esc, i) =>
+                i === idxVazio && esc.status === STATUS.COLOCANDO
+                    ? { ...esc, status: STATUS.COM_PRODUTO }
+                    : esc
+            ));
+            // Remove o ID do array de pending timeouts
+            timeoutsRef.current = timeoutsRef.current.filter(id => id !== tid);
+        }, 1200);
+        timeoutsRef.current.push(tid);
+
+        setUltimos(prev => [{ code: codigo, nome: pedido?.produto || codigo, ts: Date.now() }, ...prev].slice(0, 5));
+        setUltimoBipado({ code: codigo, nome: pedido?.produto || codigo });
     };
 
     // Menu de contexto
@@ -279,11 +345,6 @@ export default function HoneycombCheck() {
         setSupervisorTarget(null);
     };
 
-    // Finalizar escaninhos onde todos os itens foram colocados (simulação)
-    const handleFinalizarEscaninho = (numero) => {
-        setEscaninhos(prev => prev.map(esc => esc.numero === numero ? { ...esc, status: STATUS.FINALIZADO } : esc));
-    };
-
     // Voltar à seleção de cor
     const voltar = () => {
         setCorSelecionada(null);
@@ -291,6 +352,8 @@ export default function HoneycombCheck() {
         setPedido(null);
         setRestam(0);
         setContextMenu(null);
+        setUltimos([]);
+        setUltimoBipado(null);
     };
 
     // ====== TELA 1: SELEÇÃO DE COR ======
@@ -298,7 +361,7 @@ export default function HoneycombCheck() {
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="text-center space-y-2">
-                    <h1 className="text-3xl font-black tracking-tight">Conferência Colmeia</h1>
+                    <h1 className="text-3xl font-black tracking-tight">2.15 Conferência Colmeia</h1>
                     <p className="text-sm text-slate-500 font-medium">Selecione a cor da colmeia para iniciar a conferência</p>
                 </div>
 
@@ -349,7 +412,13 @@ export default function HoneycombCheck() {
 
             {/* Cabeçalho com cor da colmeia */}
             <div className="flex items-center gap-4">
-                <button onClick={voltar} className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all"><ArrowLeft className="w-5 h-5" /></button>
+                <button
+                    onClick={voltar}
+                    aria-label="Voltar à seleção de cor"
+                    className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all"
+                >
+                    <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                </button>
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl border-2 border-white/50 shadow-lg" style={{ backgroundColor: corSelecionada.hex }} />
@@ -360,8 +429,16 @@ export default function HoneycombCheck() {
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <div className="px-4 py-2 bg-success/10 border border-success/20 rounded-xl"><span className="text-[9px] font-black text-success uppercase tracking-widest">Finalizados: {finalizados}</span></div>
-                    <div className="px-4 py-2 bg-warning/10 border border-warning/20 rounded-xl"><span className="text-[9px] font-black text-warning uppercase tracking-widest">Com produto: {comProduto}</span></div>
+                    {/* success/warning → tokens Tailwind reais (danger/success/warning não definidos no CSS) */}
+                    <div className="px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-xl"><span className="text-[9px] font-black text-green-600 uppercase tracking-widest">Finalizados: {finalizados}</span></div>
+                    <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl"><span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Com produto: {comProduto}</span></div>
+                    {ultimoBipado && (
+                        <div className="px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl max-w-xs">
+                            <span className="text-[9px] font-black text-primary uppercase tracking-widest truncate block">
+                                ↳ {ultimoBipado.nome}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -374,8 +451,11 @@ export default function HoneycombCheck() {
 
             {/* Input de leitura */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex items-center gap-3">
-                <ScanBarcode className="w-5 h-5 text-secondary shrink-0" />
+                <ScanBarcode className="w-5 h-5 text-secondary shrink-0" aria-hidden="true" />
+                {/* Label acessível para leitores de tela: texto oculto visualmente */}
+                <label htmlFor="barcode-input" className="sr-only">Código de barras do produto</label>
                 <input
+                    id="barcode-input"
                     ref={inputRef}
                     type="text"
                     value={inputCode}
@@ -388,6 +468,26 @@ export default function HoneycombCheck() {
                 <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest shrink-0">ENTER p/ confirmar</span>
             </div>
 
+            {/* Últimos 5 Produtos */}
+            {ultimos.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Package className="w-3 h-3" /> Últimos 5 Produtos Conferidos
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {ultimos.map((u, i) => (
+                            // key composto ts+i: garante unicidade mesmo em bips no mesmo ms
+                            <div key={`${u.ts}-${i}`}
+                                 className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <span className="text-[8px] font-black text-slate-300">#{i + 1}</span>
+                                <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 truncate max-w-[160px]">{u.nome}</span>
+                                <code className="text-[8px] font-mono text-secondary">{u.code}</code>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Grid de Escaninhos 5×5 */}
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
                 <div className="grid grid-cols-5 gap-3 md:gap-4 max-w-2xl mx-auto">
@@ -397,9 +497,8 @@ export default function HoneycombCheck() {
                             numero={esc.numero}
                             status={esc.status}
                             qtd={esc.qtd}
-                            onClick={() => {
-                                if (esc.status === STATUS.COM_PRODUTO) handleFinalizarEscaninho(esc.numero);
-                            }}
+                            // onClick não passado: clique esquerdo intencionalmente ignorado.
+                            // Finalização é exclusiva via menu de contexto (botão direito) conforme manual v8.7.0.
                             onContextMenu={(e) => handleContextMenu(e, esc)}
                         />
                     ))}

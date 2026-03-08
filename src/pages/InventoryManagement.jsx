@@ -1,45 +1,58 @@
 import React, { useState } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  RefreshCw, 
-  Edit2, 
+import {
+  Search,
+  Filter,
+  Plus,
+  RefreshCw,
+  Edit2,
   Activity,
   ArrowLeft,
-  Package,
-  ShieldCheck,
   TrendingUp,
   BarChart3,
-  Box
+  Box,
+  X,
 } from 'lucide-react';
+
+// Constantes de modo de visualização (evitam magic strings)
+const VIEWS = Object.freeze({ MASTER: 'master', MONITOR: 'monitor' });
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import ActionPane from '../components/ui/ActionPane';
 import FastTab from '../components/ui/FastTab';
 import DataGrid from '../components/ui/DataGrid';
+import { useLocation } from 'react-router-dom';
+import { appRoutes } from '../routes';
 
 export default function InventoryManagement() {
-  const [view, setView] = useState('master'); // 'master' or 'monitor'
-  const [searchTerm, setSearchTerm] = useState('');
+  const [view,                setView]                = useState(VIEWS.MASTER);
+  const [searchTerm,          setSearchTerm]          = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const location = useLocation();
+
+  const currentRoute = appRoutes.find(r => r.path === location.pathname);
+  const pageTitle = currentRoute?.meta ? `${currentRoute.meta.codigo} ${currentRoute.meta.titulo}` : 'Gerenciamento de Estoque';
 
   const breadcrumbItems = [
     { label: 'Home', path: '/' },
-    { label: 'Estoque', path: '/estoque/gestao-inventario' },
-    { label: 'Gerenciamento', path: null },
+    { label: 'Estoque', path: location.pathname },
+    { label: currentRoute?.meta?.titulo || 'Gerenciamento', path: null },
   ];
 
   const actions = [
     [
-      { label: 'Novo Inventário', primary: true, icon: <Plus size={14}/>, onClick: () => {} },
-      { label: 'Ajuste de Saldo', icon: <Edit2 size={14}/>, onClick: () => {} }
+      // ⚠️ INTEGRAÇÃO NECESSÁRIA: modal de criação de inventário
+      { label: 'Novo Inventário',     primary: true, icon: <Plus size={14}/>,     onClick: () => console.warn('Novo Inventário: INTEGRAÇÃO NECESSÁRIA') },
+      // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/inventory/balance-adjustment
+      { label: 'Ajuste de Saldo',    icon: <Edit2 size={14}/>,    onClick: () => console.warn('Ajuste de Saldo: INTEGRAÇÃO NECESSÁRIA') },
     ],
     [
-      { label: 'Transferência', icon: <RefreshCw size={14}/>, onClick: () => {} },
-      { label: 'Monitorar Real-Time', icon: <Activity size={14}/>, onClick: () => setView('monitor') }
+      // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/inventory/transfer
+      { label: 'Transferência',       icon: <RefreshCw size={14}/>, onClick: () => console.warn('Transferência: INTEGRAÇÃO NECESSÁRIA') },
+      { label: 'Monitorar Real-Time', icon: <Activity size={14}/>,  onClick: () => setView(VIEWS.MONITOR) },
     ],
     [
-      { label: 'Relatórios', icon: <BarChart3 size={14}/>, onClick: () => {} }
-    ]
+      // ⚠️ INTEGRAÇÃO NECESSÁRIA: GET /api/inventory/reports
+      { label: 'Relatórios',          icon: <BarChart3 size={14}/>, onClick: () => console.warn('Relatórios: INTEGRAÇÃO NECESSÁRIA') },
+    ],
   ];
 
   const stockColumns = [
@@ -59,11 +72,15 @@ export default function InventoryManagement() {
     { sku: 'VPER-INC-ESQ', name: 'InnerCap (Esquerdo) - Ref.: VERTICALPARTS', location: 'R1_PP1_CL001_N004', qty: 180, available: 120, unit: 'UN', updated: '26/02/2026 09:20' }
   ];
 
-  if (view === 'monitor') {
+  if (view === VIEWS.MONITOR) {
     return (
       <div className="p-6 bg-[var(--vp-bg-alt)] min-h-screen font-sans">
-        <button onClick={() => setView('master')} className="flex items-center gap-2 text-xs font-black text-[var(--vp-text-label)] hover:text-[var(--vp-primary)] mb-6 uppercase tracking-widest transition-colors">
-          <ArrowLeft size={16}/> Voltar para Gestão de Estoque
+        <button
+          onClick={() => setView(VIEWS.MASTER)}
+          aria-label="Voltar para Gestão de Estoque"
+          className="flex items-center gap-2 text-xs font-black text-[var(--vp-text-label)] hover:text-[var(--vp-primary)] mb-6 uppercase tracking-widest transition-colors"
+        >
+          <ArrowLeft size={16} aria-hidden="true"/> Voltar para {pageTitle}
         </button>
         <div className="mb-6">
           <h1 className="text-2xl font-black text-[var(--vp-text-data)] flex items-center gap-3 tracking-tight">
@@ -85,7 +102,7 @@ export default function InventoryManagement() {
           <div className="bg-[var(--vp-secondary)] p-2 rounded-sm shadow-sm">
             <Box className="text-[var(--vp-primary)]" size={20}/>
           </div>
-          <h1 className="text-2xl font-black text-[var(--vp-text-data)] leading-tight tracking-tight uppercase">Gerenciamento de Estoque</h1>
+          <h1 className="text-2xl font-black text-[var(--vp-text-data)] leading-tight tracking-tight uppercase">{pageTitle}</h1>
         </div>
       </div>
 
@@ -121,25 +138,56 @@ export default function InventoryManagement() {
         <FastTab title="Visão Geral do Estoque Disponível" defaultOpen={true}>
           <div className="mb-4 flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
-              <input 
-                type="text" 
-                placeholder="Buscar por SKU, Localização ou Descrição..." 
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
+              {/* label sr-only: visível apenas para leitores de tela */}
+              <label htmlFor="search-inventory" className="sr-only">Buscar produto por SKU, Localização ou Descrição</label>
+              <input
+                id="search-inventory"
+                type="text"
+                placeholder="Buscar por SKU, Localização ou Descrição..."
                 className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="btn-secondary p-2 flex items-center gap-2">
-              <Filter size={16}/> <span className="text-[10px] font-bold uppercase">Filtros Avançados</span>
+            <button
+              onClick={() => setShowAdvancedFilters(prev => !prev)}
+              aria-expanded={showAdvancedFilters}
+              aria-controls="advanced-filters-panel"
+              className="btn-secondary p-2 flex items-center gap-2"
+            >
+              <Filter size={16} aria-hidden="true"/>
+              <span className="text-[10px] font-bold uppercase">Filtros Avançados</span>
             </button>
           </div>
-          <DataGrid 
-            columns={stockColumns} 
-            data={stockData.filter(i => 
-              i.sku.includes(searchTerm.toUpperCase()) || 
-              i.name.toLowerCase().includes(searchTerm.toLowerCase())
-            )} 
+
+          {/* Painel de filtros avançados — expansível */}
+          {showAdvancedFilters && (
+            <div
+              id="advanced-filters-panel"
+              role="region"
+              aria-label="Filtros avançados"
+              className="mb-4 flex items-center gap-3 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-sm text-xs font-bold text-yellow-700 animate-in fade-in duration-200"
+            >
+              {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: filtros por status, localização, data */}
+              Filtros avançados serão implementados após integração com a API de inventário.
+              <button onClick={() => setShowAdvancedFilters(false)} className="ml-auto text-yellow-600 hover:text-yellow-800" aria-label="Fechar filtros avançados">
+                <X size={14} aria-hidden="true"/>
+              </button>
+            </div>
+          )}
+
+          {/* Filtro por SKU, Nome e Localização */}
+          <DataGrid
+            columns={stockColumns}
+            data={stockData.filter(i => {
+              const q = searchTerm.toLowerCase();
+              return (
+                i.sku.toUpperCase().includes(searchTerm.toUpperCase()) ||
+                i.name.toLowerCase().includes(q) ||
+                (i.location ?? '').toLowerCase().includes(q)
+              );
+            })}
           />
         </FastTab>
       </div>

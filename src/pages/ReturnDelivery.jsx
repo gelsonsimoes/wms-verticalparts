@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   RotateCcw,
   Upload,
@@ -10,22 +10,14 @@ import {
   AlertTriangle,
   Package,
   FileText,
-  Truck,
   Play,
   Ban,
   RefreshCw,
-  Warehouse,
-  Building2,
-  Hash,
   Calendar,
-  ClipboardList,
   BadgeCheck,
-  Wrench,
   Scissors,
   Info,
-  ArrowDown,
   Check,
-  X,
   Plus,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -151,15 +143,17 @@ const DEVOLUCOES_INIT = [
 // ─── TOAST ───────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
   return (
-    <div className={cn(
-      'fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-sm font-bold border-2 animate-in slide-in-from-bottom-4 duration-300 cursor-pointer',
-      type === 'warn' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400' :
-      type === 'erro' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:border-red-800 dark:text-red-400' :
-      'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:border-green-800 dark:text-green-400'
-    )} onClick={onClose}>
-      {type === 'ok' ? <CheckCircle2 className="w-4 h-4" /> :
-       type === 'erro' ? <XCircle className="w-4 h-4" /> :
-       <AlertTriangle className="w-4 h-4" />}
+    <div
+      role="alert"
+      className={cn(
+        'fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-sm font-bold border-2 animate-in slide-in-from-bottom-4 duration-300 cursor-pointer',
+        type === 'warn' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-400' :
+        type === 'erro' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:border-red-800 dark:text-red-400' :
+        'bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:border-green-800 dark:text-green-400'
+      )} onClick={onClose}>
+      {type === 'ok' ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> :
+       type === 'erro' ? <XCircle className="w-4 h-4" aria-hidden="true" /> :
+       <AlertTriangle className="w-4 h-4" aria-hidden="true" />}
       {msg}
     </div>
   );
@@ -167,18 +161,29 @@ function Toast({ msg, type, onClose }) {
 
 // ─── MODAL CONFIRMAÇÃO CANCELAR ───────────────────────────────────────
 function ModalCancelar({ count, onClose, onConfirm }) {
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] border-2 border-red-300 dark:border-red-800/50 w-full max-w-sm shadow-2xl overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-cancelar-title"
+        className="relative bg-white dark:bg-slate-900 rounded-[24px] border-2 border-red-300 dark:border-red-800/50 w-full max-w-sm shadow-2xl overflow-hidden"
+      >
         <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-red-400 to-red-600" />
         <div className="px-6 py-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center" aria-hidden="true">
               <Ban className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm font-black text-slate-800 dark:text-white">Cancelar Devolução</p>
+              <p id="modal-cancelar-title" className="text-sm font-black text-slate-800 dark:text-white">Cancelar Devolução</p>
               <p className="text-[10px] text-slate-400">{count} registro(s) selecionado(s)</p>
             </div>
           </div>
@@ -189,7 +194,7 @@ function ModalCancelar({ count, onClose, onConfirm }) {
             <button onClick={onClose} className="flex-1 py-2.5 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-500 hover:border-slate-400 transition-all">Voltar</button>
             <button onClick={onConfirm}
               className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5">
-              <Ban className="w-3.5 h-3.5" />Confirmar Cancelamento
+              <Ban className="w-3.5 h-3.5" aria-hidden="true" />Confirmar Cancelamento
             </button>
           </div>
         </div>
@@ -217,7 +222,7 @@ function DetailGrid({ devId, itens, onChangeItem, isLocked }) {
               <thead>
                 <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   {['Cód. Produto','Descrição','Qt. Devolvida','Estado da Peça','Setor Destino Temporário'].map(h => (
-                    <th key={h} className="px-4 py-2 text-left">{h}</th>
+                    <th key={h} scope="col" className="px-4 py-2 text-left">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -283,6 +288,18 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
   const num = String(totalExistente + 1).padStart(3,'0');
   const idGerado = `INS-2026-${num}`;
 
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
+
+  const firstInputRef = useRef(null);
+
+  useEffect(() => {
+    if (firstInputRef.current) firstInputRef.current.focus();
+  }, []);
+
   const salvar = () => {
     if (!form.ordemCliente || !form.nfOriginal || !form.depositante) {
       alert('Preencha OC, NF e Depositante.'); return;
@@ -306,48 +323,72 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose}/>
-      <div className="relative bg-white dark:bg-slate-900 rounded-[24px] border-2 border-slate-200 dark:border-slate-700 w-full max-w-md shadow-2xl overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-nova-title"
+        className="relative bg-white dark:bg-slate-900 rounded-[24px] border-2 border-slate-200 dark:border-slate-700 w-full max-w-md shadow-2xl overflow-hidden"
+      >
         <div className="h-1.5 w-full bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600"/>
         <div className="px-6 py-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center" aria-hidden="true">
               <RotateCcw className="w-5 h-5 text-amber-600"/>
             </div>
             <div>
-              <p className="text-sm font-black">Nova Devolução</p>
+              <p id="modal-nova-title" className="text-sm font-black">Nova Devolução</p>
               <p className="text-[10px] text-slate-400">ID gerado: <strong className="text-secondary">{idGerado}</strong></p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              {label:'Ordem de Cliente',k:'ordemCliente',placeholder:'OC-00000'},
-              {label:'NF Original',k:'nfOriginal',placeholder:'NF-00000'},
-              {label:'Depositante',k:'depositante',placeholder:'Nome da empresa',full:true},
+              {label:'Ordem de Cliente', k:'ordemCliente', placeholder:'OC-00000'},
+              {label:'NF Original',      k:'nfOriginal',   placeholder:'NF-00000'},
+              {label:'Depositante',      k:'depositante',  placeholder:'Nome da empresa', full:true},
             ].map(({label,k,placeholder,full})=>(
               <div key={k} className={full?"col-span-2 space-y-1":"space-y-1"}>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
-                <input value={form[k]} onChange={e=>set(k,e.target.value)} placeholder={placeholder}
-                  className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none transition-all dark:bg-slate-800"/>
+                <label htmlFor={`nova-${k}`} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+                <input
+                  id={`nova-${k}`}
+                  ref={k === 'ordemCliente' ? firstInputRef : null}
+                  value={form[k]}
+                  onChange={e=>set(k,e.target.value)}
+                  placeholder={placeholder}
+                  className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none transition-all dark:bg-slate-800"
+                />
               </div>
             ))}
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</label>
-              <select value={form.tipoDevolucao} onChange={e=>set('tipoDevolucao',e.target.value)}
-                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800">
+              <label htmlFor="nova-tipoDevolucao" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipo</label>
+              <select
+                id="nova-tipoDevolucao"
+                value={form.tipoDevolucao}
+                onChange={e=>set('tipoDevolucao',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"
+              >
                 {TIPO_DEVOLUCAO.map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável</label>
-              <select value={form.responsavel} onChange={e=>set('responsavel',e.target.value)}
-                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800">
+              <label htmlFor="nova-responsavel" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável</label>
+              <select
+                id="nova-responsavel"
+                value={form.responsavel}
+                onChange={e=>set('responsavel',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"
+              >
                 {['Danilo','Matheus','Thiago'].map(r=><option key={r}>{r}</option>)}
               </select>
             </div>
             <div className="col-span-2 space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Solicitação</label>
-              <input type="date" value={form.dataSolicitacao} onChange={e=>set('dataSolicitacao',e.target.value)}
-                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"/>
+              <label htmlFor="nova-dataSolicitacao" className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data Solicitação</label>
+              <input
+                id="nova-dataSolicitacao"
+                type="date"
+                value={form.dataSolicitacao}
+                onChange={e=>set('dataSolicitacao',e.target.value)}
+                className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"
+              />
             </div>
           </div>
           <div className="flex gap-2 pt-1">
@@ -372,9 +413,21 @@ export default function ReturnDelivery() {
   const [importing,  setImporting]  = useState(false);
   const fileRef = useRef(null);
 
+  const toastTimeoutRef  = useRef(null);
+  const execTimeoutRef   = useRef(null);
+  const importTimeoutRef = useRef(null);
+
+  // Cleanup global de todos os timeouts ao desmontar
+  useEffect(() => () => {
+    clearTimeout(toastTimeoutRef.current);
+    clearTimeout(execTimeoutRef.current);
+    clearTimeout(importTimeoutRef.current);
+  }, []);
+
   const showToast = (msg, type = 'ok') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3500);
   };
 
   const filtered = useMemo(() =>
@@ -417,7 +470,8 @@ export default function ReturnDelivery() {
     const file = e.target.files?.[0];
     if (!file) return;
     setImporting(true);
-    setTimeout(() => {
+    clearTimeout(importTimeoutRef.current);
+    importTimeoutRef.current = setTimeout(() => {
       const novo = {
         id: 'DEV-' + Date.now(),
         idInsucesso: 'INS-2026-' + String(devs.length + 1).padStart(3, '0'),
@@ -449,14 +503,18 @@ export default function ReturnDelivery() {
     const ids = new Set(elegíveis.map(d => d.id));
     setDevs(ds => ds.map(d => {
       if (!ids.has(d.id)) return d;
-      // Simula execução → depois finaliza
       return { ...d, status: 'Executando', selecionado: false };
     }));
     showToast(`Execução iniciada para ${elegíveis.length} devolução(ões). Tarefas de remanejamento geradas!`);
 
-    // Simula finalização após 3s
-    setTimeout(() => {
-      setDevs(ds => ds.map(d => ids.has(d.id) ? { ...d, status: 'Finalizada' } : d));
+    // Simula finalização após 3s — só altera se ainda estiver 'Executando'
+    clearTimeout(execTimeoutRef.current);
+    execTimeoutRef.current = setTimeout(() => {
+      setDevs(ds => ds.map(d =>
+        ids.has(d.id) && d.status === 'Executando'
+          ? { ...d, status: 'Finalizada' }
+          : d
+      ));
       showToast(`${elegíveis.length} devolução(ões) finalizada(s) e mercadoria recolhida ao estoque!`);
     }, 3000);
   };
@@ -472,10 +530,12 @@ export default function ReturnDelivery() {
   };
 
   const confirmCancelar = () => {
-    const ids = new Set(selecionados.map(d => d.id));
+    // Opera apenas nos elegíveis (Pendente/Executando) para não sobrescrever outros status
+    const elegiveis = selecionados.filter(d => ['Pendente', 'Executando'].includes(d.status));
+    const ids = new Set(elegiveis.map(d => d.id));
     setDevs(ds => ds.map(d => ids.has(d.id) ? { ...d, status: 'Cancelada', selecionado: false } : d));
     setModal(null);
-    showToast(`${selecionados.length} devolução(ões) cancelada(s).`, 'warn');
+    showToast(`${elegiveis.length} devolução(ões) cancelada(s).`, 'warn');
   };
 
   // ── KPIs ─────────────────────────────────────────────────────────
@@ -521,7 +581,7 @@ export default function ReturnDelivery() {
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 3 — Entrada e Recebimento</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Devolução ou Insucesso de Entrega</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">2.2 Processar Devoluções — Devolução ou Insucesso de Entrega</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
               Triagem de peças devolvidas · Remanejamento para estoque definitivo · 
               <span className="text-amber-500 font-black"> Garantia: </span>
@@ -546,9 +606,15 @@ export default function ReturnDelivery() {
 
         {/* Busca */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ID, OC, NF ou Depositante..."
-            className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all w-56" />
+          <label htmlFor="rd-search" className="sr-only">Buscar devolução</label>
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+          <input
+            id="rd-search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="ID, OC, NF ou Depositante..."
+            className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all w-56"
+          />
         </div>
 
         {/* Filtro Status */}
@@ -608,19 +674,24 @@ export default function ReturnDelivery() {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
                 {/* Checkbox all */}
-                <th className="p-3 w-10">
-                  <button onClick={toggleAll}
-                    className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                <th scope="col" className="p-3 w-10">
+                  <button
+                    role="checkbox"
+                    aria-checked={filtered.length > 0 && filtered.every(d => d.selecionado)}
+                    aria-label="Selecionar todas as devoluções visíveis"
+                    onClick={toggleAll}
+                    onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleAll(); } }}
+                    className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all focus:ring-2 focus:ring-secondary focus:outline-none',
                       filtered.length > 0 && filtered.every(d => d.selecionado)
-                        ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600'
+                        ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 hover:border-secondary'
                     )}>
-                    {filtered.length > 0 && filtered.every(d => d.selecionado) && <Check className="w-3 h-3 text-primary" />}
+                    {filtered.length > 0 && filtered.every(d => d.selecionado) && <Check className="w-3 h-3 text-primary" aria-hidden="true" />}
                   </button>
                 </th>
                 {/* Expand */}
-                <th className="p-3 w-8" />
+                <th scope="col" className="p-3 w-8" />
                 {['ID Insucesso','Data Solicitação','Ordem de Cliente','NF Original','Tipo','Depositante','Status'].map(h => (
-                  <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -633,30 +704,42 @@ export default function ReturnDelivery() {
                       onClick={() => toggleSel(d.id)}
                       className={cn('border-t border-slate-100 dark:border-slate-800 cursor-pointer transition-all',
                         d.selecionado ? 'bg-secondary/8 dark:bg-secondary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                      )}>
+                      )}
+                    >
                       {/* Checkbox */}
                       <td className="p-3">
-                        <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
-                          d.selecionado ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600'
-                        )}>
-                          {d.selecionado && <Check className="w-3 h-3 text-primary" />}
-                        </div>
+                        <button
+                          role="checkbox"
+                          tabIndex={0}
+                          aria-checked={d.selecionado}
+                          aria-label={`Selecionar devolução ${d.idInsucesso}`}
+                          onClick={(e) => { e.stopPropagation(); toggleSel(d.id); }}
+                          onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); toggleSel(d.id); } }}
+                          className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all focus:ring-2 focus:ring-secondary focus:outline-none',
+                            d.selecionado ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 hover:border-secondary'
+                          )}
+                        >
+                          {d.selecionado && <Check className="w-3 h-3 text-primary" aria-hidden="true" />}
+                        </button>
                       </td>
 
                       {/* Expand button */}
                       <td className="p-3" onClick={e => toggleExpand(d.id, e)}>
-                        <button className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-secondary hover:bg-secondary/10 transition-all">
+                        <button
+                          aria-label={d.expanded ? `Recolher itens de ${d.idInsucesso}` : `Expandir itens de ${d.idInsucesso}`}
+                          className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-secondary hover:bg-secondary/10 transition-all"
+                        >
                           {d.expanded
-                            ? <ChevronDown className="w-3.5 h-3.5" />
-                            : <ChevronRight className="w-3.5 h-3.5" />}
+                            ? <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                            : <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />}
                         </button>
                       </td>
 
                       <td className="p-3"><code className="text-xs font-black text-secondary">{d.idInsucesso}</code></td>
                       <td className="p-3 text-xs text-slate-500">
                         <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          {new Date(d.dataSolicitacao + 'T12:00:00').toLocaleDateString('pt-BR')}
+                          <Calendar className="w-3 h-3 text-slate-400" aria-hidden="true" />
+                          {d.dataSolicitacao.split('-').reverse().join('/')}
                         </div>
                       </td>
                       <td className="p-3"><code className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{d.ordemCliente}</code></td>

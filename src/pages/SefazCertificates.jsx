@@ -22,11 +22,9 @@ import {
   Lock,
   FileKey,
   Loader2,
-  Info,
   TriangleAlert,
   Zap,
   Globe,
-  ArrowRight,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -114,7 +112,7 @@ function PainelCertificado() {
       {isVencido && (
         <div className={cn('rounded-2xl border-2 px-4 py-3 flex items-center gap-3 shadow-lg',
           'bg-red-50 border-red-400 dark:bg-red-950/30 dark:border-red-700')}>
-          <ShieldX className="w-5 h-5 text-red-600 shrink-0" />
+          <ShieldX className="w-5 h-5 text-red-600 shrink-0" aria-hidden="true" />
           <div>
             <p className="text-xs font-black text-red-700 dark:text-red-400">⛔ CERTIFICADO VENCIDO!</p>
             <p className="text-[10px] text-red-600/80 dark:text-red-500/80">As emissões de NF-e estão bloqueadas. Carregue um novo certificado imediatamente.</p>
@@ -124,7 +122,7 @@ function PainelCertificado() {
       {isAlerta && !isVencido && (
         <div className={cn('rounded-2xl border-2 px-4 py-3 flex items-center gap-3 shadow-lg transition-all',
           blink ? 'bg-amber-50 border-amber-400 dark:bg-amber-950/30 dark:border-amber-700' : 'bg-amber-100 border-amber-500 dark:bg-amber-900/40 dark:border-amber-600')}>
-          <TriangleAlert className="w-5 h-5 text-amber-600 shrink-0" />
+          <TriangleAlert className="w-5 h-5 text-amber-600 shrink-0" aria-hidden="true" />
           <div>
             <p className="text-xs font-black text-amber-700 dark:text-amber-400">⚠ Certificado vence em {diasParaVencer} dia{diasParaVencer !== 1 ? 's' : ''}!</p>
             <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80">Renove antes de {CERT_ATUAL.validade.toLocaleDateString('pt-BR')} para evitar interrupção das emissões.</p>
@@ -151,14 +149,14 @@ function PainelCertificado() {
           {/* CNPJ */}
           <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 space-y-1">
             <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              <Building2 className="w-3 h-3" />CNPJ Vinculado
+              <Building2 className="w-3 h-3" aria-hidden="true" />CNPJ Vinculado
             </div>
             <p className="text-base font-black text-slate-800 dark:text-white tracking-widest">{CERT_ATUAL.cnpj}</p>
           </div>
           {/* Titular */}
           <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 space-y-1">
             <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              <FileKey className="w-3 h-3" />Titular do Certificado
+              <FileKey className="w-3 h-3" aria-hidden="true" />Titular do Certificado
             </div>
             <p className="text-sm font-black text-slate-800 dark:text-white">{CERT_ATUAL.titular}</p>
             <p className="text-[10px] text-slate-500 font-medium">Emitente: {CERT_ATUAL.emitente}</p>
@@ -171,7 +169,7 @@ function PainelCertificado() {
           )}>
             <div className={cn('flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest',
               isVencido ? 'text-red-500' : isAlerta ? 'text-amber-600 dark:text-amber-400' : 'text-green-600')}>
-              <Calendar className="w-3 h-3" />Data de Validade
+              <Calendar className="w-3 h-3" aria-hidden="true" />Data de Validade
             </div>
             <p className={cn('text-lg font-black', isVencido ? 'text-red-700 dark:text-red-400' : isAlerta ? 'text-amber-700 dark:text-amber-400' : 'text-green-700 dark:text-green-400')}>
               {CERT_ATUAL.validade.toLocaleDateString('pt-BR')}
@@ -224,16 +222,23 @@ function PainelCertificado() {
 
         {/* Senha */}
         <div className="space-y-1.5">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-            <Lock className="w-3 h-3" />Senha do Certificado
+          <label htmlFor="cert-senha" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+            <Lock className="w-3 h-3" aria-hidden="true" />Senha do Certificado
           </label>
           <div className="relative">
-            <input type={showPass ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
+            <input
+              id="cert-senha"
+              type={showPass ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)}
               placeholder="Senha do arquivo .pfx..."
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-bold outline-none transition-all pr-10" />
-            <button type="button" onClick={() => setShowPass(v => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-              {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-bold outline-none transition-all pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(v => !v)}
+              aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showPass ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -242,8 +247,10 @@ function PainelCertificado() {
         {uploadMsg && (
           <div className={cn('flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-black',
             uploadMsg.ok ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400'
-          )}>
-            {uploadMsg.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
+          )} role="alert">
+            {uploadMsg.ok
+              ? <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+              : <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" />}
             {uploadMsg.msg}
           </div>
         )}
@@ -270,15 +277,19 @@ function PainelSefaz() {
   const [ultimoTeste, setUltimoTeste] = useState(null);
   const [ambFiltro, setAmbFiltro]   = useState('Todos');
 
+  const intervalRef = useRef(null);
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+
   const testar = () => {
     setTestando(true);
     setTestIdx(0);
     let idx = 0;
-    const interval = setInterval(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
       idx++;
       setTestIdx(idx);
       if (idx >= endpoints.length) {
-        clearInterval(interval);
+        clearInterval(intervalRef.current);
         const novoStatus = endpoints.map(ep => ({
           ...ep,
           status: Math.random() < 0.85 ? 'online' : 'offline',
@@ -363,7 +374,7 @@ function PainelSefaz() {
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
               {['Status','Ambiente','Serviço SEFAZ','URL do Endpoint','Latência'].map(h => (
-                <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -400,7 +411,7 @@ function PainelSefaz() {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center gap-1.5">
-                      <Globe className="w-3 h-3 text-slate-400 shrink-0" />
+                      <Globe className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
                       <span className="text-xs font-black text-slate-700 dark:text-slate-300 whitespace-nowrap">{ep.servico}</span>
                     </div>
                   </td>
@@ -461,7 +472,7 @@ export default function SefazCertificates() {
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 11 — Administração e Manutenção</p>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Comunicação SEFAZ e Certificados Digitais</h1>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">10.5 Gerenciar Certificados</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Gestão do Certificado A1 · Upload .pfx · Monitoramento de endpoints · Teste de conectividade</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-3">

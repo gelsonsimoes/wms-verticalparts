@@ -1,11 +1,103 @@
-import React from 'react';
-import { Bell, Search, Menu, LogOut, Settings, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Bell, Search, Menu, LogOut, Settings, User, 
+  Package, Zap, MapPin, ChevronRight, Loader2 
+} from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../services/supabaseClient';
 
 export default function Header({ toggleSidebar, onLogout, session }) {
+  const navigate = useNavigate();
   const { currentUser } = useApp();
-  // Usa dados da sessão de login se disponíveis, senão cai no AppContext
   const user = session || currentUser;
+
+  // ─── Lógica de Busca Global ──────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const delayDebounce = setTimeout(async () => {
+      if (!searchQuery.trim() || searchQuery.length < 2) {
+        setResults([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const query = searchQuery.trim();
+        const searchResults = [];
+
+        // 1. Buscar Produtos (SKU ou Descrição)
+        const { data: prods } = await supabase
+          .from('produtos')
+          .select('id, sku, descricao')
+          .or(`sku.ilike.%${query}%,descricao.ilike.%${query}%`)
+          .limit(3);
+        
+        if (prods) {
+          prods.forEach(p => searchResults.push({
+            type: 'produto',
+            title: p.sku,
+            subtitle: p.descricao,
+            link: `/cadastros/produtos?sku=${p.sku}`
+          }));
+        }
+
+        // 2. Buscar Tarefas (ID)
+        // Se for número, tenta buscar por ID
+        if (!isNaN(query)) {
+          const { data: task } = await supabase
+            .from('tarefas')
+            .select('id, tipo, status')
+            .eq('id', query)
+            .single();
+          
+          if (task) {
+            searchResults.push({
+              type: 'tarefa',
+              title: `Tarefa #${task.id}`,
+              subtitle: `${task.tipo} — ${task.status}`,
+              link: `/operacao/kanban-alocacao?id=${task.id}`
+            });
+          }
+        }
+
+        // 3. Buscar Endereços
+        const { data: addrs } = await supabase
+          .from('enderecos')
+          .select('id, status')
+          .ilike('id', `%${query}%`)
+          .limit(3);
+        
+        if (addrs) {
+          addrs.forEach(a => searchResults.push({
+            type: 'endereco',
+            title: a.id,
+            subtitle: `Status: ${a.status}`,
+            link: `/operacao/mapa-visual?endereco=${a.id}`
+          }));
+        }
+
+        setResults(searchResults);
+      } catch (err) {
+        console.error('[Header] Global search error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
+  // Fechar busca ao clicar fora
+  useEffect(() => {
+    const handleEsc = (e) => { if (e.key === 'Escape') setIsSearching(false); };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-[var(--vp-border)] px-6 py-3 flex items-center justify-between shadow-sm">
@@ -34,15 +126,61 @@ export default function Header({ toggleSidebar, onLogout, session }) {
       </div>
 
       {/* Center Section: Search Bar */}
-      <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
+      <div className="hidden md:flex items-center flex-1 max-w-md mx-8 relative">
         <div className="w-full relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--vp-text-label)]" />
           <input
             type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearching(true)}
             placeholder="Buscar pedido, produto, carga..."
-            className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm bg-[var(--vp-bg-main)] focus:border-[var(--vp-primary)] focus:outline-none transition-colors"
+            className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm bg-[var(--vp-bg-main)] focus:border-[var(--vp-primary)] focus:outline-none transition-colors shadow-inner font-bold"
           />
+          {loading && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-500"></div>
+            </div>
+          )}
         </div>
+
+        {/* Search Results Dropdown */}
+        {isSearching && searchQuery.length > 1 && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-[var(--vp-border)] rounded-sm shadow-2xl overflow-hidden z-50 max-h-[400px] overflow-y-auto">
+            {results.length > 0 ? (
+              <div className="divide-y divide-gray-100">
+                {results.map((res, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      navigate(res.link);
+                      setIsSearching(false);
+                      setSearchQuery('');
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-yellow-50 flex items-center justify-between transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gray-50 rounded group-hover:bg-yellow-100 transition-colors">
+                        {res.type === 'produto' && <Package size={16} className="text-blue-500" />}
+                        {res.type === 'tarefa' && <Zap size={16} className="text-yellow-500" />}
+                        {res.type === 'endereco' && <MapPin size={16} className="text-red-500" />}
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-black uppercase text-black">{res.title}</p>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">{res.subtitle}</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-yellow-600" />
+                  </button>
+                ))}
+              </div>
+            ) : !loading && (
+              <div className="px-4 py-6 text-center">
+                <p className="text-[10px] font-black uppercase text-gray-400">Nenhum resultado encontrado para "{searchQuery}"</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right Section: Status, Notifications & User */}

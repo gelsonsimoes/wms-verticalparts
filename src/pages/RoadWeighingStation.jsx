@@ -25,6 +25,7 @@ function cn(...inputs) {
 }
 
 // ===== CONSTANTES =====
+const DIVERGENCE_TOLERANCE = 500; // kg — extraído para facilitar ajustes futuros
 const SCALES = ['Balança Rodoviária Primária — Toledo 60T', 'Balança Rodoviária Secundária — Toledo 30T', 'Plataforma de Eixo — Doca 01'];
 const MOCK_VEHICLES = [
   { placa: 'ABC-1D23', transportadora: 'TBM Logística',    tipo: 'Recebimento', pesoNota: 28500 },
@@ -44,6 +45,17 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const supervisorTimeoutRef = useRef(null);
+
+  // Escape fecha o modal
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => {
+      document.removeEventListener('keydown', fn);
+      if (supervisorTimeoutRef.current) clearTimeout(supervisorTimeoutRef.current);
+    };
+  }, [onClose]);
 
   const handleConfirm = () => {
     if (!user || !pass || !motivo.trim()) {
@@ -52,7 +64,7 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
     }
     setLoading(true);
     setError('');
-    setTimeout(() => {
+    supervisorTimeoutRef.current = setTimeout(() => {
       if (user === 'danilo.supervisor' && pass === '1234') {
         setLoading(false);
         onConfirm(motivo);
@@ -68,15 +80,20 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
 
   return (
     <div className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-950 rounded-[32px] border-2 border-red-900/60 shadow-2xl w-full max-w-lg overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="supervisor-modal-title"
+        className="bg-slate-950 rounded-[32px] border-2 border-red-900/60 shadow-2xl w-full max-w-lg overflow-hidden"
+      >
         {/* Header vermelho de alerta */}
         <div className="bg-danger px-8 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center" aria-hidden="true">
             <ShieldAlert className="w-7 h-7 text-white" />
           </div>
           <div>
             <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">Divergência Detectada</p>
-            <h2 className="text-xl font-black text-white uppercase tracking-tight">Autorização de Supervisor</h2>
+            <h2 id="supervisor-modal-title" className="text-xl font-black text-white uppercase tracking-tight">Autorização de Supervisor</h2>
           </div>
         </div>
 
@@ -98,10 +115,11 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Usuário Supervisor *</label>
+                <label htmlFor="sup-user" className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Usuário Supervisor *</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <User className="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
                   <input
+                    id="sup-user"
                     value={user} onChange={e => setUser(e.target.value)}
                     placeholder="danilo.supervisor"
                     className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border-2 border-slate-800 rounded-xl text-xs font-bold text-slate-200 outline-none focus:border-danger transition-all"
@@ -109,10 +127,11 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Senha *</label>
+                <label htmlFor="sup-pass" className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Senha *</label>
                 <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <KeyRound className="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
                   <input
+                    id="sup-pass"
                     type="password" value={pass} onChange={e => setPass(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleConfirm()}
                     placeholder="••••••••"
@@ -122,8 +141,9 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Motivo da Liberação *</label>
+              <label htmlFor="sup-motivo" className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Motivo da Liberação *</label>
               <textarea
+                id="sup-motivo"
                 value={motivo} onChange={e => setMotivo(e.target.value)} rows={3}
                 placeholder="Descreva o motivo da liberação da divergência de peso..."
                 className="w-full px-4 py-3 bg-slate-900 border-2 border-slate-800 rounded-xl text-xs font-medium text-slate-200 outline-none focus:border-danger transition-all resize-none"
@@ -132,8 +152,8 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-950 border border-red-800 rounded-2xl">
-              <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
+            <div className="flex items-center gap-2 p-3 bg-red-950 border border-red-800 rounded-2xl" role="alert">
+              <AlertTriangle className="w-4 h-4 text-danger shrink-0" aria-hidden="true" />
               <span className="text-xs font-bold text-danger">{error}</span>
             </div>
           )}
@@ -145,7 +165,7 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
             <button onClick={handleConfirm} disabled={loading}
               className="flex-1 py-3.5 rounded-2xl bg-danger text-white text-sm font-black hover:opacity-90 active:scale-95 transition-all uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? <ShieldAlert className="w-4 h-4 animate-pulse" /> : <ShieldAlert className="w-4 h-4" />}
+              {loading ? <ShieldAlert className="w-4 h-4 animate-pulse" aria-hidden="true" /> : <ShieldAlert className="w-4 h-4" aria-hidden="true" />}
               {loading ? 'Validando...' : 'Liberar com Divergência'}
             </button>
           </div>
@@ -160,24 +180,41 @@ function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm 
 
 // ===== MODAL HISTÓRICO =====
 function HistoryModal({ onClose }) {
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-950 rounded-[28px] border-2 border-slate-800 shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="history-modal-title"
+        className="bg-slate-950 rounded-[28px] border-2 border-slate-800 shadow-2xl w-full max-w-2xl overflow-hidden"
+      >
         <div className="bg-secondary px-7 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <History className="w-6 h-6 text-primary" />
+            <History className="w-6 h-6 text-primary" aria-hidden="true" />
             <div>
               <p className="text-[9px] font-black text-primary/60 uppercase tracking-widest">Balança Rodoviária</p>
-              <h2 className="text-base font-black text-primary uppercase">Histórico de Pesagens</h2>
+              <h2 id="history-modal-title" className="text-base font-black text-primary uppercase">Histórico de Pesagens</h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-primary/50 hover:text-primary"><X className="w-5 h-5" /></button>
+          <button
+            onClick={onClose}
+            aria-label="Fechar histórico de pesagens"
+            className="text-primary/50 hover:text-primary"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="bg-slate-900 border-b border-slate-800">
               {['Data/Hora', 'Placa', 'Op.', 'Tara (Kg)', 'Bruto (Kg)', 'Líquido (Kg)', 'Status'].map(h => (
-                <th key={h} className="p-4 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                <th key={h} scope="col" className="p-4 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -222,6 +259,16 @@ export default function RoadWeighingStation() {
   const [liberado, setLiberado] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // Refs para cleanup de timeouts
+  const captureTimeoutRef  = useRef(null);
+  const saveTimeoutRef     = useRef(null);
+
+  // Cleanup global ao desmontar
+  useEffect(() => () => {
+    if (captureTimeoutRef.current)  clearTimeout(captureTimeoutRef.current);
+    if (saveTimeoutRef.current)     clearTimeout(saveTimeoutRef.current);
+  }, []);
+
   // Simula oscilação da balança
   useEffect(() => {
     const base = isCapturing ? 0 : (tara === null ? 800 : 31200);
@@ -243,7 +290,8 @@ export default function RoadWeighingStation() {
 
   const handleCapture = () => {
     setIsCapturing(true);
-    setTimeout(() => {
+    if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
+    captureTimeoutRef.current = setTimeout(() => {
       const stable = tara === null
         ? Math.floor(8000 + Math.random() * 800)
         : Math.floor(29000 + Math.random() * 5000);
@@ -263,12 +311,13 @@ export default function RoadWeighingStation() {
   };
 
   const liquido = bruto !== null && tara !== null ? bruto - tara : null;
-  const hasDivergence = liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota) > 500;
+  const hasDivergence = liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota) > DIVERGENCE_TOLERANCE;
   const canSave = bruto !== null && tara !== null && (liberado || !hasDivergence);
 
   const handleSave = () => {
     setSaved(true);
-    setTimeout(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
       handleReset();
       setSaved(false);
     }, 2500);
@@ -291,7 +340,7 @@ export default function RoadWeighingStation() {
           </div>
           <div>
             <p className="text-[9px] font-black text-primary/50 uppercase tracking-widest">Pesagem Rodoviária</p>
-            <h1 className="text-xl font-black text-white uppercase tracking-tight">Balança Rodoviária</h1>
+            <h1 className="text-xl font-black text-white uppercase tracking-tight">2.21 Pesagem Rodoviária</h1>
             <p className="text-[10px] text-slate-500 font-medium">VerticalParts Connector — Serial Bridge</p>
           </div>
         </div>
@@ -303,12 +352,15 @@ export default function RoadWeighingStation() {
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Veículo / Placa</p>
             <button
               onClick={() => setShowVehicleDropdown(p => !p)}
+              aria-expanded={showVehicleDropdown}
+              aria-haspopup="listbox"
+              aria-label="Selecionar veículo"
               className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-xl text-xs font-black text-primary hover:border-primary/50 transition-all"
             >
               <span className="flex items-center gap-2">
-                <Truck className="w-3.5 h-3.5" />{selectedVehicle.placa}
+                <Truck className="w-3.5 h-3.5" aria-hidden="true" />{selectedVehicle.placa}
               </span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
             </button>
             {showVehicleDropdown && (
               <div className="absolute top-full mt-1 left-0 w-64 bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
@@ -347,13 +399,16 @@ export default function RoadWeighingStation() {
           <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Balança Ativa</p>
           <button
             onClick={() => setShowScaleDropdown(p => !p)}
+            aria-expanded={showScaleDropdown}
+            aria-haspopup="listbox"
+            aria-label="Selecionar balança ativa"
             className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-800 border-2 border-primary/30 rounded-xl text-[10px] font-black text-primary hover:border-primary/60 transition-all"
           >
             <span className="flex items-center gap-2 truncate">
-              <Radio className="w-3.5 h-3.5 shrink-0 text-primary/70" />
+              <Radio className="w-3.5 h-3.5 shrink-0 text-primary/70" aria-hidden="true" />
               <span className="truncate">{activeScale.split(' — ')[0]}</span>
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 shrink-0" aria-hidden="true" />
           </button>
           {showScaleDropdown && (
             <div className="absolute top-full mt-1 right-0 w-72 bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
@@ -590,7 +645,7 @@ export default function RoadWeighingStation() {
         <SupervisorModal
           divergencia={liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota)}
           pesoNota={selectedVehicle.pesoNota}
-          pesoBruto={liquido || 0}
+          pesoBruto={bruto || 0}
           onClose={() => setShowSupervisorModal(false)}
           onConfirm={(motivo) => { setShowSupervisorModal(false); setLiberado(true); }}
         />

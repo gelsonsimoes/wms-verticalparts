@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   Building2, 
   Search, 
@@ -58,18 +58,21 @@ const MOCK_DOCK_DETAILS = {
 };
 
 const DockCard = ({ dock, onClick }) => {
-  const isLivre = dock.status === 'Livre';
+  const isLivre    = dock.status === 'Livre';
   const isAtrasada = dock.atrasada;
 
   return (
-    <div 
+    <div
       onClick={() => !isLivre && onClick(dock)}
       className={cn(
-        "relative overflow-hidden rounded-[32px] border-2 transition-all p-6 cursor-pointer group",
-        isLivre 
-          ? "bg-green-500/5 border-green-500/20 hover:bg-green-500/10" 
-          : isAtrasada 
-            ? "bg-danger/5 border-danger/30 hover:bg-danger/10 shadow-lg shadow-danger/10"
+        "relative overflow-hidden rounded-[32px] border-2 transition-all p-6 group",
+        // cursor-pointer apenas quando há ação real (doca ocupada)
+        isLivre ? "cursor-default" : "cursor-pointer",
+        isLivre
+          ? "bg-green-500/5 border-green-500/20 hover:bg-green-500/10"
+          : isAtrasada
+            // danger → red-500 (token 'danger' não está definido no CSS)
+            ? "bg-red-500/5 border-red-500/30 hover:bg-red-500/10 shadow-lg shadow-red-500/10"
             : "bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10"
       )}
     >
@@ -78,22 +81,27 @@ const DockCard = ({ dock, onClick }) => {
           <h3 className="text-xl font-black uppercase tracking-tight">{dock.nome}</h3>
           <p className={cn(
             "text-[9px] font-black uppercase tracking-widest mt-1",
-            isLivre ? "text-green-500" : isAtrasada ? "text-danger" : "text-amber-500"
+            isLivre ? "text-green-500" : isAtrasada ? "text-red-400" : "text-amber-500"
           )}>
             {isLivre ? '● Disponível para Operação' : isAtrasada ? '⚠️ Alerta de Atraso' : '● Em Atividade'}
           </p>
         </div>
         {!isLivre && (
           <div className="w-10 h-10 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center">
-            {dock.operacao === 'Recebimento' ? <ArrowDownLeft className="text-primary w-5 h-5" /> : <ArrowUpRight className="text-blue-400 w-5 h-5" />}
+            {/* primary → yellow-400 (#FFD700 do design system) */}
+            {dock.operacao === 'Recebimento'
+              ? <ArrowDownLeft className="text-yellow-400 w-5 h-5" aria-hidden="true" />
+              : <ArrowUpRight  className="text-blue-400 w-5 h-5"   aria-hidden="true" />}
           </div>
         )}
       </div>
 
       {isLivre ? (
         <div className="py-8 flex flex-col items-center justify-center text-center space-y-3 opacity-40 group-hover:opacity-100 transition-all">
-          <DoorOpen className="w-12 h-12 text-green-500/50" />
-          <p className="text-xs font-black text-green-500 uppercase tracking-widest">DOCA LIVRE<br/><span className="text-[10px]">Aguardando Veículo</span></p>
+          <DoorOpen className="w-12 h-12 text-green-500/50" aria-hidden="true" />
+          <p className="text-xs font-black text-green-500 uppercase tracking-widest">
+            DOCA LIVRE<br/><span className="text-[10px]">Aguardando Veículo</span>
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -104,10 +112,11 @@ const DockCard = ({ dock, onClick }) => {
             </div>
             <div className="bg-slate-900/50 p-3 rounded-2xl border border-slate-800">
               <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Operação</p>
-              <p className="text-xs font-black text-primary uppercase">{dock.operacao}</p>
+              {/* primary → yellow-400 */}
+              <p className="text-xs font-black text-yellow-400 uppercase">{dock.operacao}</p>
             </div>
           </div>
-          
+
           <div>
             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Depositante</p>
             <p className="text-xs font-bold text-slate-300 truncate">{dock.depositante}</p>
@@ -119,18 +128,19 @@ const DockCard = ({ dock, onClick }) => {
               <span className="text-[10px] font-black text-white">{dock.progresso}%</span>
             </div>
             <div className="h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-               <div 
-                 className={cn(
-                   "h-full transition-all duration-1000",
-                   isAtrasada ? "bg-danger" : "bg-primary"
-                 )}
-                 style={{ width: `${dock.progresso}%` }}
-               />
+              <div
+                className={cn(
+                  "h-full transition-all duration-1000",
+                  // danger → red-500 / primary → yellow-400
+                  isAtrasada ? "bg-red-500" : "bg-yellow-400"
+                )}
+                style={{ width: `${dock.progresso}%` }}
+              />
             </div>
           </div>
 
           <div className="flex items-center gap-2 pt-2 border-t border-slate-800/50 text-[10px] font-bold text-slate-500">
-            <Clock className="w-3.5 h-3.5" />
+            <Clock className="w-3.5 h-3.5" aria-hidden="true" />
             <span>ETR: <span className="text-slate-200 font-black">{dock.etr}</span></span>
           </div>
         </div>
@@ -140,9 +150,21 @@ const DockCard = ({ dock, onClick }) => {
 };
 
 export default function DockActivities() {
-  const [filter, setFilter] = useState('Todas');
+  const [filter,      setFilter]      = useState('Todas');
   const [selectedDock, setSelectedDock] = useState(null);
-  const { isTvMode, setIsTvMode } = useApp();
+  const { isTvMode, setIsTvMode }     = useApp();
+  const drawerRef = useRef(null);
+
+  // Fechar drawer com Escape
+  const closeDrawer = useCallback(() => setSelectedDock(null), []);
+  useEffect(() => {
+    if (!selectedDock) return;
+    const onKey = (e) => { if (e.key === 'Escape') closeDrawer(); };
+    document.addEventListener('keydown', onKey);
+    // Mover foco para o drawer ao abrir
+    if (drawerRef.current) drawerRef.current.focus();
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selectedDock, closeDrawer]);
 
   const stats = useMemo(() => ({
     total: MOCK_DOCKS.length,
@@ -160,20 +182,20 @@ export default function DockActivities() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 space-y-6 animate-in fade-in duration-700 relative overflow-hidden",
+      "min-h-screen bg-slate-950 text-slate-200 p-4 md:p-8 space-y-6 relative overflow-hidden",
       isTvMode && "p-12 scale-110 origin-top"
     )}>
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full -mr-64 -mt-64 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-yellow-400/5 blur-[120px] rounded-full -mr-64 -mt-64 pointer-events-none" aria-hidden="true" />
 
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
         <div>
            <div className="flex items-center gap-4 mb-2">
-              <div className={cn(
-                "p-3 bg-primary/10 rounded-2xl border border-primary/20",
-                isTvMode && "p-6"
-              )}>
-                 <LayoutDashboard className={cn("text-primary", isTvMode ? "w-14 h-14" : "w-8 h-8")} />
-              </div>
+               <div className={cn(
+                 "p-3 bg-yellow-400/10 rounded-2xl border border-yellow-400/20",
+                 isTvMode && "p-6"
+               )}>
+                  <LayoutDashboard className={cn("text-yellow-400", isTvMode ? "w-14 h-14" : "w-8 h-8")} aria-hidden="true" />
+               </div>
               <div>
                  <h1 className={cn(
                    "font-black uppercase tracking-tight text-white leading-none",
@@ -190,14 +212,17 @@ export default function DockActivities() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsTvMode(!isTvMode)}
+            aria-pressed={isTvMode}
             className={cn(
               "flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl",
-              isTvMode 
-                ? "bg-danger text-white hover:bg-red-600 animate-pulse" 
-                : "bg-primary text-secondary hover:bg-primary/90"
+              // danger → red-600 / primary → yellow-400
+              // animate-pulse removido: distrai operadores em ambiente industrial
+              isTvMode
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-yellow-400 text-slate-900 hover:bg-yellow-300"
             )}
           >
-            {isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />}
+            {isTvMode ? <Monitor className="w-4 h-4" aria-hidden="true" /> : <Tv className="w-4 h-4" aria-hidden="true" />}
             {isTvMode ? "Sair do Modo TV" : "Modo TV"}
           </button>
 
@@ -215,39 +240,61 @@ export default function DockActivities() {
         ))}
       </div>
 
-      <div className={cn(
-        "fixed inset-y-0 right-0 w-full md:w-[450px] bg-slate-900 border-l-2 border-slate-800 z-[100] shadow-2xl transition-transform duration-500 transform flex flex-col",
-        selectedDock ? "translate-x-0" : "translate-x-full"
-      )}>
+      {/* Drawer de detalhe da doca */}
+      <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="drawer-dock-titulo"
+        tabIndex={-1}
+        className={cn(
+          "fixed inset-y-0 right-0 w-full md:w-[450px] bg-slate-900 border-l-2 border-slate-800 z-[100] shadow-2xl transition-transform duration-500 transform flex flex-col outline-none",
+          selectedDock ? "translate-x-0" : "translate-x-full"
+        )}
+      >
         {selectedDock && (
           <>
             <div className="p-8 border-b border-slate-800 flex items-center justify-between shrink-0">
                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-primary/10 rounded-2xl border border-primary/20 flex items-center justify-center">
-                     {selectedDock.operacao === 'Recebimento' ? <ArrowDownLeft className="text-primary w-7 h-7" /> : <ArrowUpRight className="text-blue-400 w-7 h-7" />}
+                  <div className="w-14 h-14 bg-yellow-400/10 rounded-2xl border border-yellow-400/20 flex items-center justify-center">
+                     {selectedDock.operacao === 'Recebimento'
+                       ? <ArrowDownLeft className="text-yellow-400 w-7 h-7" aria-hidden="true" />
+                       : <ArrowUpRight  className="text-blue-400 w-7 h-7"   aria-hidden="true" />}
                   </div>
                   <div>
-                     <h2 className="text-xl font-black uppercase tracking-tight text-white">{selectedDock.nome}</h2>
+                     <h2 id="drawer-dock-titulo" className="text-xl font-black uppercase tracking-tight text-white">{selectedDock.nome}</h2>
                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{selectedDock.placa} · {selectedDock.operacao}</p>
                   </div>
                </div>
-               <button onClick={() => setSelectedDock(null)} className="p-2 hover:text-danger"><X className="w-6 h-6" /></button>
+               <button
+                 onClick={closeDrawer}
+                 aria-label="Fechar detalhes da doca"
+                 className="p-2 hover:text-red-400 transition-colors"
+               >
+                 <X className="w-6 h-6" aria-hidden="true" />
+               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 space-y-6">
-               {MOCK_DOCK_DETAILS[selectedDock.id]?.map((item, i) => (
-                 <div key={i} className="bg-slate-800/30 p-4 rounded-2xl flex justify-between">
+               {MOCK_DOCK_DETAILS[selectedDock.id]?.map((item) => (
+                 <div key={item.sku} className="bg-slate-800/30 p-4 rounded-2xl flex justify-between">
                     <div>
                        <p className="text-xs font-black text-white">{item.sku}</p>
                        <p className="text-[9px] text-slate-500">{item.desc}</p>
                     </div>
-                    <p className="text-xs font-black text-primary">{item.qtd} pçs</p>
+                    <p className="text-xs font-black text-yellow-400">{item.qtd} pçs</p>
                  </div>
                ))}
             </div>
           </>
         )}
       </div>
-      {selectedDock && <div onClick={() => setSelectedDock(null)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]" />}
+      {selectedDock && (
+        <div
+          onClick={closeDrawer}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90]"
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }

@@ -63,14 +63,19 @@ function ModalConfirmacao({ onClose, onConfirm, dataLimite, tabelasSel }) {
     setTimeout(() => setShaking(false), 600);
   };
 
-  const handleProsseguir = () => {
-    if (senha !== 'admin123') { shake('Senha de administrador incorreta.'); return; }
+  const handleProsseguir = async () => {
+    if (!senha.trim()) { shake('Informe a senha de administrador.'); return; }
     if (confirma !== 'CONFIRMAR') { shake('Digite exatamente "CONFIRMAR" em maiúsculas.'); return; }
+    // ⚠️  INTEGRAÇÃO NECESSÁRIA: substituir por POST /api/admin/purge/auth { senha }
+    // Em produção: validação server-side com hash comparison e log de tentativas.
+    // Exemplo:
+    //   const res = await fetch('/api/admin/purge/auth', { method:'POST', body: JSON.stringify({ senha }) });
+    //   if (!res.ok) { shake('Credenciais inválidas.'); return; }
     onConfirm();
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-expurgo-titulo">
       {/* Overlay escuro e vermelho */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
@@ -84,11 +89,11 @@ function ModalConfirmacao({ onClose, onConfirm, dataLimite, tabelasSel }) {
           <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_8px,rgba(255,0,0,0.07)_8px,rgba(255,0,0,0.07)_16px)]" />
           <div className="flex items-center gap-3 relative">
             <div className="w-12 h-12 rounded-2xl bg-red-600/30 border-2 border-red-500/50 flex items-center justify-center animate-pulse">
-              <TriangleAlert className="w-7 h-7 text-red-300" />
+              <TriangleAlert className="w-7 h-7 text-red-300" aria-hidden="true" />
             </div>
             <div>
               <p className="text-[9px] font-black text-red-400 uppercase tracking-[0.3em]">⚠ Operação Destrutiva e Irreversível</p>
-              <p className="text-base font-black text-white">Confirmação de Expurgo</p>
+              <p id="modal-expurgo-titulo" className="text-base font-black text-white">Confirmação de Expurgo</p>
             </div>
             <button onClick={onClose} className="ml-auto text-red-300/60 hover:text-red-200 transition-colors"><XCircle className="w-5 h-5" /></button>
           </div>
@@ -211,20 +216,23 @@ function ModalConfirmacao({ onClose, onConfirm, dataLimite, tabelasSel }) {
 }
 
 // ─── BARRA DE PROGRESSO DE EXECUÇÃO ─────────────────────────────────
-function ProgressoExpurgo({ tabelasSel, onDone }) {
+function ProgressoExpurgo({ tabelasSel, onDone, startTime }) {
   const [step, setStep] = useState(0);
   const [pct,  setPct]  = useState(0);
 
   useEffect(() => {
-    let s = 0;
     const interval = setInterval(() => {
       setPct(p => {
         if (p >= 100) {
           clearInterval(interval);
-          setTimeout(onDone, 600);
+          // Calcula duração real em vez de Math.random()
+          const elapsedMs = Date.now() - startTime;
+          const mins = Math.floor(elapsedMs / 60000);
+          const secs = Math.floor((elapsedMs % 60000) / 1000);
+          setTimeout(() => onDone(`${mins}m ${String(secs).padStart(2,'0')}s`), 600);
           return 100;
         }
-        const inc = Math.random() * 8 + 4;
+        const inc = 4 + (Math.random() * 8); // variação visual realista
         const np = Math.min(p + inc, 100);
         const ns = Math.floor(np / (100 / tabelasSel.length));
         setStep(Math.min(ns, tabelasSel.length - 1));
@@ -304,24 +312,26 @@ function ConfigurarExpurgo({ historico, setHistorico }) {
     ? new Intl.DateTimeFormat('pt-BR').format(new Date(dataLimite + 'T12:00:00'))
     : '—';
 
+  const [purgeStartTime, setPurgeStartTime] = useState(null);
+
   const onConfirm = () => {
     setShowModal(false);
+    setPurgeStartTime(Date.now());
     setShowProgress(true);
   };
 
-  const onDone = () => {
+  const onDone = (duracao) => {
     setShowProgress(false);
     setSuccessMsg(true);
-    // Adiciona ao histórico
     const novoLog = {
       id: `EX-${String(historico.length + 1).padStart(3,'0')}`,
       dataHora: new Intl.DateTimeFormat('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }).format(new Date()),
-      usuario: 'admin@vp.com',
+      usuario: 'admin@vp.com', // ⚠️ Em produção: lido do contexto de autenticação
       tabelas: tabelasSel.map(t => t.label),
       qtde: estimativa,
       status: 'Sucesso',
       dataLimite: dataFormatada,
-      duracao: `${Math.floor(Math.random() * 3)}m ${Math.floor(Math.random() * 59)}s`,
+      duracao, // duração real calculada pelo ProgressoExpurgo
     };
     setHistorico(h => [novoLog, ...h]);
     setSelecionadas({});
@@ -331,7 +341,7 @@ function ConfigurarExpurgo({ historico, setHistorico }) {
   return (
     <>
       {showModal   && <ModalConfirmacao tabelasSel={tabelasSel} dataLimite={dataFormatada} onClose={() => setShowModal(false)} onConfirm={onConfirm} />}
-      {showProgress && <ProgressoExpurgo tabelasSel={tabelasSel} onDone={onDone} />}
+      {showProgress && <ProgressoExpurgo tabelasSel={tabelasSel} onDone={onDone} startTime={purgeStartTime} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
@@ -563,7 +573,7 @@ export default function DataPurge() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 dark:bg-slate-950 p-4 md:p-8 space-y-5 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-slate-950 p-4 md:p-8 space-y-5">
 
       {/* HEADER */}
       <div className="bg-slate-900 rounded-[32px] border-2 border-slate-800 p-6 shadow-sm relative overflow-hidden">
@@ -575,7 +585,7 @@ export default function DataPurge() {
           </div>
           <div>
             <p className="text-[10px] font-black text-red-500/80 uppercase tracking-[0.2em]">Cat. 11 — Administração e Manutenção</p>
-            <h1 className="text-xl font-black text-white uppercase tracking-tight">Service Desk — Gestão de Expurgo de Dados</h1>
+            <h1 className="text-xl font-black text-white uppercase tracking-tight">10.4 Expurgar Dados Antigos</h1>
             <p className="text-xs text-slate-500 font-medium mt-0.5">Limpeza controlada de registros históricos · Logs de execução · Acesso restrito ao Administrador</p>
           </div>
           <div className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-red-950/50 border border-red-800/40 rounded-xl">
@@ -588,13 +598,13 @@ export default function DataPurge() {
       {/* TABS */}
       <div className="bg-slate-900 rounded-2xl border-2 border-slate-800 p-2 flex gap-2">
         {TABS.map((t, i) => (
-          <button key={i} onClick={() => setTab(i)}
+          <button key={t.label} onClick={() => setTab(i)}
             className={cn('flex-1 flex items-center gap-3 px-5 py-3 rounded-xl transition-all',
               tab === i
                 ? 'bg-gradient-to-r from-red-800 to-red-700 text-white shadow-lg'
                 : 'text-slate-500 hover:bg-slate-800'
             )}>
-            <t.icon className="w-5 h-5 shrink-0" />
+            <t.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
             <div className="text-left">
               <p className="text-xs font-black uppercase tracking-wide">{t.label}</p>
               <p className={cn('text-[9px] font-medium', tab === i ? 'text-white/60' : 'text-slate-600')}>{t.desc}</p>

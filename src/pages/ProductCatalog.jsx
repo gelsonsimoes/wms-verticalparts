@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useId } from 'react';
 import {
   Package,
   Search,
@@ -24,6 +24,16 @@ import {
   ArrowUpDown,
   Copy,
   Check,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  MapPin,
+  Eye,
+  EyeOff,
+  BarChart3,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -34,6 +44,7 @@ function cn(...i) { return twMerge(clsx(i)); }
 const TIPOS    = ['Peça', 'Conjunto', 'Serviço', 'Embalagem', 'Consumível'];
 const FAMILIAS = ['Motor', 'Freio', 'Cabine', 'Contrapeso', 'Guia de Corrediça', 'Painel Elétrico', 'Porta', 'Cabos e Cintas', 'Escada Rolante', 'Segurança', 'Sinalização', 'Outros'];
 const MARCAS   = ['Atlas Schindler', 'Otis', 'ThyssenKrupp', 'Kone', 'Mitsubishi', 'Hidra', 'Genérico', 'Importado'];
+const UNIDADES = ['PC', 'UN', 'KG', 'MT', 'M2', 'M3', 'LT', 'CX', 'PAR', 'JG', 'KIT', 'RL', 'SC', 'BD', 'FD', 'GL', 'TB', 'PT'];
 const REGRAS_EXP = [
   { value: 'FIFO', label: 'FIFO — First In, First Out', desc: 'Expede o lote mais antigo primeiro.' },
   { value: 'LIFO', label: 'LIFO — Last In, First Out',  desc: 'Expede o lote mais recente primeiro.' },
@@ -99,12 +110,17 @@ const PRODUTOS_INIT = [
   },
 ];
 
+import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../services/supabaseClient';
+
 // ─── INPUT HELPER ─────────────────────────────────────────────────────
+// Gera um id único por instância (React 18+) e vincula label→input
 function Field({ label, children, className }) {
+  const id = useId();
   return (
     <div className={cn('space-y-1', className)}>
-      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
-      {children}
+      <label htmlFor={id} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+      {React.cloneElement(React.Children.only(children), { id })}
     </div>
   );
 }
@@ -112,23 +128,52 @@ function Field({ label, children, className }) {
 const inputCls = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 const selectCls = inputCls + " appearance-none cursor-pointer";
 
+// ─── COMPONENTE DE AJUDA (TOOLTIP) ────────────────────────────
+const HelpTip = ({ text, position = 'top' }) => (
+  <div className="group relative inline-block ml-1.5 focus:outline-none shrink-0" tabIndex="0">
+    <Info className="w-3 h-3 text-slate-400 hover:text-secondary cursor-help transition-colors" />
+    <div className={cn(
+      "absolute hidden group-hover:block z-[100] w-48 p-2.5 text-[10px] font-bold leading-tight text-white bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200 pointer-events-none",
+      position === 'top' ? "bottom-full left-1/2 -translate-x-1/2 mb-2" : "top-full left-1/2 -translate-x-1/2 mt-2"
+    )}>
+      {text}
+      <div className={cn(
+        "absolute left-1/2 -translate-x-1/2 border-4",
+        position === 'top' 
+          ? "top-full border-t-slate-900 border-x-transparent border-b-transparent" 
+          : "bottom-full border-b-slate-900 border-x-transparent border-t-transparent"
+      )} />
+    </div>
+  </div>
+);
+
 // ─── ABA DADOS DO PRODUTO ─────────────────────────────────────────────
 function TabDados({ prod, onChange }) {
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Código do Produto">
+      {/* Identificação */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Field label={<span className="flex items-center">Código do Produto (SKU) <HelpTip text="Identificador único no ERP Omie. Sincronizado automaticamente." /></span>}>
           <input value={prod.codigo} onChange={e => onChange('codigo', e.target.value)}
-            className={inputCls} placeholder="Ex: MOT-TP-0220" />
+            className={inputCls} placeholder="Ex: 4001003534" />
+        </Field>
+        <Field label={<span className="flex items-center">Unidade <HelpTip text="Unidade de medida principal (PC, UN, KG). Vem do Omie." /></span>}>
+          <select value={prod.unidade || 'PC'} onChange={e => onChange('unidade', e.target.value)} className={selectCls}>
+            {UNIDADES.map(u => <option key={u}>{u}</option>)}
+          </select>
         </Field>
         <Field label="Tipo">
           <select value={prod.tipo} onChange={e => onChange('tipo', e.target.value)} className={selectCls}>
             {TIPOS.map(t => <option key={t}>{t}</option>)}
           </select>
         </Field>
-        <Field label="Descrição" className="col-span-2">
+        <Field label={<span className="flex items-center">Descrição <HelpTip text="Nome completo do produto para etiquetas e conferência." /></span>} className="col-span-2 md:col-span-3">
           <input value={prod.descricao} onChange={e => onChange('descricao', e.target.value)}
             className={inputCls} placeholder="Descrição completa do produto..." />
+        </Field>
+        <Field label={<span className="flex items-center">Código NCM <HelpTip text="Campo fiscal obrigatório. Importado automaticamente do cadastro Omie." /></span>}>
+          <input value={prod.ncm || ''} onChange={e => onChange('ncm', e.target.value)}
+            className={inputCls + " font-mono"} placeholder="Ex: 7318.19.00" maxLength={13} />
         </Field>
         <Field label="Família">
           <select value={prod.familia} onChange={e => onChange('familia', e.target.value)} className={selectCls}>
@@ -140,25 +185,93 @@ function TabDados({ prod, onChange }) {
             {MARCAS.map(m => <option key={m}>{m}</option>)}
           </select>
         </Field>
-        <Field label="Observações" className="col-span-2">
-          <textarea value={prod.observacao} onChange={e => onChange('observacao', e.target.value)} rows={2}
-            className={inputCls + " resize-none"} placeholder="Detalhes adicionais, especificações técnicas..." />
+      </div>
+
+      {/* Dimensões e Peso */}
+      <div>
+        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+          <Ruler className="w-3.5 h-3.5" />Dimensões e Peso
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Field label={
+            <span className="flex items-center gap-1.5 ring-offset-2 ring-primary/20">
+              Peso Bruto (kg) *
+              {!prod.peso_bruto && <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />}
+            </span>
+          }>
+            <input 
+              type="number" 
+              min="0" 
+              step="0.001" 
+              value={prod.peso_bruto || ''} 
+              onChange={e => onChange('peso_bruto', +e.target.value)}
+              className={cn(inputCls, !prod.peso_bruto && "border-red-400 focus:border-red-500")} 
+              placeholder="0.000" 
+              required
+            />
+          </Field>
+          <Field label="Peso Líquido (kg)">
+            <input type="number" min="0" step="0.001" value={prod.peso_liquido || ''} onChange={e => onChange('peso_liquido', +e.target.value)}
+              className={inputCls} placeholder="0.000" />
+          </Field>
+          <Field label="Altura (cm)">
+            <input type="number" min="0" step="0.1" value={prod.altura || ''} onChange={e => onChange('altura', +e.target.value)}
+              className={inputCls} placeholder="0.0" />
+          </Field>
+          <Field label="Largura (cm)">
+            <input type="number" min="0" step="0.1" value={prod.largura || ''} onChange={e => onChange('largura', +e.target.value)}
+              className={inputCls} placeholder="0.0" />
+          </Field>
+          <Field label="Profundidade (cm)">
+            <input type="number" min="0" step="0.1" value={prod.profundidade || ''} onChange={e => onChange('profundidade', +e.target.value)}
+              className={inputCls} placeholder="0.0" />
+          </Field>
+        </div>
+        {(prod.altura > 0 && prod.largura > 0 && prod.profundidade > 0) && (
+          <div className="mt-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2 text-[10px] font-bold text-slate-500 flex items-center gap-2">
+            <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
+            Cubagem: <strong className="text-secondary">{((prod.altura * prod.largura * prod.profundidade) / 1000000).toFixed(4)} m³</strong>
+          </div>
+        )}
+      </div>
+
+      {/* Local de Estoque + Crossdocking */}
+      <div className="grid grid-cols-2 gap-4">
+        <Field label={<span className="flex items-center">Local de Estoque (Omie) <HelpTip text="Endereço de referência no Omie. Serve como guia para alocação no WMS." /></span>}>
+          <input value={prod.local_estoque || ''} onChange={e => onChange('local_estoque', e.target.value)}
+            className={inputCls} placeholder="Ex: VERTICAL MP - Estoque Próprio" />
+        </Field>
+        <Field label={<span className="flex items-center">Dias de Crossdocking <HelpTip text="Tempo máximo permitido na área de transbordo (Recebimento → Expedição Direta)." /></span>}>
+          <input type="number" min="0" value={prod.dias_crossdocking || 0} onChange={e => onChange('dias_crossdocking', +e.target.value)}
+            className={inputCls} />
         </Field>
       </div>
+
+      {/* Observações */}
+      <Field label="Observações">
+        <textarea value={prod.observacao} onChange={e => onChange('observacao', e.target.value)} rows={2}
+          className={inputCls + " resize-none"} placeholder="Detalhes adicionais, especificações técnicas..." />
+      </Field>
 
       {/* Movimenta Estoque */}
       <div className={cn('border-2 rounded-2xl p-4 flex items-start gap-4 transition-all',
         prod.movimentaEstoque ? 'border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800/50' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/50'
       )}>
-        <button onClick={() => onChange('movimentaEstoque', !prod.movimentaEstoque)}
+        <button
+          role="checkbox"
+          aria-checked={prod.movimentaEstoque}
+          aria-label={prod.movimentaEstoque ? 'Movimenta estoque físico — clique para desativar' : 'Não movimenta estoque — clique para ativar'}
+          onClick={() => onChange('movimentaEstoque', !prod.movimentaEstoque)}
           className={cn('w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all',
             prod.movimentaEstoque ? 'bg-green-600 border-green-600' : 'border-amber-400 bg-white dark:bg-slate-800'
-          )}>
-          {prod.movimentaEstoque && <Check className="w-3.5 h-3.5 text-white" />}
+          )}
+        >
+          {prod.movimentaEstoque && <Check className="w-3.5 h-3.5 text-white" aria-hidden="true" />}
         </button>
         <div>
-          <p className={cn('text-sm font-black', prod.movimentaEstoque ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400')}>
+          <p className={cn('text-sm font-black flex items-center', prod.movimentaEstoque ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400')}>
             Movimenta Estoque Físico
+            <HelpTip text="Define se o item gera saldo físico no armazém ou se é apenas um serviço não estocável." />
           </p>
           {prod.movimentaEstoque
             ? <p className="text-[10px] text-green-600 dark:text-green-500 mt-0.5 font-medium">Este item é uma <strong>peça / produto físico</strong> — entra e sai do estoque do armazém.</p>
@@ -184,12 +297,16 @@ function TabEmbalagens({ prod, onChange }) {
   const [newRow, setNewRow] = useState(false);
   const [editRow, setEditRow] = useState(null); // { barcode, apresentacao, fator, lastro, camada, pesoBruto }
 
-  const emptyRow = () => ({ id: 'new_' + Date.now(), barcode:'', apresentacao: APRESEN[0], fator:1, lastro:1, camada:1, pesoBruto:0 });
+  const emptyRow = () => ({ id: 'emb_' + crypto.randomUUID(), barcode:'', apresentacao: APRESEN[0], fator:1, lastro:1, camada:1, pesoBruto:0 });
 
   const startNew = () => { setEditRow(emptyRow()); setNewRow(true); };
 
   const gerarBarcode = () => {
-    const bc = gerarEAN13();
+    // Garante unicidade: gera até encontrar um EAN que não exista nas embalagens do produto
+    let bc;
+    const existentes = new Set(prod.embalagens.map(e => e.barcode));
+    let tentativas = 0;
+    do { bc = gerarEAN13(); tentativas++; } while (existentes.has(bc) && tentativas < 20);
     setEditRow(r => ({ ...r, barcode: bc }));
   };
 
@@ -200,7 +317,12 @@ function TabEmbalagens({ prod, onChange }) {
   };
 
   const saveRow = () => {
+    // Validação dos campos obrigatórios e limites lógicos
     if (!editRow.barcode) return;
+    if (editRow.fator    < 1) return;
+    if (editRow.lastro   < 1) return;
+    if (editRow.camada   < 1) return;
+    if (editRow.pesoBruto < 0) return;
     const embs = [...prod.embalagens];
     if (newRow) {
       embs.push(editRow);
@@ -244,9 +366,12 @@ function TabEmbalagens({ prod, onChange }) {
               <div className="flex gap-2">
                 <input value={editRow.barcode} onChange={e => setEditRow(r => ({ ...r, barcode: e.target.value }))}
                   className={inputCls + " font-mono tracking-widest"} placeholder="Ex: 7891234560001" maxLength={14} />
-                <button onClick={gerarBarcode} title="Gerar EAN-13 automático"
-                  className="shrink-0 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-[10px] font-black transition-all flex items-center gap-1.5 whitespace-nowrap">
-                  <Barcode className="w-4 h-4" />Gerar
+                <button
+                  onClick={gerarBarcode}
+                  aria-label="Gerar código de barras EAN-13 automático"
+                  className="shrink-0 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-[10px] font-black transition-all flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  <Barcode className="w-4 h-4" aria-hidden="true" />Gerar
                 </button>
               </div>
             </Field>
@@ -275,9 +400,12 @@ function TabEmbalagens({ prod, onChange }) {
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={cancelEdit} className="px-4 py-2 border-2 border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl text-xs font-black hover:border-slate-400 transition-all">Cancelar</button>
-            <button onClick={saveRow} disabled={!editRow.barcode}
-              className="px-5 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-md">
-              <Save className="w-3.5 h-3.5" />Salvar Embalagem
+            <button
+              onClick={saveRow}
+              disabled={!editRow.barcode || editRow.fator < 1 || editRow.lastro < 1 || editRow.camada < 1 || editRow.pesoBruto < 0}
+              className="px-5 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-md"
+            >
+              <Save className="w-3.5 h-3.5" aria-hidden="true" />Salvar Embalagem
             </button>
           </div>
         </div>
@@ -290,7 +418,7 @@ function TabEmbalagens({ prod, onChange }) {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
                 {['Cód. de Barras','Apresentação','Fator','Lastro','Camadas','Peso Bruto','Cx/Palete','Ações'].map(h => (
-                  <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -301,10 +429,16 @@ function TabEmbalagens({ prod, onChange }) {
                 )}>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
-                      <Barcode className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <Barcode className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
                       <code className="text-xs font-bold text-slate-700 dark:text-slate-300 tracking-widest">{emb.barcode}</code>
-                      <button onClick={() => copyBarcode(emb.barcode)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        {copied === emb.barcode ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400 hover:text-secondary" />}
+                      <button
+                        onClick={() => copyBarcode(emb.barcode)}
+                        aria-label={copied === emb.barcode ? 'Código copiado!' : `Copiar código de barras ${emb.barcode}`}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {copied === emb.barcode
+                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" aria-hidden="true" />
+                          : <Copy        className="w-3.5 h-3.5 text-slate-400 hover:text-secondary" aria-hidden="true" />}
                       </button>
                     </div>
                   </td>
@@ -322,11 +456,19 @@ function TabEmbalagens({ prod, onChange }) {
                   </td>
                   <td className="p-3">
                     <div className="flex items-center gap-1">
-                      <button onClick={() => startEdit(emb)} className="p-1.5 hover:bg-secondary/10 rounded-lg transition-all text-slate-400 hover:text-secondary">
-                        <Edit3 className="w-3.5 h-3.5" />
+                      <button
+                        onClick={() => startEdit(emb)}
+                        aria-label={`Editar embalagem ${emb.apresentacao} (${emb.barcode})`}
+                        className="p-1.5 hover:bg-secondary/10 rounded-lg transition-all text-slate-400 hover:text-secondary"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
-                      <button onClick={() => removeRow(emb.id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all text-slate-400 hover:text-red-600">
-                        <Trash2 className="w-3.5 h-3.5" />
+                      <button
+                        onClick={() => removeRow(emb.id)}
+                        aria-label={`Excluir embalagem ${emb.apresentacao} (${emb.barcode})`}
+                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all text-slate-400 hover:text-red-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -358,18 +500,33 @@ function TabRegras({ prod, onChange }) {
       <div className="space-y-3">
         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
           <ArrowUpDown className="w-3.5 h-3.5" />Regra de Expedição
+          <HelpTip text="Define qual lote sairá primeiro no Picking: o mais antigo (FIFO) ou o mais novo (LIFO)." />
         </label>
         <div className="space-y-2">
           {REGRAS_EXP.map(r => (
-            <label key={r.value} onClick={() => onChange('regraExpedicao', r.value)}
+            <label
+              key={r.value}
               className={cn('flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all',
                 r.value === prod.regraExpedicao
                   ? 'border-secondary/60 bg-secondary/5'
                   : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-              )}>
-              <div className={cn('w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
-                r.value === prod.regraExpedicao ? 'border-secondary bg-secondary' : 'border-slate-300 dark:border-slate-600'
-              )}>
+              )}
+            >
+              {/* Radio nativo oculto — garante acessibilidade por teclado e leitores de tela */}
+              <input
+                type="radio"
+                name="regraExpedicao"
+                value={r.value}
+                checked={prod.regraExpedicao === r.value}
+                onChange={() => onChange('regraExpedicao', r.value)}
+                className="sr-only"
+              />
+              <div
+                aria-hidden="true"
+                className={cn('w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
+                  r.value === prod.regraExpedicao ? 'border-secondary bg-secondary' : 'border-slate-300 dark:border-slate-600'
+                )}
+              >
                 {r.value === prod.regraExpedicao && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
               </div>
               <div>
@@ -404,25 +561,180 @@ function TabRegras({ prod, onChange }) {
   );
 }
 
+// ─── BADGE DE DELTA ───────────────────────────────────────────────────
+function DeltaBadge({ erp, wms, real }) {
+  const base = real != null ? real : wms;
+  if (erp == null || base == null) return <span className="text-[9px] text-slate-300 font-bold">—</span>;
+  const delta = erp - base;
+  if (delta === 0) return <span className="flex items-center gap-0.5 text-[10px] font-black text-green-600"><CheckCircle2 className="w-3 h-3" />OK</span>;
+  if (delta > 0) return <span className="flex items-center gap-0.5 text-[10px] font-black text-red-500"><TrendingDown className="w-3 h-3" />+{delta}</span>;
+  return <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-500"><TrendingUp className="w-3 h-3" />{delta}</span>;
+}
+
+// ─── ABA ESTOQUE & DELTA ──────────────────────────────────────────────
+function TabEstoque({ prod, onChange }) {
+  const estoqueErp = prod.estoque_erp ?? null;
+  const estoqueWms = prod.estoque_wms ?? 0;
+  const estoqueReal = prod.estoque_real ?? null;
+  const base = estoqueReal != null ? estoqueReal : estoqueWms;
+  const delta = estoqueErp != null ? estoqueErp - base : null;
+
+  const cards = [
+    { label: 'Estoque ERP (Omie)', value: estoqueErp, icon: FileSpreadsheet, color: 'blue', editable: true, field: 'estoque_erp' },
+    { label: 'Estoque WMS', value: estoqueWms, icon: Package, color: 'secondary', editable: false },
+    { label: 'Estoque Real', value: estoqueReal, icon: Eye, color: 'emerald', editable: true, field: 'estoque_real' },
+    { label: 'Estoque Mínimo', value: prod.estoque_minimo, icon: AlertCircle, color: 'amber', editable: true, field: 'estoque_minimo' },
+  ];
+
+  return (
+    <div className="space-y-5">
+      {/* Cards de estoque */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {cards.map(c => (
+          <div key={c.label} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-2">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              <c.icon className="w-3.5 h-3.5" />{c.label}
+            </p>
+            {c.editable ? (
+              <input type="number" min="0" value={c.value ?? ''} onChange={e => onChange(c.field, e.target.value === '' ? null : +e.target.value)}
+                className={inputCls + " text-lg font-black text-center"} placeholder="—" />
+            ) : (
+              <p className="text-2xl font-black text-slate-700 dark:text-slate-200 text-center">{c.value ?? '—'}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Delta visual */}
+      <div className={cn('border-2 rounded-2xl p-5 flex items-center gap-4',
+        delta === null ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900' :
+        delta === 0 ? 'border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800/50' :
+        delta > 0 ? 'border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800/50' :
+        'border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/50'
+      )}>
+        <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
+          delta === null ? 'bg-slate-200 dark:bg-slate-800' :
+          delta === 0 ? 'bg-green-600' : delta > 0 ? 'bg-red-500' : 'bg-amber-500'
+        )}>
+          {delta === null ? <Minus className="w-5 h-5 text-slate-400" /> :
+           delta === 0 ? <Check className="w-5 h-5 text-white" /> :
+           delta > 0 ? <TrendingDown className="w-5 h-5 text-white" /> :
+           <TrendingUp className="w-5 h-5 text-white" />}
+        </div>
+        <div>
+          <p className="text-sm font-black text-slate-800 dark:text-white flex items-center">
+            Delta ERP vs {estoqueReal != null ? 'Real' : 'WMS'}: {delta != null ? (delta > 0 ? `+${delta}` : delta) : 'Sem dados'}
+            <HelpTip text="Discrepância entre o saldo do Omie e o saldo físico atual. 0 indica estoque perfeito." />
+          </p>
+          <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+            {delta === null && 'Preencha o Estoque ERP para ver a discrepância.'}
+            {delta === 0 && '✅ Estoque bateu! Sem divergência entre ERP e armazém.'}
+            {delta > 0 && `⚠️ O Omie diz ter ${delta} unidade(s) a MAIS que o ${estoqueReal != null ? 'inventário real' : 'WMS'}. Possível perda, furto ou entrada sem registro.`}
+            {delta < 0 && `⚠️ O Omie diz ter ${Math.abs(delta)} unidade(s) a MENOS que o ${estoqueReal != null ? 'inventário real' : 'WMS'}. Possível entrada não faturada ou erro no ERP.`}
+          </p>
+        </div>
+      </div>
+
+      {/* Alerta estoque mínimo */}
+      {prod.estoque_minimo > 0 && estoqueErp != null && estoqueErp <= prod.estoque_minimo && (
+        <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800/40 rounded-2xl p-4 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          <p className="text-xs font-black text-red-700 dark:text-red-400">
+            ⚠️ Estoque abaixo do mínimo! Atual: {estoqueErp} · Mínimo: {prod.estoque_minimo}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MAPEAMENTO COLUNAS OMIE ─────────────────────────────────────────
+const OMIE_COL = {
+  1: 'codigo_integracao', 2: 'codigo', 3: 'descricao', 4: 'ncm',
+  6: 'ean', 7: 'preco_venda', 8: 'unidade', 9: 'familia',
+  10: 'estoque_minimo', 11: 'estoque_erp', 12: 'preco_custo',
+  15: 'local_estoque', 16: 'peso_liquido', 17: 'peso_bruto',
+  18: 'altura', 19: 'largura', 20: 'profundidade',
+  21: 'marca', 24: 'dias_crossdocking', 34: 'descricao_detalhada', 37: 'observacao',
+};
+
 // ─── COMPONENTE ROOT ─────────────────────────────────────────────────
 export default function ProductCatalog() {
-  const [produtos, setProdutos] = useState(PRODUTOS_INIT);
-  const [selectedId, setSelectedId]   = useState(PRODUTOS_INIT[0].id);
+  const [searchParams] = useSearchParams();
+  const savedTimeoutRef = useRef(null);
+
+  const [produtos, setProdutos] = useState([]);
+  const [loading, setFetching] = useState(true);
+  const [selectedId, setSelectedId]   = useState(null);
   const [search,     setSearch]       = useState('');
   const [activeTab,  setActiveTab]    = useState(0);
   const [saved,      setSaved]        = useState(false);
   const [isNew,      setIsNew]        = useState(false);
+  const [importStatus, setImportStatus] = useState(null); // { total, ok, errors[] }
+  const fileInputRef = useRef(null);
+
+  // 1. Carregar produtos do Supabase
+  const fetchProducts = async () => {
+    setFetching(true);
+    try {
+      const { data, error } = await supabase
+        .from('produtos')
+        .select('*')
+        .order('sku', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Adaptar campos se necessário (ex: codigo -> sku)
+      const adapted = (data || []).map(p => ({
+        ...p,
+        codigo: p.sku, // Linkar com o UI existente que usa 'codigo'
+        movimentaEstoque: p.movimenta_estoque,
+        regraExpedicao: p.regra_expedicao
+      }));
+
+      setProdutos(adapted);
+
+      // Lógica de deep-link (se vier da busca global)
+      const skuParam = searchParams.get('sku');
+      if (skuParam) {
+        setSearch(skuParam);
+        const find = adapted.find(p => p.sku === skuParam);
+        if (find) setSelectedId(find.id);
+      } else if (adapted.length > 0 && !selectedId) {
+        setSelectedId(adapted[0].id);
+      }
+    } catch (err) {
+      console.error('[ProductCatalog] Fetch error:', err);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useEffect(() => { fetchProducts(); }, []);
+
+  // Sincroniza busca se o parâmetro da URL mudar
+  useEffect(() => {
+    const sku = searchParams.get('sku');
+    if (sku) {
+      setSearch(sku);
+      const find = produtos.find(p => p.sku === sku);
+      if (find) setSelectedId(find.id);
+    }
+  }, [searchParams, produtos]);
+
+  useEffect(() => () => { if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current); }, []);
 
   const TABS = [
     { label: 'Dados do Produto', icon: Package },
     { label: 'Embalagens',       icon: Box     },
     { label: 'Regras de Negócio',icon: Settings },
+    { label: 'Estoque & Delta',  icon: BarChart3 },
   ];
 
   const filtered = useMemo(() =>
     produtos.filter(p =>
-      p.codigo.toLowerCase().includes(search.toLowerCase()) ||
-      p.descricao.toLowerCase().includes(search.toLowerCase())
+      (p.codigo || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.descricao || '').toLowerCase().includes(search.toLowerCase())
     ), [produtos, search]);
 
   const selected = useMemo(() => produtos.find(p => p.id === selectedId), [produtos, selectedId]);
@@ -432,18 +744,141 @@ export default function ProductCatalog() {
     setSaved(false);
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setIsNew(false);
-    setTimeout(() => setSaved(false), 2500);
+  const handleSave = async () => {
+    if (!selected) return;
+    setSaved(false);
+    
+    try {
+      // Prepara o payload completo agora que o banco terá as colunas
+      const payload = {
+        sku: (selected.codigo || '').trim().toUpperCase(),
+        descricao: (selected.descricao || '').trim(),
+        unidade: selected.unidade || 'PC',
+        tipo: selected.tipo,
+        familia: selected.familia,
+        marca: selected.marca,
+        ncm: selected.ncm || null,
+        peso_bruto: selected.peso_bruto || null,
+        peso_liquido: selected.peso_liquido || null,
+        altura: selected.altura || null,
+        largura: selected.largura || null,
+        profundidade: selected.profundidade || null,
+        local_estoque: selected.local_estoque || null,
+        dias_crossdocking: selected.dias_crossdocking || null,
+        estoque_erp: selected.estoque_erp ?? null,
+        estoque_wms: selected.estoque_wms ?? 0,
+        estoque_real: selected.estoque_real ?? null,
+        estoque_minimo: selected.estoque_minimo ?? null,
+        preco_venda: selected.preco_venda || null,
+        preco_custo: selected.preco_custo || null,
+        codigo_integracao: selected.codigo_integracao || null,
+        movimenta_estoque: selected.movimentaEstoque,
+        regra_expedicao: selected.regraExpedicao,
+        observacao: selected.observacao,
+        embalagens: selected.embalagens || []
+      };
+
+      if (!payload.sku || !payload.descricao || !payload.peso_bruto) {
+        alert('SKU, Descrição e Peso Bruto são obrigatórios para conferência.');
+        return;
+      }
+
+      console.log('[ProductCatalog] Saving payload:', payload);
+
+      const { error } = await supabase
+        .from('produtos')
+        .upsert(payload, { onConflict: 'sku' });
+
+      if (error) throw error;
+
+      setSaved(true);
+      setIsNew(false);
+      await fetchProducts(); // Recarrega a lista do banco
+      
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
+      savedTimeoutRef.current = setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error('[ProductCatalog] Save error:', err);
+      // Mostra o erro detalhado para o usuário ajudar a identificar colunas faltando
+      alert(`Erro ao salvar: ${err.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  // ─── IMPORTAR PLANILHA OMIE ─────────────────────────────
+  const handleImportOmie = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ''; // Reset input
+    try {
+      const XLSX = (await import('xlsx')).default;
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets['Omie_Produtos'] || wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      // Pula as 3 primeiras linhas (instrução, cabeçalho, limites)
+      const dataRows = rows.slice(3).filter(r => r && r[2]); // só linhas com código
+      const imported = [];
+      const errors = [];
+      for (let i = 0; i < dataRows.length; i++) {
+        const r = dataRows[i];
+        const sku = String(r[2] || '').trim();
+        const desc = String(r[3] || '').trim();
+        if (!sku || !desc) { errors.push(`Linha ${i+4}: SKU ou Descrição vazio`); continue; }
+        imported.push({
+          id: 'imp_' + Date.now() + '_' + i,
+          codigo: sku, sku, descricao: desc,
+          ncm: String(r[4] || ''),
+          unidade: String(r[8] || 'PC').toUpperCase(),
+          familia: String(r[9] || FAMILIAS[0]),
+          marca: String(r[21] || MARCAS[0]),
+          tipo: TIPOS[0],
+          movimentaEstoque: true,
+          regraExpedicao: 'FIFO',
+          observacao: String(r[37] || r[34] || ''),
+          estoque_minimo: r[10] ? +r[10] : null,
+          estoque_erp: r[11] ? +r[11] : null,
+          estoque_wms: 0,
+          estoque_real: null,
+          preco_venda: r[7] ? +r[7] : null,
+          preco_custo: r[12] ? +r[12] : null,
+          local_estoque: String(r[15] || ''),
+          peso_liquido: r[16] ? +r[16] : null,
+          peso_bruto: r[17] ? +r[17] : null,
+          altura: r[18] ? +r[18] : null,
+          largura: r[19] ? +r[19] : null,
+          profundidade: r[20] ? +r[20] : null,
+          dias_crossdocking: r[24] ? +r[24] : null,
+          codigo_integracao: String(r[1] || ''),
+          embalagens: r[6] ? [{ id: 'e_' + i, barcode: String(r[6]), apresentacao: '1x1 (Unitário)', fator: 1, lastro: 1, camada: 1, pesoBruto: r[17] ? +r[17] : 0 }] : [],
+        });
+      }
+      setProdutos(prev => {
+        const skuMap = new Map(prev.map(p => [p.codigo, p]));
+        imported.forEach(p => skuMap.set(p.codigo, { ...skuMap.get(p.codigo), ...p }));
+        return [...skuMap.values()];
+      });
+      if (imported.length > 0) setSelectedId(imported[0].id);
+      setImportStatus({ total: dataRows.length, ok: imported.length, errors });
+      setTimeout(() => setImportStatus(null), 10000);
+    } catch (err) {
+      console.error('[Import]', err);
+      alert('Erro ao ler planilha: ' + err.message);
+    }
   };
 
   const handleNew = () => {
     const novo = {
-      id: 'P' + Date.now(), codigo: '', descricao: '',
+      id: 'temp_' + Date.now(),
+      codigo: '', sku: '', descricao: '',
       tipo: TIPOS[0], familia: FAMILIAS[0], marca: MARCAS[0],
+      unidade: 'PC', ncm: '',
       movimentaEstoque: true, observacao: '',
       regraExpedicao: 'FIFO', locaisPreferidos: '',
+      peso_bruto: null, peso_liquido: null,
+      altura: null, largura: null, profundidade: null,
+      local_estoque: '', dias_crossdocking: 0,
+      estoque_erp: null, estoque_wms: 0, estoque_real: null, estoque_minimo: null,
+      preco_venda: null, preco_custo: null, codigo_integracao: '',
       embalagens: [],
     };
     setProdutos(ps => [novo, ...ps]);
@@ -452,12 +887,26 @@ export default function ProductCatalog() {
     setIsNew(true);
   };
 
-  const handleDelete = () => {
-    if (produtos.length <= 1) return;
-    const remaining = produtos.filter(p => p.id !== selectedId);
-    setProdutos(remaining);
-    setSelectedId(remaining[0].id);
-    setIsNew(false);
+  const handleDelete = async () => {
+    if (!selectedId || produtos.length <= 1) return;
+    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('produtos')
+        .delete()
+        .eq('sku', selected.sku);
+
+      if (error) throw error;
+
+      const remaining = produtos.filter(p => p.id !== selectedId);
+      setProdutos(remaining);
+      setSelectedId(remaining[0]?.id || null);
+      setIsNew(false);
+      fetchProducts();
+    } catch (err) {
+      console.error('[ProductCatalog] Delete error:', err);
+    }
   };
 
   return (
@@ -471,17 +920,37 @@ export default function ProductCatalog() {
             <Package className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 1 — Cadastros e Segurança</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Cadastro de Produtos e Embalagens</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">7.4 Cadastro e Segurança</p>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.4 Catálogo de Produtos</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Peças de elevador · Conjuntos · Embalagens · Regras de expedição</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <div className="relative group">
+              <button onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black hover:border-secondary hover:text-secondary transition-all">
+                <Upload className="w-4 h-4" />Importar Omie
+              </button>
+              <div className="absolute hidden group-hover:block z-[100] top-full left-1/2 -translate-x-1/2 mt-2 w-48 p-2.5 text-[10px] font-bold text-white bg-slate-900 rounded-xl shadow-2xl border border-slate-700 animate-in fade-in zoom-in duration-200">
+                Suba a planilha do Omie (aba Omie_Produtos) para atualizar códigos e estoque ERP.
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-b-slate-900 border-x-transparent border-t-transparent" />
+              </div>
+            </div>
             <button onClick={handleNew}
               className="flex items-center gap-1.5 px-4 py-2.5 bg-secondary text-primary rounded-2xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
               <Plus className="w-4 h-4" />Novo Produto
             </button>
           </div>
         </div>
+        {/* Status da importação */}
+        {importStatus && (
+          <div className="mt-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/40 rounded-xl px-4 py-2 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+            <p className="text-xs font-bold text-green-700 dark:text-green-400">
+              Importação concluída! {importStatus.ok} de {importStatus.total} produtos importados.
+              {importStatus.errors.length > 0 && ` (${importStatus.errors.length} com erros)`}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ══ LAYOUT MASTER-DETAIL ══ */}
@@ -520,6 +989,7 @@ export default function ProductCatalog() {
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md font-bold">{p.tipo}</span>
                       {!p.movimentaEstoque && <span className="text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded-md font-bold">Serviço</span>}
+                      {p.estoque_erp != null && <DeltaBadge erp={p.estoque_erp} wms={p.estoque_wms} real={p.estoque_real} />}
                     </div>
                   </div>
                   {isSel && <ChevronRight className="w-4 h-4 text-secondary shrink-0 mt-2" />}
@@ -585,6 +1055,7 @@ export default function ProductCatalog() {
                 {activeTab === 0 && <TabDados   prod={selected} onChange={updateField} />}
                 {activeTab === 1 && <TabEmbalagens prod={selected} onChange={updateField} />}
                 {activeTab === 2 && <TabRegras  prod={selected} onChange={updateField} />}
+                {activeTab === 3 && <TabEstoque prod={selected} onChange={updateField} />}
               </div>
             </>
           ) : (

@@ -36,11 +36,11 @@ const AVATAR_COLORS = [
   'bg-rose-500',  'bg-amber-500',  'bg-cyan-500',
   'bg-indigo-500','bg-teal-500',
 ];
-const AVATAR_IDX = {};
-let _ai = 0;
+// Hash determinístico do nome → cor sempre consistente independente da ordem de renderização
 function avatarIdx(name) {
-  if (!(name in AVATAR_IDX)) AVATAR_IDX[name] = _ai++ % AVATAR_COLORS.length;
-  return AVATAR_IDX[name];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash << 5) - hash + name.charCodeAt(i);
+  return Math.abs(hash) % AVATAR_COLORS.length;
 }
 function initials(name) { return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
 
@@ -119,15 +119,19 @@ export default function OperatorPerformance() {
   const [tipoAtiv,  setTipoAtiv]  = useState('Todos');
   const [showAll,   setShowAll]   = useState(false);
 
-  // ── Filtros ──
+  // ── Filtros (inclui filtragem por data: converte dd/mm/aaaa → yyyy-mm-dd para comparação) ──
   const filtered = useMemo(() => RAW.filter(r => {
     if (tipoAtiv !== 'Todos' && r.tipo !== tipoAtiv) return false;
     if (busca) {
       const q = busca.toLowerCase();
       if (!r.operador.toLowerCase().includes(q)) return false;
     }
+    // Converte data do registro de "dd/mm/aaaa" para "aaaa-mm-dd" para comparação ISO
+    const dataISO = r.data.split('/').reverse().join('-');
+    if (dataIni && dataISO < dataIni) return false;
+    if (dataFim && dataISO > dataFim) return false;
     return true;
-  }), [tipoAtiv, busca]);
+  }), [tipoAtiv, busca, dataIni, dataFim]);
 
   // ── Média de tempo por tipo ──
   const mediaTempos = useMemo(() => {
@@ -189,11 +193,19 @@ export default function OperatorPerformance() {
       : <TrendingDown className="w-3 h-3 text-secondary ml-1 inline" />;
   };
 
-  const ThBtn = ({ k, label }) => (
-    <th className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-secondary transition-colors" onClick={() => toggle(k)}>
-      {label}<SortIcon k={k} />
-    </th>
-  );
+  const ThBtn = ({ k, label }) => {
+    const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+    return (
+      <th
+        scope="col"
+        aria-sort={sorted_}
+        className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-secondary transition-colors"
+        onClick={() => toggle(k)}
+      >
+        {label}<SortIcon k={k} />
+      </th>
+    );
+  };
 
   const displayRows = showAll ? sorted : sorted.slice(0, 15);
 
@@ -209,7 +221,7 @@ export default function OperatorPerformance() {
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 7 — Consultas, Relatórios e Faturamento</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Performance e Produtividade dos Operadores</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">8.3 Performance e Produtividade dos Operadores</h1>
             <p className="text-xs text-slate-400 font-medium">Dashboard de RH/Logística · Tempo médio · Volumes · Comparativo entre operadores</p>
           </div>
         </div>
@@ -225,13 +237,17 @@ export default function OperatorPerformance() {
             {/* Período */}
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3" />Data Início</label>
-                <input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)}
+                <label htmlFor="data-inicio" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                  <Calendar className="w-3 h-3" aria-hidden="true" />Data Início
+                </label>
+                <input id="data-inicio" type="date" value={dataIni} onChange={e => setDataIni(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-violet-500 transition-all" />
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Calendar className="w-3 h-3" />Data Fim</label>
-                <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
+                <label htmlFor="data-fim" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                  <Calendar className="w-3 h-3" aria-hidden="true" />Data Fim
+                </label>
+                <input id="data-fim" type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-violet-500 transition-all" />
               </div>
             </div>
@@ -241,12 +257,22 @@ export default function OperatorPerformance() {
 
           {/* Busca operador */}
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><User className="w-3 h-3" />Usuário / Operador</label>
+            <label htmlFor="busca-operador" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+              <User className="w-3 h-3" aria-hidden="true" />Usuário / Operador
+            </label>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome..."
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+              <input id="busca-operador" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome..."
                 className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-violet-500 transition-all" />
-              {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"><X className="w-3 h-3" /></button>}
+              {busca && (
+                <button
+                  onClick={() => setBusca('')}
+                  aria-label="Limpar busca de operador"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                >
+                  <X className="w-3 h-3" aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -319,7 +345,7 @@ export default function OperatorPerformance() {
             ].map(k => (
               <div key={k.label} className={cn('rounded-[24px] bg-gradient-to-br text-white p-5 shadow-lg', k.color)}>
                 <div className="flex items-start justify-between mb-3">
-                  <k.icon className="w-6 h-6 text-white/80" />
+                  <k.icon className="w-6 h-6 text-white/80" aria-hidden="true" />
                   <span className="text-[8px] font-black text-white/50 uppercase tracking-widest text-right">{k.label}</span>
                 </div>
                 <p className="text-3xl font-black">{k.value} <span className="text-base font-bold opacity-60">{k.unit}</span></p>
@@ -383,7 +409,7 @@ export default function OperatorPerformance() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
-                    <th className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">#</th>
+                    <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">#</th>
                     <ThBtn k="operador"  label="Nome do Usuário" />
                     <ThBtn k="data"      label="Data" />
                     <ThBtn k="hIni"      label="Hora Início" />
@@ -391,8 +417,8 @@ export default function OperatorPerformance() {
                     <ThBtn k="tempo"     label="Tempo Total" />
                     <ThBtn k="volumes"   label="Qtde Volumes" />
                     <ThBtn k="itens"     label="Qtde Itens" />
-                    <th className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
-                    <th className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance</th>
+                    <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+                    <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,7 +473,7 @@ export default function OperatorPerformance() {
                         </td>
                         <td className="p-3">
                           <div className={cn('flex items-center gap-1.5', perfTextColor)}>
-                            <PerfIcon className="w-3.5 h-3.5 shrink-0" />
+                            <PerfIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                             <div>
                               <p className="text-[10px] font-black">{perfLabel}</p>
                               <p className="text-[9px] opacity-70">{ratio <= 1 ? `${Math.round((1-ratio)*100)}% mais rápido` : `${Math.round((ratio-1)*100)}% mais lento`}</p>

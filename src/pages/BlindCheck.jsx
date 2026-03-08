@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   ClipboardCheck, Search, ScanBarcode, CheckCircle2, XCircle, AlertTriangle,
   RefreshCw, ShieldCheck, X, Minus, Plus, EyeOff, Lock, User, SkipForward,
-  Package, Hash, Zap, Check, Loader2, RotateCcw,
+  Package, Hash, Zap, Check, Loader2, RotateCcw, Scale
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -191,6 +191,8 @@ function ModalConferencia({ ordem, onClose, onSave }) {
   const [loteInput, setLoteInput]   = useState('');
   const [validadeInput, setValidadeInput] = useState('');
   const [validadeErro, setValidadeErro]   = useState('');
+  const [pesoInput, setPesoInput]     = useState('');
+  const [corInput, setCorInput]       = useState('');
 
   useEffect(() => { barcodeRef.current?.focus(); }, []);
 
@@ -236,16 +238,38 @@ function ModalConferencia({ ordem, onClose, onSave }) {
     setValidadeErro('');
 
     const qty = isNaN(qtInput) || qtInput < 1 ? 1 : Math.floor(qtInput);
+    
+    // Capturar novos campos: Peso e Cor
+    // Se o peso for informado, validamos o formato
+    const pesoNum = parseFloat(pesoInput.replace(',', '.'));
+
     setItens(prev => prev.map(i => i.id === item.id
-      ? { ...i, qtContada: i.qtContada + qty, lote: loteInput || i.lote, validade: validadeInput || i.validade }
+      ? { 
+          ...i, 
+          qtContada: i.qtContada + qty, 
+          lote: loteInput || i.lote, 
+          validade: validadeInput || i.validade,
+          peso_capturado: !isNaN(pesoNum) ? pesoNum : i.peso_capturado,
+          cor_confirmada: corInput || i.cor_confirmada
+        }
       : i
     ));
-    addLog(`+${qty}× ${item.descricao} (${bc})`, 'ok');
+    
+    const details = [];
+    if (!isNaN(pesoNum)) details.push(`${pesoNum}kg`);
+    if (corInput) details.push(corInput);
+    const detailStr = details.length > 0 ? ` [${details.join(' | ')}]` : '';
+
+    addLog(`+${qty}× ${item.descricao}${detailStr}`, 'ok');
     triggerFlash('ok');
+    
+    // Reset form
     setBarcode('');
     setQtInput(1);
     setLoteInput('');
     setValidadeInput('');
+    setPesoInput('');
+    setCorInput('');
   };
 
   /* Ignorar — registra no log qual barcode e vincula à lista de itens */
@@ -494,6 +518,26 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                 {validadeErro && <p className="text-[10px] text-red-500 font-bold flex items-center gap-1"><XCircle className="w-3 h-3" />{validadeErro}</p>}
               </div>
 
+              {/* Peso e Cor — Novos Campos Reais */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Scale className="w-3 h-3" />Peso (kg)
+                  </label>
+                  <input value={pesoInput} onChange={e => setPesoInput(e.target.value)} disabled={fase !== 'conferindo'}
+                    placeholder="0.000"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-400 rounded-xl text-sm font-bold outline-none transition-all disabled:opacity-40" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Zap className="w-3 h-3" />Cor / Obs
+                  </label>
+                  <input value={corInput} onChange={e => setCorInput(e.target.value)} disabled={fase !== 'conferindo'}
+                    placeholder="Ex: Amarelo"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-400 rounded-xl text-sm font-bold outline-none transition-all disabled:opacity-40 uppercase" />
+                </div>
+              </div>
+
               {/* Ações — botão ignorar explicitamente separado, único Finalizar */}
               <div className="flex gap-2 flex-wrap">
                 <button onClick={handleRegistrar} disabled={!barcode.trim() || fase !== 'conferindo' || !!validadeErro}
@@ -587,10 +631,14 @@ function ModalConferencia({ ordem, onClose, onSave }) {
                           ? (lido ? '✓ Leitura registrada' : 'Aguardando leitura...')
                           : `Contado: ${item.qtContada} · Esperado: ${item.qtEsperada}`}
                       </div>
-                      {(item.lote || item.validade) && (
+                      {(item.lote || item.validade || item.peso_capturado || item.cor_confirmada) && (
                         <div className="mt-1 border-t border-slate-100 dark:border-slate-800 pt-1 space-y-0.5">
                           {item.lote    && <p className="text-[8px] font-bold text-slate-500">Lote: {item.lote}</p>}
                           {item.validade && <p className="text-[8px] font-bold text-slate-500">Val: {item.validade}</p>}
+                          <div className="flex gap-2">
+                             {item.peso_capturado && <p className="text-[8px] font-bold text-primary">P: {item.peso_capturado}kg</p>}
+                             {item.cor_confirmada && <p className="text-[8px] font-bold text-secondary">{item.cor_confirmada}</p>}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -678,7 +726,7 @@ export default function BlindCheck() {
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 3 — Entrada e Recebimento</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Conferência Cega e Alocação</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">2.7 Realizar Conferência Cega</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Quantidade esperada oculta durante contagem · Tratamento de divergências com supervisor</p>
           </div>
           <div className="ml-auto flex gap-3">

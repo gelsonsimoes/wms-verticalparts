@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useId, useRef, useEffect } from 'react';
 import {
   RefreshCw,
   ArrowLeftRight,
@@ -18,7 +18,6 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  ChevronDown,
   Search,
   Send,
   ShieldAlert,
@@ -69,6 +68,7 @@ function CadastrarModal({ item, onClose, onSave }) {
     setorOrig: 'SETOR-A', setorDest: 'SETOR-A', produto: '', qtd: '',
     confirmarQtde: false, status: 'Aguardando',
   });
+  const replId = useId();
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const valid = form.origemEnd && form.destEnd && form.produto && form.qtd;
 
@@ -87,36 +87,45 @@ function CadastrarModal({ item, onClose, onSave }) {
               </h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-7 space-y-5">
           {/* Origem */}
           <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/40 rounded-2xl space-y-3">
             <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> Origem (Pulmão)
+              <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Origem (Pulmão)
             </p>
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { l: 'Endereço Origem *', k: 'origemEnd', ph: 'Ex: R1_PP1_A1' },
-              ].map(f2 => (
-                <div key={f2.k} className="col-span-2 space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{f2.l}</label>
-                  <input value={form[f2.k]} onChange={e => f(f2.k, e.target.value)} placeholder={f2.ph}
-                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
-                </div>
-              ))}
+              <div className="col-span-2 space-y-1.5">
+                <label htmlFor={`${replId}-origem-end`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Origem *</label>
+                <input
+                  id={`${replId}-origem-end`}
+                  value={form.origemEnd}
+                  onChange={e => f('origemEnd', e.target.value)}
+                  placeholder="Ex: R1_PP1_A1"
+                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
+                />
+              </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo Região Origem</label>
-                <select value={form.tipoOrigem} onChange={e => f('tipoOrigem', e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all">
+                <label htmlFor={`${replId}-tipo-origem`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo Região Origem</label>
+                <select
+                  id={`${replId}-tipo-origem`}
+                  value={form.tipoOrigem}
+                  onChange={e => f('tipoOrigem', e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
+                >
                   {TIPO_REGIAO.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Setor Origem</label>
-                <select value={form.setorOrig} onChange={e => f('setorOrig', e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all">
+                <label htmlFor={`${replId}-setor-orig`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Setor Origem</label>
+                <select
+                  id={`${replId}-setor-orig`}
+                  value={form.setorOrig}
+                  onChange={e => f('setorOrig', e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
+                >
                   {SETORES.map(s => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -126,24 +135,24 @@ function CadastrarModal({ item, onClose, onSave }) {
           {/* Destino */}
           <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/40 rounded-2xl space-y-3">
             <p className="text-[9px] font-black text-green-700 uppercase tracking-widest flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5" /> Destino (Picking)
+              <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Destino (Picking)
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Destino *</label>
-                <input value={form.destEnd} onChange={e => f('destEnd', e.target.value)} placeholder="Ex: R1_PP1_A1"
+                <label htmlFor={`${replId}-dest-end`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Endereço Destino *</label>
+                <input id={`${replId}-dest-end`} value={form.destEnd} onChange={e => f('destEnd', e.target.value)} placeholder="Ex: R1_PP1_A1"
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo Região Destino</label>
-                <select value={form.tipoDest} onChange={e => f('tipoDest', e.target.value)}
+                <label htmlFor={`${replId}-tipo-dest`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo Região Destino</label>
+                <select id={`${replId}-tipo-dest`} value={form.tipoDest} onChange={e => f('tipoDest', e.target.value)}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all">
                   {TIPO_REGIAO.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Setor Destino</label>
-                <select value={form.setorDest} onChange={e => f('setorDest', e.target.value)}
+                <label htmlFor={`${replId}-setor-dest`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Setor Destino</label>
+                <select id={`${replId}-setor-dest`} value={form.setorDest} onChange={e => f('setorDest', e.target.value)}
                   className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all">
                   {SETORES.map(s => <option key={s}>{s}</option>)}
                 </select>
@@ -154,26 +163,32 @@ function CadastrarModal({ item, onClose, onSave }) {
           {/* Produto + Qtde */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1.5">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Produto (SKU ou Descrição) *</label>
-              <input value={form.produto} onChange={e => f('produto', e.target.value)} placeholder="Ex: VP-FR4429-X — Pastilha de Freio"
+              <label htmlFor={`${replId}-prod-name`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Produto (SKU ou Descrição) *</label>
+              <input id={`${replId}-prod-name`} value={form.produto} onChange={e => f('produto', e.target.value)} placeholder="Ex: VP-FR4429-X — Pastilha de Freio"
                 className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Qtde *</label>
-              <input type="number" min={1} value={form.qtd} onChange={e => f('qtd', e.target.value)} placeholder="0"
+              <label htmlFor={`${replId}-prod-qtd`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Qtde *</label>
+              <input id={`${replId}-prod-qtd`} type="number" min={1} value={form.qtd} onChange={e => f('qtd', e.target.value)} placeholder="0"
                 className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all text-center" />
             </div>
           </div>
 
           {/* Confirmar Qtde */}
-          <label className="flex items-center gap-3 cursor-pointer p-3 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-secondary/5 transition-all group">
-            <div className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
-              form.confirmarQtde ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 group-hover:border-secondary'
-            )} onClick={() => f('confirmarQtde', !form.confirmarQtde)}>
-              {form.confirmarQtde && <CheckSquare className="w-3.5 h-3.5 text-primary" />}
-            </div>
+          <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-secondary/5 transition-all group">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={form.confirmarQtde}
+              onClick={() => f('confirmarQtde', !form.confirmarQtde)}
+              className={cn('w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all',
+                form.confirmarQtde ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 group-hover:border-secondary'
+              )}
+            >
+              {form.confirmarQtde && <CheckSquare className="w-3.5 h-3.5 text-primary" aria-hidden="true" />}
+            </button>
             <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Confirmar Quantidade — Requer bipagem no coletor para validar qtde física</span>
-          </label>
+          </div>
 
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all uppercase tracking-wider">Cancelar</button>
@@ -194,12 +209,19 @@ function CadastrarModal({ item, onClose, onSave }) {
 function RemanejArModal({ item, onClose, onConfirm }) {
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState(false);
+  const timeoutRef1 = React.useRef();
+  const timeoutRef2 = React.useRef();
 
   const handleConfirm = () => {
     setConfirming(true);
-    setTimeout(() => { setDone(true); }, 1500);
-    setTimeout(() => { onConfirm(item.id); onClose(); }, 2300);
+    timeoutRef1.current = setTimeout(() => { setDone(true); }, 1500);
+    timeoutRef2.current = setTimeout(() => { onConfirm(item.id); onClose(); }, 2300);
   };
+
+  React.useEffect(() => () => {
+    clearTimeout(timeoutRef1.current);
+    clearTimeout(timeoutRef2.current);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -212,12 +234,12 @@ function RemanejArModal({ item, onClose, onConfirm }) {
               <h2 className="text-base font-black text-white uppercase">Remanejar via Web</h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-7 space-y-5">
           <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl flex gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
             <p className="text-xs font-bold text-amber-700 dark:text-amber-400 leading-relaxed">
               O remanejamento emergencial executa a movimentação direto no sistema, <strong>sem uso do coletor de dados</strong>. A operação será registrada com usuário, data e hora para auditoria.
             </p>
@@ -240,7 +262,7 @@ function RemanejArModal({ item, onClose, onConfirm }) {
 
           {done && (
             <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-3 animate-in slide-in-from-bottom-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <CheckCircle2 className="w-5 h-5 text-green-600" aria-hidden="true" />
               <p className="text-sm font-black text-green-700">Movimentação registrada com sucesso!</p>
             </div>
           )}
@@ -269,6 +291,24 @@ export default function StockReplenishment() {
   const [showRemanejar, setShowRemanejar]= useState(false);
   const [finalizing, setFinalizing]     = useState(false);
   const [formando, setFormando]         = useState(false);
+  const [toast, setToast]               = useState(null);
+  const replId = useId();
+
+  const finalTimeoutRef = React.useRef();
+  const formTimeoutRef = React.useRef();
+  const toastTimeoutRef = React.useRef();
+
+  React.useEffect(() => () => {
+    clearTimeout(finalTimeoutRef.current);
+    clearTimeout(formTimeoutRef.current);
+    clearTimeout(toastTimeoutRef.current);
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3500);
+  };
 
   const selected = items.find(i => i.id === selectedId);
 
@@ -298,15 +338,19 @@ export default function StockReplenishment() {
   const handleFinalizar = () => {
     if (!selected) return;
     setFinalizing(true);
-    setTimeout(() => {
+    finalTimeoutRef.current = setTimeout(() => {
       setItems(prev => prev.map(i => i.id === selectedId ? { ...i, status: 'Planejado' } : i));
       setFinalizing(false);
+      showToast('Planejamento finalizado com sucesso!');
     }, 1800);
   };
 
   const handleFormarLote = () => {
     setFormando(true);
-    setTimeout(() => setFormando(false), 1600);
+    formTimeoutRef.current = setTimeout(() => {
+      setFormando(false);
+      showToast('Lotes formados com sucesso!');
+    }, 1600);
   };
 
   const handleRemanejado = (id) => {
@@ -318,6 +362,29 @@ export default function StockReplenishment() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 space-y-5 animate-in fade-in duration-700">
+      {/* Toast Notification */}
+      {toast && (
+        <div 
+          className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300"
+          role="status"
+        >
+          <div className={cn(
+            "flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 text-white",
+            toast.type === 'success' ? 'bg-green-500 border-green-700' : 
+            toast.type === 'error'   ? 'bg-red-500 border-red-700' : 
+            'bg-blue-600 border-blue-800'
+          )}>
+            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" aria-hidden="true" /> : <AlertCircle className="w-5 h-5" aria-hidden="true" />}
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest opacity-70 leading-none mb-1">Notificação</p>
+              <p className="text-sm font-bold">{toast.message}</p>
+            </div>
+            <button onClick={() => setToast(null)} className="ml-4 p-1 hover:bg-black/10 rounded-full transition-colors" aria-label="Fechar notificação">
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════ HEADER ═══════════ */}
       <div className="bg-white dark:bg-slate-900 rounded-[32px] border-2 border-slate-100 dark:border-slate-800 p-6 shadow-sm relative overflow-hidden">
@@ -329,7 +396,7 @@ export default function StockReplenishment() {
             </div>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 4 — Movimentação Interna e Estoque</p>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">Remanejamento e Reabastecimento Planejado</h1>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">4.4 Remanejar Produtos</h1>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Pulmão → Picking · Transferência planejada para evitar ruptura de separação</p>
             </div>
           </div>
@@ -379,9 +446,12 @@ export default function StockReplenishment() {
           {formando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
           {formando ? 'Formando...' : 'Formar Lotes'}
         </button>
-        <button disabled={!selectedId}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-blue-600 text-xs font-black uppercase tracking-wider hover:bg-blue-50 disabled:opacity-30 transition-all">
-          <Link2 className="w-3.5 h-3.5" />Vincular Lotes
+        <button
+          disabled={!selectedId}
+          onClick={() => showToast('Funcionalidade "Vincular Lotes" em desenvolvimento.')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-blue-600 text-xs font-black uppercase tracking-wider hover:bg-blue-50 disabled:opacity-30 transition-all"
+        >
+          <Link2 className="w-3.5 h-3.5" aria-hidden="true" />Vincular Lotes
         </button>
         <button disabled={!selectedId || finalizing}
           onClick={handleFinalizar}
@@ -408,16 +478,21 @@ export default function StockReplenishment() {
 
       {/* ═══════════ FILTROS ═══════════ */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 px-5 py-4 flex flex-wrap items-center gap-3 shadow-sm">
-        <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+        <Filter className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3" />
-          <input value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3" aria-hidden="true" />
+          <label htmlFor={`${replId}-filter-search`} className="sr-only">Pesquisar produto ou endereço</label>
+          <input
+            id={`${replId}-filter-search`}
+            value={filterSearch}
+            onChange={e => setFilterSearch(e.target.value)}
             placeholder="Produto, endereço origem ou destino..."
-            className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-64" />
+            className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-64"
+          />
         </div>
         <button onClick={() => { setFilterStatus('Todos'); setFilterSearch(''); }}
           className="flex items-center gap-1.5 text-xs font-black text-slate-400 hover:text-red-500 transition-all">
-          <X className="w-3.5 h-3.5" /> Limpar
+          <X className="w-3.5 h-3.5" aria-hidden="true" /> Limpar
         </button>
         <span className="ml-auto text-[10px] font-black text-slate-400">{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
       </div>
@@ -427,9 +502,17 @@ export default function StockReplenishment() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
-              {['', 'End. Origem', 'Tipo Origem', 'End. Destino', 'Tipo Destino', 'Setor Orig.', 'Setor Dest.', 'Produto', 'Qtd', 'Lote', 'Status'].map((h, i) => (
-                <th key={i} className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
-              ))}
+              <th scope="col" className="p-4 w-10" />
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">End. Origem</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tipo Origem</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">End. Destino</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Tipo Destino</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Setor Orig.</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Setor Dest.</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Produto</th>
+              <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Qtd</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Lote</th>
+              <th scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Status</th>
             </tr>
           </thead>
           <tbody>

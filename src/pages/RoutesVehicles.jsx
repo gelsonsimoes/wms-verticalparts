@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Truck,
   MapPin,
@@ -15,18 +15,11 @@ import {
   ArrowRight,
   ArrowLeft,
   ArrowRightLeft,
-  Star,
-  StarOff,
   X,
   Route,
   Building2,
-  Weight,
-  Gauge,
-  Hash,
-  Tag,
   ToggleLeft,
   ToggleRight,
-  AlertTriangle,
   GripVertical,
   Check,
 } from 'lucide-react';
@@ -75,10 +68,10 @@ const ROTAS_INIT = [
 const inputCls = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all";
 const selectCls = inputCls + " appearance-none cursor-pointer";
 
-function Field({ label, children, className }) {
+function Field({ label, id, children, className }) {
   return (
     <div className={cn('space-y-1', className)}>
-      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+      <label htmlFor={id} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
       {children}
     </div>
   );
@@ -96,9 +89,16 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
   );
   const [selDisp, setSelDisp] = useState([]);
   const [selVinc, setSelVinc] = useState([]);
-  const [dragOver, setDragOver] = useState(null); // 'disp' | 'vinc'
+  const [dragOver, setDragOver] = useState(null);
   const [searchDisp, setSearchDisp] = useState('');
   const [searchVinc, setSearchVinc] = useState('');
+
+  // Escape fecha o modal
+  useEffect(() => {
+    const fn = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', fn);
+    return () => document.removeEventListener('keydown', fn);
+  }, [onClose]);
 
   const toggleSel = (list, setList, id) => {
     setList(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -130,7 +130,6 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
     setSelVinc([]);
   };
 
-  // Drag & Drop entre listas
   const handleDragStart = (e, clienteId, from) => {
     e.dataTransfer.setData('clienteId', clienteId);
     e.dataTransfer.setData('from',      from);
@@ -159,36 +158,49 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
       draggable
       onDragStart={e => handleDragStart(e, c.id, from)}
       onClick={() => onToggle(c.id)}
+      role="checkbox"
+      aria-checked={selList.includes(c.id)}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(c.id); } }}
       className={cn(
         'flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none border-2',
         selList.includes(c.id)
           ? 'border-secondary/60 bg-secondary/10'
           : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
       )}>
-      <GripVertical className="w-3 h-3 text-slate-400 shrink-0" />
+      <GripVertical className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{c.nome}</p>
         <p className="text-[9px] text-slate-400 font-medium">{c.cidade}</p>
       </div>
-      {selList.includes(c.id) && <Check className="w-3.5 h-3.5 text-secondary shrink-0" />}
+      {selList.includes(c.id) && <Check className="w-3.5 h-3.5 text-secondary shrink-0" aria-hidden="true" />}
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-[28px] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-vincular-title"
+        className="relative bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-[28px] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center" aria-hidden="true">
             <Users className="w-4 h-4 text-secondary" />
           </div>
           <div>
-            <p className="text-xs font-black text-slate-800 dark:text-white">Vincular Clientes à Rota</p>
+            <p id="modal-vincular-title" className="text-xs font-black text-slate-800 dark:text-white">Vincular Clientes à Rota</p>
             <p className="text-[10px] text-slate-400 font-medium">{rota.codigo} · {rota.descricao}</p>
           </div>
-          <button onClick={onClose} className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            aria-label="Fechar modal de vínculo de clientes"
+            className="ml-auto text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+          >
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -200,7 +212,7 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Disponíveis ({disponiveis.length})</p>
             </div>
             <div className="relative mb-2 shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input value={searchDisp} onChange={e => setSearchDisp(e.target.value)} placeholder="Buscar..."
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
             </div>
@@ -222,26 +234,38 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
 
           {/* Controles centrais */}
           <div className="flex flex-col items-center justify-center gap-2 shrink-0 py-6">
-            <button onClick={moveToVinc} disabled={selDisp.length === 0}
-              title="Mover selecionados →"
-              className="w-8 h-8 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronRight className="w-4 h-4" />
+            <button
+              onClick={moveToVinc}
+              disabled={selDisp.length === 0}
+              aria-label="Mover selecionados para vinculados"
+              className="w-8 h-8 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
-            <button onClick={moveAllToVinc} disabled={disponiveis.length === 0}
-              title="Mover todos →"
-              className="w-8 h-8 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ArrowRight className="w-3.5 h-3.5" />
+            <button
+              onClick={moveAllToVinc}
+              disabled={disponiveis.length === 0}
+              aria-label="Mover todos para vinculados"
+              className="w-8 h-8 rounded-lg bg-secondary/10 hover:bg-secondary/20 text-secondary flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-auto" />
-            <button onClick={moveToDisp} disabled={selVinc.length === 0}
-              title="← Remover selecionados"
-              className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ChevronLeft className="w-4 h-4" />
+            <button
+              onClick={moveToDisp}
+              disabled={selVinc.length === 0}
+              aria-label="Remover selecionados dos vinculados"
+              className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <button onClick={moveAllToDisp} disabled={vinculados.length === 0}
-              title="← Remover todos"
-              className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed">
-              <ArrowLeft className="w-3.5 h-3.5" />
+            <button
+              onClick={moveAllToDisp}
+              disabled={vinculados.length === 0}
+              aria-label="Remover todos dos vinculados"
+              className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
 
@@ -251,7 +275,7 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vinculados ({vinculados.length})</p>
             </div>
             <div className="relative mb-2 shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input value={searchVinc} onChange={e => setSearchVinc(e.target.value)} placeholder="Buscar..."
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
             </div>
@@ -274,7 +298,7 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
 
         {/* Dica drag-and-drop */}
         <div className="px-5 pb-2 flex items-center gap-1.5 text-[9px] text-slate-400 font-medium shrink-0">
-          <GripVertical className="w-3 h-3" />Arraste itens entre as listas, ou selecione e use as setas do centro
+          <GripVertical className="w-3 h-3" aria-hidden="true" />Arraste itens entre as listas, ou selecione e use as setas do centro
         </div>
 
         {/* Footer */}
@@ -282,7 +306,7 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
           <button onClick={onClose} className="px-4 py-2 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-500 hover:border-slate-400 transition-all">Cancelar</button>
           <button onClick={() => onSave(vinculados.map(c => c.id))}
             className="px-5 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md flex items-center gap-1.5">
-            <Check className="w-3.5 h-3.5" />Salvar Vínculos ({vinculados.length} clientes)
+            <Check className="w-3.5 h-3.5" aria-hidden="true" />Salvar Vínculos ({vinculados.length} clientes)
           </button>
         </div>
       </div>
@@ -298,7 +322,10 @@ function SecaoVeiculos() {
   const [saved,    setSaved]    = useState(false);
   const [search,   setSearch]   = useState('');
 
-  const empty = () => ({ id:'V' + Date.now(), placa:'', codigo:'', classificacao:CLASSIFICACOES[0], modelo:'', transportadora:TRANSPORTADORAS[0], tara:0, lotacao:0, disponivel:true });
+  const saveTimeoutRef = useRef(null);
+  useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
+
+  const empty = () => ({ id: crypto.randomUUID(), placa:'', codigo:'', classificacao:CLASSIFICACOES[0], modelo:'', transportadora:TRANSPORTADORAS[0], tara:0, lotacao:0, disponivel:true });
 
   const filtered = useMemo(() =>
     veiculos.filter(v => v.placa.toLowerCase().includes(search.toLowerCase()) || v.modelo.toLowerCase().includes(search.toLowerCase())),
@@ -312,7 +339,8 @@ function SecaoVeiculos() {
     if (!editando.placa) return;
     setVeiculos(vs => isNew ? [editando, ...vs] : vs.map(v => v.id === editando.id ? editando : v));
     setSaved(true);
-    setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
   };
 
   const handleDelete = (id) => setVeiculos(vs => vs.filter(v => v.id !== id));
@@ -361,13 +389,20 @@ function SecaoVeiculos() {
                 {TRANSPORTADORAS.map(t => <option key={t}>{t}</option>)}
               </select>
             </Field>
-            <Field label="Status">
-              <button type="button" onClick={() => setEditando(v => ({ ...v, disponivel: !v.disponivel }))}
+            <Field label="Status" id="field-status-vei">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={editando.disponivel}
+                onClick={() => setEditando(v => ({ ...v, disponivel: !v.disponivel }))}
                 className={cn('w-full flex items-center justify-between px-3 py-2 rounded-xl border-2 transition-all font-bold text-sm',
                   editando.disponivel ? 'border-green-400 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400' : 'border-red-300 bg-red-50 dark:bg-red-950/20 text-red-600'
-                )}>
+                )}
+              >
                 <span className="text-xs">{editando.disponivel ? 'Disponível' : 'Indisponível'}</span>
-                {editando.disponivel ? <ToggleRight className="w-5 h-5 text-green-600" /> : <ToggleLeft className="w-5 h-5 text-red-500" />}
+                {editando.disponivel
+                  ? <ToggleRight className="w-5 h-5 text-green-600" aria-hidden="true" />
+                  : <ToggleLeft className="w-5 h-5 text-red-500" aria-hidden="true" />}
               </button>
             </Field>
             <Field label="Tara (kg — Peso Vazio)">
@@ -399,7 +434,7 @@ function SecaoVeiculos() {
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
               {['Status','Placa','Código','Classificação','Modelo','Transportadora','Tara','Lotação','Ações'].map(h => (
-                <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
@@ -407,10 +442,16 @@ function SecaoVeiculos() {
             {filtered.map(v => (
               <tr key={v.id} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all group">
                 <td className="p-3">
-                  <button onClick={() => toggleDisp(v.id)} className="flex items-center gap-1.5 group/tog">
+                  <button
+                    role="switch"
+                    aria-checked={v.disponivel}
+                    aria-label={v.disponivel ? `Marcar veículo ${v.placa} como indisponível` : `Marcar veículo ${v.placa} como disponível`}
+                    onClick={() => toggleDisp(v.id)}
+                    className="flex items-center gap-1.5 group/tog"
+                  >
                     {v.disponivel
-                      ? <ToggleRight className="w-5 h-5 text-green-500 group-hover/tog:text-green-600" />
-                      : <ToggleLeft className="w-5 h-5 text-slate-400 group-hover/tog:text-red-500" />}
+                      ? <ToggleRight className="w-5 h-5 text-green-500 group-hover/tog:text-green-600" aria-hidden="true" />
+                      : <ToggleLeft className="w-5 h-5 text-slate-400 group-hover/tog:text-red-500" aria-hidden="true" />}
                     <span className={cn('text-[9px] font-black uppercase', v.disponivel ? 'text-green-600' : 'text-slate-400')}>
                       {v.disponivel ? 'Disponível' : 'Indispon.'}
                     </span>
@@ -424,12 +465,20 @@ function SecaoVeiculos() {
                 <td className="p-3 text-right text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">{v.tara.toLocaleString('pt-BR')} kg</td>
                 <td className="p-3 text-right text-xs font-black text-secondary whitespace-nowrap">{v.lotacao.toLocaleString('pt-BR')} kg</td>
                 <td className="p-3">
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => startEdit(v)} className="p-1.5 hover:bg-secondary/10 rounded-lg text-slate-400 hover:text-secondary transition-all">
-                      <Edit3 className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => startEdit(v)}
+                      aria-label={`Editar veículo ${v.placa}`}
+                      className="p-1.5 hover:bg-secondary/10 rounded-lg text-slate-400 hover:text-secondary transition-all"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
-                    <button onClick={() => handleDelete(v.id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-500 transition-all">
-                      <Trash2 className="w-3.5 h-3.5" />
+                    <button
+                      onClick={() => handleDelete(v.id)}
+                      aria-label={`Excluir veículo ${v.placa}`}
+                      className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 </td>
@@ -454,7 +503,10 @@ function SecaoRotas() {
   const [modalRota, setModalRota] = useState(null);
   const [search,   setSearch]   = useState('');
 
-  const empty = () => ({ id:'R' + Date.now(), codigo:'', descricao:'', prioridade:'Média', clientes:[] });
+  const saveTimeoutRef = useRef(null);
+  useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
+
+  const empty = () => ({ id: crypto.randomUUID(), codigo:'', descricao:'', prioridade:'Média', clientes:[] });
 
   const filtered = useMemo(() =>
     rotas.filter(r => r.codigo.toLowerCase().includes(search.toLowerCase()) || r.descricao.toLowerCase().includes(search.toLowerCase())),
@@ -468,7 +520,8 @@ function SecaoRotas() {
     if (!editando.codigo) return;
     setRotas(rs => isNew ? [editando, ...rs] : rs.map(r => r.id === editando.id ? editando : r));
     setSaved(true);
-    setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
   };
 
   const handleDelete = (id) => setRotas(rs => rs.filter(r => r.id !== id));
@@ -532,7 +585,7 @@ function SecaoRotas() {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
                 {['Código','Descrição da Rota','Prioridade','Clientes','Ações'].map(h => (
-                  <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -557,15 +610,26 @@ function SecaoRotas() {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-1">
-                        <button onClick={() => setModalRota(r)}
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-[9px] font-black transition-all whitespace-nowrap">
-                          <Users className="w-3 h-3" />Clientes
+                        <button
+                          onClick={() => setModalRota(r)}
+                          aria-label={`Vincular clientes à rota ${r.codigo}`}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-[9px] font-black transition-all whitespace-nowrap"
+                        >
+                          <Users className="w-3 h-3" aria-hidden="true" />Clientes
                         </button>
-                        <button onClick={() => startEdit(r)} className="p-1.5 hover:bg-secondary/10 rounded-lg text-slate-400 hover:text-secondary transition-all opacity-0 group-hover:opacity-100">
-                          <Edit3 className="w-3.5 h-3.5" />
+                        <button
+                          onClick={() => startEdit(r)}
+                          aria-label={`Editar rota ${r.codigo}`}
+                          className="p-1.5 hover:bg-secondary/10 rounded-lg text-slate-400 hover:text-secondary transition-all opacity-30 group-hover:opacity-100"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
-                        <button onClick={() => handleDelete(r.id)} className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100">
-                          <Trash2 className="w-3.5 h-3.5" />
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          aria-label={`Excluir rota ${r.codigo}`}
+                          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg text-slate-400 hover:text-red-500 transition-all opacity-30 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                       </div>
                     </td>
@@ -603,8 +667,8 @@ export default function RoutesVehicles() {
             <Truck className="w-6 h-6 text-white" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 1 — Cadastros e Segurança</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Gestão de Rotas e Veículos</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">7.5 Cadastro e Segurança</p>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.5 Cadastrar Rotas e Veículos</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Frota · Transportadoras · Rotas de entrega · Vínculo de destinatários</p>
           </div>
         </div>

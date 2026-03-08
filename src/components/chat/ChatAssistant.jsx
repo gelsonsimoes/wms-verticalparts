@@ -2,11 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// GoogleGenerativeAI removido do frontend por segurança e compatibilidade
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
+// URL da Edge Function que criamos no Supabase — agora dinâmica
+const CHAT_AI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SYSTEM_PROMPT = `
 Você é o Assistente Logístico Inteligente do VerticalParts WMS.
@@ -69,42 +71,43 @@ export default function ChatAssistant() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMsg = { role: 'user', content: input };
+    const userText = input;
+    const userMsg = { role: 'user', content: userText };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // Modelo Gemini ativo — gemini-2.5-flash (mais recente disponível na chave)
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-      const chat = model.startChat({
-        history: [
-          { role: 'user', parts: [{ text: "Contexto do seu comportamento: " + SYSTEM_PROMPT }] },
-          { role: 'model', parts: [{ text: "Entendido. Sou o assistente do WMS." }] },
-          ...messages.slice(1).map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          }))
-        ]
+      const response = await fetch(CHAT_AI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          messages: messages.filter(m => m.content),
+          input: userText,
+          systemPrompt: SYSTEM_PROMPT
+        }),
       });
 
-      const result = await chat.sendMessage(input);
-      const text = result.response.text();
-      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Erro ${response.status}`);
+      }
+
+      const data = await response.json();
+      setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
       setAiStatus('online');
     } catch (error) {
-      console.error("Gemini Error:", error);
-      let errorMsg = "⚠️ Erro ao conectar com o assistente. Verifique sua conexão e tente novamente.";
+      console.error("Chat Error:", error);
+      let errorMsg = `⚠️ Erro: ${error.message || "Falha na comunicação com a IA"}`;
       
-      if (error.message?.includes('404')) {
-        errorMsg = "⚠️ Modelo de IA não encontrado. Entre em contato com o administrador do sistema.";
-      } else if (error.message?.includes('403') || error.message?.includes('API_KEY')) {
-        errorMsg = "⚠️ Chave de API inválida ou sem permissão. Verifique as configurações em Config > Geral.";
-      } else if (error.message?.includes('429')) {
-        errorMsg = "⚠️ Limite de requisições atingido. Aguarde alguns segundos e tente novamente.";
-      } else if (error.message?.includes('NETWORK') || error.message?.includes('fetch')) {
-        errorMsg = "⚠️ Sem conexão com a internet. Verifique sua rede.";
+      if (error.message?.includes('429')) {
+        errorMsg = "⚠️ Limite de requisições atingido. Aguarde alguns segundos.";
+      } else if (error.message?.includes('fetch')) {
+        errorMsg = "⚠️ Erro de conexão com o servidor do chat (Supabase).";
       }
       
       setAiStatus('error');
@@ -132,7 +135,7 @@ export default function ChatAssistant() {
                 <Bot className="w-6 h-6 text-primary" />
                 <div>
                   <h3 className="text-[11px] font-black text-white uppercase tracking-widest flex items-center">
-                    WMS Assistant
+                    WMS Assistant v3
                     <span className="relative flex h-2 w-2 ml-2 shrink-0">
                       {aiStatus === 'online' ? (
                         <>

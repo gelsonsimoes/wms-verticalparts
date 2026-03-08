@@ -21,7 +21,7 @@ const MOCK_DATA = [
   { id: '1005', sku: 'VPER-LUM-LED-VRD-24V', desc: 'Luminária em LED Verde 24V', qty: 15, status: 'Ativo' }
 ];
 
-export default function EnterprisePageBase({ title, breadcrumbItems = [] }) {
+export default function EnterprisePageBase({ title, breadcrumbItems = [], actions, children }) {
   const [registroId] = useState('VP-AUTO-001');
   const [depositante, setDepositante] = useState('VerticalParts Matriz');
   const [tipoOperacao, setTipoOperacao] = useState('Entrada Normal');
@@ -62,48 +62,55 @@ export default function EnterprisePageBase({ title, breadcrumbItems = [] }) {
              </div>
              <h1 className="text-sm font-black text-black uppercase tracking-tight">{title}</h1>
           </div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
-        <ActionPane groups={actionGroups} />
+        {!actions && <ActionPane groups={actionGroups} />}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-        <FastTab title="Informações Gerais" defaultOpen={true}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
-             <div className="space-y-1">
-                <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">ID Registro</label>
-                <input readOnly value={registroId} className="w-full bg-[#F3F4F6] border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-black text-black" />
-             </div>
-             <div className="space-y-1">
-                <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Depositante</label>
-                <input value={depositante} onChange={(e) => setDepositante(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black focus:border-[var(--vp-primary)] outline-none" />
-             </div>
-             <div className="space-y-1">
-                <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Tipo Operação</label>
-                <select value={tipoOperacao} onChange={(e) => setTipoOperacao(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none">
-                   <option>Entrada Normal</option>
-                   <option>Devolução</option>
-                   <option>Transferência</option>
-                </select>
-             </div>
-             <div className="space-y-1">
-                <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Data Referência</label>
-                <input type="date" value={dataReferencia} onChange={(e) => setDataReferencia(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none" />
-             </div>
-          </div>
-        </FastTab>
+        {children ? (
+            children
+        ) : (
+            <>
+                <FastTab title="Informações Gerais" defaultOpen={true}>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">ID Registro</label>
+                        <input readOnly value={registroId} className="w-full bg-[#F3F4F6] border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-black text-black" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Depositante</label>
+                        <input value={depositante} onChange={(e) => setDepositante(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black focus:border-[var(--vp-primary)] outline-none" />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Tipo Operação</label>
+                        <select value={tipoOperacao} onChange={(e) => setTipoOperacao(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none">
+                        <option>Entrada Normal</option>
+                        <option>Devolução</option>
+                        <option>Transferência</option>
+                        </select>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest leading-none">Data Referência</label>
+                        <input type="date" value={dataReferencia} onChange={(e) => setDataReferencia(e.target.value)} className="w-full bg-white border border-[var(--vp-border)] rounded-sm px-3 py-2 text-xs font-bold text-black outline-none" />
+                    </div>
+                </div>
+                </FastTab>
 
-        <FastTab title="Linhas de Dados (SKUs Reais)" defaultOpen={true}>
-          <div className="p-0 border-t border-[var(--vp-border)]">
-             <DataGrid columns={MOCK_COLUMNS} data={MOCK_DATA} />
-          </div>
-        </FastTab>
+                <FastTab title="Linhas de Dados (SKUs Reais)" defaultOpen={true}>
+                <div className="p-0 border-t border-[var(--vp-border)]">
+                    <DataGrid columns={MOCK_COLUMNS} data={MOCK_DATA} />
+                </div>
+                </FastTab>
 
-        <FastTab title="Configurações Avançadas" defaultOpen={false}>
-          <div className="p-6 text-center text-gray-400">
-             <Settings2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
-             <p className="text-[10px] font-black uppercase tracking-widest">Parâmetros Adicionais do Módulo</p>
-          </div>
-        </FastTab>
+                <FastTab title="Configurações Avançadas" defaultOpen={false}>
+                <div className="p-6 text-center text-gray-400">
+                    <Settings2 className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">Parâmetros Adicionais do Módulo</p>
+                </div>
+                </FastTab>
+            </>
+        )}
       </div>
 
       <div className="px-4 py-2 border-t border-[var(--vp-border)] bg-[#F8F9FA] flex justify-between items-center">

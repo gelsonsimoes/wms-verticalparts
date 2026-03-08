@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Building,
   FileText,
@@ -76,7 +76,16 @@ function VincularModal({ remessa, onClose, onVincular }) {
   const [chaveRetorno, setChaveRetorno] = useState('');
   const [step, setStep] = useState('input'); // input | confirmar
   const [copied, setCopied] = useState(false);
+  const inputRef = useRef(null);
   const isValid = chaveRetorno.replace(/\D/g, '').length === 44;
+
+  // Auto-focus no input ao abrir + fecha com Escape
+  useEffect(() => {
+    inputRef.current?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(remessa.chave).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
@@ -141,6 +150,7 @@ function VincularModal({ remessa, onClose, onVincular }) {
             </label>
             <div className="relative">
               <input
+                ref={inputRef}
                 value={chaveRetorno}
                 onChange={e => setChaveRetorno(e.target.value)}
                 placeholder="Ex: 35260200000000000100550010000000881..."
@@ -199,7 +209,9 @@ export default function GeneralWarehouseFiscal() {
   const [remessas, setRemessas] = useState(REMESSAS);
   const [consistindo, setConsistindo] = useState(false);
   const [filterStatus, setFilterStatus] = useState('Todos');
-  const fileRef = useRef(null);
+  const fileRef   = useRef(null);
+  const [uploadFeedback,  setUploadFeedback]  = useState(null); // { name } | null
+  const [consistFeedback, setConsistFeedback] = useState(null); // { ok, msg } | null
 
   const TABS = [
     { label: 'NF-es Aguardando Cobertura',   icon: FileText,  count: remessas.filter(r => r.cobertura !== 'Coberta').length },
@@ -217,8 +229,29 @@ export default function GeneralWarehouseFiscal() {
 
   const handleConsistir = () => {
     setConsistindo(true);
-    setTimeout(() => setConsistindo(false), 2200);
+    // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/fiscal/consistir
+    setTimeout(() => {
+      setConsistindo(false);
+      const pendentes = remessas.filter(r => r.cobertura !== 'Coberta').length;
+      setConsistFeedback({
+        ok: pendentes === 0,
+        msg: pendentes === 0
+          ? 'Todos os lotes estão cobertos fiscalmente.'
+          : `${pendentes} lote(s) com cobertura pendente ou parcial.`
+      });
+      setTimeout(() => setConsistFeedback(null), 4000);
+    }, 2200);
   };
+
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/fiscal/coverage/import (FormData)
+    setUploadFeedback({ name: file.name });
+    setTimeout(() => setUploadFeedback(null), 4000);
+    // Limpa o input para permitir reenvio do mesmo arquivo
+    e.target.value = '';
+  }, []);
 
   const remessasFiltradas = filterStatus === 'Todos' ? remessas : remessas.filter(r => r.cobertura === filterStatus);
 
@@ -240,7 +273,7 @@ export default function GeneralWarehouseFiscal() {
             </div>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Módulo Fiscal — Cat. 6</p>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">Armazém Geral e Retorno Simbólico</h1>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight">5.4 Controlar Armazém Geral</h1>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Conciliação Fiscal — Conta e Ordem de Terceiros</p>
             </div>
           </div>
@@ -266,40 +299,60 @@ export default function GeneralWarehouseFiscal() {
 
       {/* ═══════════ TOOLBAR ═══════════ */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 px-5 py-3 flex flex-wrap items-center gap-2 shadow-sm">
-        <input type="file" ref={fileRef} accept=".xml" className="hidden" />
+        <input type="file" ref={fileRef} accept=".xml" className="hidden" onChange={handleFileChange} />
         <button onClick={() => fileRef.current?.click()}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-md">
-          <Upload className="w-3.5 h-3.5" />Importar Cobertura Fiscal (XML)
+          <Upload className="w-3.5 h-3.5" aria-hidden="true" />Importar Cobertura Fiscal (XML)
         </button>
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-black uppercase tracking-wider hover:bg-slate-200 transition-all">
-          <Download className="w-3.5 h-3.5" />Exportar Retorno Referenciado
+        {/* Feedback inline do arquivo selecionado */}
+        {uploadFeedback && (
+          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl">
+            "{uploadFeedback.name}" recebido — aguardando processamento.
+          </span>
+        )}
+        {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: GET ou POST /api/fiscal/export */}
+        <button
+          disabled
+          title="Exportação em desenvolvimento"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <Download className="w-3.5 h-3.5" aria-hidden="true" />Exportar Retorno Referenciado
         </button>
         <button onClick={handleConsistir} disabled={consistindo}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-primary text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 disabled:opacity-50 transition-all shadow-md">
           {consistindo
-            ? <><CheckSquare className="w-3.5 h-3.5 animate-pulse" /> Consistindo...</>
-            : <><CheckSquare className="w-3.5 h-3.5" /> Consistir Lotes Faturados vs Conferidos</>
+            ? <><CheckSquare className="w-3.5 h-3.5 animate-pulse" aria-hidden="true" /> Consistindo...</>
+            : <><CheckSquare className="w-3.5 h-3.5" aria-hidden="true" /> Consistir Lotes Faturados vs Conferidos</>
           }
         </button>
+        {/* Banner de resultado da consistência */}
+        {consistFeedback && (
+          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-xl border ${
+            consistFeedback.ok
+              ? 'text-green-700 bg-green-50 border-green-200'
+              : 'text-amber-700 bg-amber-50 border-amber-200'
+          }`}>
+            {consistFeedback.msg}
+          </span>
+        )}
       </div>
 
       {/* ═══════════ TABS ═══════════ */}
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
         {/* Tab Headers */}
         <div className="flex border-b-2 border-slate-100 dark:border-slate-800">
-          {TABS.map((tab, i) => (
-            <button key={i} onClick={() => setActiveTab(i)}
+          {TABS.map((tab) => (
+            <button key={tab.label} onClick={() => setActiveTab(TABS.indexOf(tab))}
               className={cn(
                 'flex items-center gap-2.5 px-6 py-4 text-xs font-black uppercase tracking-wider transition-all border-b-2 -mb-px',
-                activeTab === i
+                activeTab === TABS.indexOf(tab)
                   ? 'border-b-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/10'
                   : 'border-b-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
               )}>
-              <tab.icon className="w-4 h-4" />
+              <tab.icon className="w-4 h-4" aria-hidden="true" />
               {tab.label}
               {tab.count > 0 && (
                 <span className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black',
-                  activeTab === i ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                  activeTab === TABS.indexOf(tab) ? 'bg-blue-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
                 )}>{tab.count}</span>
               )}
             </button>
@@ -446,8 +499,8 @@ export default function GeneralWarehouseFiscal() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
-                  {['SKU', 'Descrição', 'Lote', 'NF Remessa', 'Depositante', 'Qtd Física', 'Qtd Coberta', 'Descoberto', 'Status'].map((h, i) => (
-                    <th key={i} className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  {['SKU', 'Descrição', 'Lote', 'NF Remessa', 'Depositante', 'Qtd Física', 'Qtd Coberta', 'Descoberto', 'Status'].map((h) => (
+                    <th key={h} scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -486,8 +539,8 @@ export default function GeneralWarehouseFiscal() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
-                  {['NF Retorno', 'NF Remessa (Ref.)', 'Tipo', 'Depositante', 'Data Registro', 'Valor', 'Status'].map((h, i) => (
-                    <th key={i} className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                  {['NF Retorno', 'NF Remessa (Ref.)', 'Tipo', 'Depositante', 'Data Registro', 'Valor', 'Status'].map((h) => (
+                    <th key={h} scope="col" className="p-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>

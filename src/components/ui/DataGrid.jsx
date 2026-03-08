@@ -12,6 +12,7 @@ export default function DataGrid({ columns = [], data = [], onRowClick }) {
             {columns.map((col, index) => (
               <th 
                 key={index}
+                scope="col"
                 className="px-4 text-left text-[11px] font-black text-[var(--vp-text-label)] uppercase tracking-wider"
               >
                 {col.header}

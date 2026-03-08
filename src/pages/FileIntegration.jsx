@@ -45,49 +45,63 @@ const MOCK_LOGS = [
     { id: 4, action: 'ERRO: Falha na validação do campo ClientID', status: 'ERROR', time: '03:45:12' },
 ];
 
+// ─── Mapeamento centralizado de status → estilos Tailwind reais ─────────────
+// danger/info/success não existem no CSS → substituídos por tokens Tailwind válidos.
+const STATUS_STYLES = {
+    'Concluído':  'bg-green-100 text-green-700 border-green-200',
+    'Erro':       'bg-red-100 text-red-700 border-red-200',
+    'Agendado':   'bg-blue-100 text-blue-700 border-blue-200',
+    'Aguardando': 'bg-slate-100 text-slate-400 border-slate-200',
+};
+
 export default function FileIntegration() {
-    const [selectedId, setSelectedId] = useState(null);
+    const [selectedId,   setSelectedId]   = useState(null);
     const [showUploader, setShowUploader] = useState(false);
-    const [showLogs, setShowLogs] = useState(false);
+    const [showLogs,     setShowLogs]     = useState(false);
+    const [uploadMsg,    setUploadMsg]    = useState(null); // substitui alert() do drop
+    const [retryMsg,     setRetryMsg]     = useState(null); // substitui alert() do retry
     const [filters, setFilters] = useState({
         status: ['Todos'],
         operation: ['Importação', 'Exportação']
     });
-    const [activeTab, setActiveTab] = useState('history'); // 'history' ou 'mapper'
+    const [activeTab,  setActiveTab]  = useState('history');
     const [dragActive, setDragActive] = useState(false);
     const [copyFeedback, setCopyFeedback] = useState(false);
-    
-    const clickTimeoutRef = useRef(null);
-    const clickCountRef = useRef(0);
 
-    // Seleção automática da primeira linha com erro para exemplo
+    const clickTimeoutRef = useRef(null);
+    const clickCountRef   = useRef(0);
+
+    // Seleção automática da primeira linha com erro
     useEffect(() => {
         if (!selectedId) setSelectedId('INT-4421');
     }, []);
 
+    // Cleanup do timeout ao desmontar — evita memory leak
+    useEffect(() => {
+        return () => {
+            if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+        };
+    }, []);
+
     const selectedFile = MOCK_INTEGRATIONS.find(i => i.id === selectedId);
-
-    // Lógica de Triple Click
-    const handleTripleClick = (content) => {
-        clickCountRef.current += 1;
-        
-        if (clickCountRef.current === 1) {
-            clickTimeoutRef.current = setTimeout(() => {
-                clickCountRef.current = 0;
-            }, 500);
-        }
-
-        if (clickCountRef.current === 3) {
-            clearTimeout(clickTimeoutRef.current);
-            clickCountRef.current = 0;
-            copyToClipboard(content);
-        }
-    };
 
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         setCopyFeedback(true);
         setTimeout(() => setCopyFeedback(false), 2000);
+    };
+
+    // Triple-click mantido como atalho; agora o ícone de copiar no hover também funciona
+    const handleTripleClick = (content) => {
+        clickCountRef.current += 1;
+        if (clickCountRef.current === 1) {
+            clickTimeoutRef.current = setTimeout(() => { clickCountRef.current = 0; }, 500);
+        }
+        if (clickCountRef.current === 3) {
+            clearTimeout(clickTimeoutRef.current);
+            clickCountRef.current = 0;
+            copyToClipboard(content);
+        }
     };
 
     const handleStatusFilter = (st) => {
@@ -124,9 +138,12 @@ export default function FileIntegration() {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
-        // Simulação de upload
-        alert("Arquivo recebido com sucesso! Iniciando processamento...");
-        setShowUploader(false);
+        const file = e.dataTransfer.files?.[0];
+        const name = file ? file.name : 'arquivo';
+        // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/integrations/upload (FormData)
+        // Por ora: feedback inline sem bloquear UI (substitui alert)
+        setUploadMsg(`"${name}" recebido. Aguardando processamento...`);
+        setTimeout(() => { setUploadMsg(null); setShowUploader(false); }, 2500);
     };
 
     return (
@@ -135,7 +152,7 @@ export default function FileIntegration() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                        <ArrowRightLeft className="w-8 h-8 text-secondary" /> Integração de Arquivo (ETL)
+                        <ArrowRightLeft className="w-8 h-8 text-secondary" /> 9.4 Mapear Arquivos (Layouts)
                     </h1>
                     <p className="text-sm text-slate-500 font-medium italic">Fluxos de arquivos TXT/XML entre VerticalParts e Parceiros</p>
                 </div>
@@ -238,24 +255,29 @@ export default function FileIntegration() {
                         </div>
                     </div>
 
-                    {/* Exibir Button */}
-                    <div className="flex items-end justify-end">
-                        <button className="bg-secondary text-primary font-black py-4 px-10 rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-black/20 flex items-center gap-3">
-                            <RefreshCw className="w-4 h-4" /> Exibir Integrações
-                        </button>
-                    </div>
+                    {/* Filtros são reativos — botão 'Exibir Integrações' era redundante e sem onClick. Removido. */}
                 </div>
                 {/* Background Decor */}
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
             </div>
 
             {/* ====== TOOLBAR DE AÇÕES ====== */}
+            {retryMsg && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-2xl text-xs font-bold text-green-700">
+                    <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />{retryMsg}
+                </div>
+            )}
             <div className="flex flex-wrap gap-2">
-                <button 
-                    className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-[9px] uppercase tracking-widest text-slate-500 hover:text-primary hover:border-secondary transition-all"
-                    onClick={() => alert('Reprocessando ' + selectedId)}
+                <button
+                    disabled={!selectedId}
+                    className="flex items-center gap-2 px-5 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl font-black text-[9px] uppercase tracking-widest text-slate-500 hover:text-primary hover:border-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => {
+                        // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/integrations/{selectedId}/retry
+                        setRetryMsg(`Reprocessamento de ${selectedId} solicitado.`);
+                        setTimeout(() => setRetryMsg(null), 3000);
+                    }}
                 >
-                    <RefreshCw className="w-4 h-4" /> Integrar Novamente
+                    <RefreshCw className="w-4 h-4" aria-hidden="true" /> Integrar Novamente
                 </button>
                 <button 
                     className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all ${
@@ -266,8 +288,8 @@ export default function FileIntegration() {
                     <FileText className="w-4 h-4" /> Log de Integração
                 </button>
                 {selectedFile?.status === 'Erro' && (
-                    <button className="flex items-center gap-2 px-5 py-3 bg-danger text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-danger/90 transition-all shadow-lg shadow-danger/20">
-                        <Download className="w-4 h-4" /> Baixar Arquivo com Erro
+                    <button className="flex items-center gap-2 px-5 py-3 bg-red-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-600/20" aria-label={`Baixar arquivo com erro: ${selectedFile.file}`}>
+                        <Download className="w-4 h-4" aria-hidden="true" /> Baixar Arquivo com Erro
                     </button>
                 )}
             </div>
@@ -313,20 +335,15 @@ export default function FileIntegration() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-center">
-                                        <span className={`px-2.5 py-1 text-[8px] font-black uppercase rounded-lg border inline-block min-w-[80px] ${
-                                            item.status === 'Concluído' ? 'bg-success/10 text-success border-success/20' :
-                                            item.status === 'Erro' ? 'bg-danger/10 text-danger border-danger/20' :
-                                            item.status === 'Agendado' ? 'bg-info/10 text-info border-info/20' :
-                                            'bg-slate-100 dark:bg-slate-700 text-slate-400 border-slate-200 dark:border-slate-600'
-                                        }`}>
+                                        <span className={`px-2.5 py-1 text-[8px] font-black uppercase rounded-lg border inline-block min-w-[80px] ${STATUS_STYLES[item.status] ?? 'bg-slate-100 text-slate-400 border-slate-200'}`}>
                                             {item.status}
                                         </span>
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-3">
                                             <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                <div 
-                                                    className={`h-full transition-all duration-1000 ${item.status === 'Erro' ? 'bg-danger' : 'bg-secondary'}`}
+                                                <div
+                                                    className={`h-full transition-all duration-1000 ${item.status === 'Erro' ? 'bg-red-500' : 'bg-secondary'}`}
                                                     style={{ width: `${item.progress}%` }}
                                                 />
                                             </div>
@@ -379,41 +396,47 @@ export default function FileIntegration() {
                                 <tbody className="divide-y divide-white/5 text-[11px] font-bold text-white/70">
                                     {MOCK_LOGS.map(log => (
                                         <tr key={log.id} className="hover:bg-white/5 transition-all">
-                                            <td className="px-6 py-4">
+                                             <td className="px-6 py-4">
+                                                {/* danger → red / info → blue */}
                                                 <span className={`px-2 py-0.5 rounded text-[8px] font-black ${
-                                                    log.status === 'ERROR' ? 'bg-danger text-white' : 'bg-info/20 text-info'
+                                                    log.status === 'ERROR' ? 'bg-red-600 text-white' : 'bg-blue-500/20 text-blue-300'
                                                 }`}>
                                                     {log.status}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 font-mono opacity-50">{log.time}</td>
-                                            <td 
-                                                className={`px-6 py-4 cursor-pointer relative group/copy ${log.status === 'ERROR' ? 'text-danger' : ''}`}
+                                            <td
+                                                className={`px-6 py-4 relative group/copy ${log.status === 'ERROR' ? 'text-red-400' : ''}`}
                                                 onClick={() => handleTripleClick(log.action)}
-                                                title="Clique 3x para copiar"
+                                                title="Clique 3x para copiar · ou use o ícone no hover"
                                             >
                                                 {log.action}
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/copy:opacity-100 transition-opacity">
-                                                    <Copy className="w-3 h-3 text-white/20" />
-                                                </div>
+                                                {/* Ícone de copiar agora funciona com click simples */}
+                                                <button
+                                                    onClick={e => { e.stopPropagation(); copyToClipboard(log.action); }}
+                                                    aria-label="Copiar mensagem"
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/copy:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
+                                                >
+                                                    <Copy className="w-3 h-3 text-white/40" aria-hidden="true" />
+                                                </button>
                                             </td>
                                         </tr>
                                     ))}
                                     {selectedFile?.error && (
-                                        <tr className="bg-danger/5 text-danger font-mono text-[10px]">
-                                            <td colSpan="3" className="px-6 py-6 border-l-4 border-danger">
+                                        <tr className="bg-red-500/5 text-red-400 font-mono text-[10px]">
+                                            <td colSpan="3" className="px-6 py-6 border-l-4 border-red-500">
                                                 <div className="flex flex-col gap-2">
                                                     <span className="font-black text-[8px] uppercase tracking-widest flex items-center gap-2">
-                                                        <AlertCircle className="w-3 h-3" /> Detalhe da Falha Fatal:
+                                                        <AlertCircle className="w-3 h-3" aria-hidden="true" /> Detalhe da Falha Fatal:
                                                     </span>
-                                                    <p 
-                                                        className="bg-black/50 p-4 rounded-xl border border-danger/20 cursor-help select-all"
-                                                        onClick={() => handleTripleClick(selectedFile.error)}
-                                                        title="Clique 3x para copiar"
+                                                    <p
+                                                        className="bg-black/50 p-4 rounded-xl border border-red-500/20 cursor-pointer select-all"
+                                                        onClick={() => copyToClipboard(selectedFile.error)}
+                                                        title="Clique para copiar"
                                                     >
                                                         {selectedFile.error}
                                                     </p>
-                                                    <span className="text-[7px] text-danger/40 italic">Dica: Clique 3x no texto acima para copiar para a área de transferência.</span>
+                                                    <span className="text-[7px] text-red-400/40 italic">Dica: Clique no texto acima para copiar para a área de transferência.</span>
                                                 </div>
                                             </td>
                                         </tr>

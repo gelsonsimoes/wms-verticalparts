@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useId, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import {
     CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Clock,
@@ -47,9 +47,13 @@ function MiniCalendar({ selectedDate, onSelect }) {
     return (
         <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
             <div className="flex items-center justify-between mb-2">
-                <button onClick={() => setViewMonth(new Date(year, month - 1))} className="p-1 rounded-lg hover:bg-slate-100 transition-all"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setViewMonth(new Date(year, month - 1))} aria-label="Mês anterior" className="p-1 rounded-lg hover:bg-slate-100 transition-all">
+                    <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{viewMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
-                <button onClick={() => setViewMonth(new Date(year, month + 1))} className="p-1 rounded-lg hover:bg-slate-100 transition-all"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setViewMonth(new Date(year, month + 1))} aria-label="Próximo mês" className="p-1 rounded-lg hover:bg-slate-100 transition-all">
+                    <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
             </div>
             <div className="grid grid-cols-7 gap-0.5 text-center">
                 {DIAS.map((d, i) => <div key={i} className="text-[7px] font-black text-slate-400 uppercase py-1">{d}</div>)}
@@ -83,12 +87,31 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
         notasFiscais: initial?.notasFiscais || '',
     });
 
+    const firstInputRef = useRef(null);
+    const modalId = useId();
+
+    useEffect(() => {
+        const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', handleEsc);
+        firstInputRef.current?.focus();
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.depositante || !form.transportadora || !form.dataInicio || !form.dataFim) return;
+        
+        // Validação de data fim
+        const ini = new Date(form.dataInicio);
+        const fim = new Date(form.dataFim);
+        if (fim <= ini) {
+            alert('A data de término deve ser posterior à data de início.');
+            return;
+        }
+
         onSave({
             ...form,
-            qtdVolume: Number(form.qtdVolume),
+            qtdVolume: parseInt(form.qtdVolume) || 0,
             status: 'agendado',
             historico: [{ status: 'agendado', data: new Date().toISOString(), usuario: 'danilo.supervisor' }],
         });
@@ -96,41 +119,47 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div 
+                role="dialog" 
+                aria-modal="true" 
+                aria-labelledby={`${modalId}-title`}
+                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" 
+                onClick={e => e.stopPropagation()}
+            >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-800 z-10 rounded-t-3xl">
                     <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${tipo === 'Recebimento' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                            {tipo === 'Recebimento' ? <ArrowDownLeft className="w-5 h-5 text-blue-600" /> : <ArrowUpRight className="w-5 h-5 text-green-600" />}
+                            {tipo === 'Recebimento' ? <ArrowDownLeft className="w-5 h-5 text-blue-600" aria-hidden="true" /> : <ArrowUpRight className="w-5 h-5 text-green-600" aria-hidden="true" />}
                         </div>
                         <div>
-                            <h3 className="text-base font-black">Realizar Agendamento</h3>
+                            <h3 id={`${modalId}-title`} className="text-base font-black">Realizar Agendamento</h3>
                             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{tipo}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} aria-label="Fechar modal" className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Depositante" required><input required value={form.depositante} onChange={e => setForm({...form, depositante: e.target.value})} className="field" placeholder="VerticalParts Matriz" /></Field>
-                        <Field label="Doca"><select value={form.doca} onChange={e => setForm({...form, doca: e.target.value})} className="field">{DOCAS.map(d => <option key={d}>{d}</option>)}</select></Field>
+                        <Field id={`${modalId}-dep`} label="Depositante" required><input id={`${modalId}-dep`} ref={firstInputRef} required value={form.depositante} onChange={e => setForm({...form, depositante: e.target.value})} className="field" placeholder="VerticalParts Matriz" /></Field>
+                        <Field id={`${modalId}-doca`} label="Doca"><select id={`${modalId}-doca`} value={form.doca} onChange={e => setForm({...form, doca: e.target.value})} className="field">{DOCAS.map(d => <option key={d}>{d}</option>)}</select></Field>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Transportadora" required><input required value={form.transportadora} onChange={e => setForm({...form, transportadora: e.target.value})} className="field" placeholder="Transvip Logística" /></Field>
-                        <Field label="Motorista"><input value={form.motorista} onChange={e => setForm({...form, motorista: e.target.value})} className="field" placeholder="Ex: Danilo" /></Field>
+                        <Field id={`${modalId}-transp`} label="Transportadora" required><input id={`${modalId}-transp`} required value={form.transportadora} onChange={e => setForm({...form, transportadora: e.target.value})} className="field" placeholder="Transvip Logística" /></Field>
+                        <Field id={`${modalId}-motorista`} label="Motorista"><input id={`${modalId}-motorista`} value={form.motorista} onChange={e => setForm({...form, motorista: e.target.value})} className="field" placeholder="Ex: Danilo" /></Field>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
-                        <Field label="Veículo (Placa)"><input value={form.veiculo} onChange={e => setForm({...form, veiculo: e.target.value.toUpperCase()})} className="field font-mono" placeholder="ABC-1234" /></Field>
-                        <Field label="Turno de Trabalho"><select value={form.turno} onChange={e => setForm({...form, turno: e.target.value})} className="field">{TURNOS.map(t => <option key={t}>{t}</option>)}</select></Field>
-                        <Field label="Qtde Volume"><input type="number" min="0" value={form.qtdVolume} onChange={e => setForm({...form, qtdVolume: e.target.value})} className="field font-mono" /></Field>
+                        <Field id={`${modalId}-veiculo`} label="Veículo (Placa)"><input id={`${modalId}-veiculo`} value={form.veiculo} onChange={e => setForm({...form, veiculo: e.target.value.toUpperCase()})} className="field font-mono" placeholder="ABC-1234" /></Field>
+                        <Field id={`${modalId}-turno`} label="Turno de Trabalho"><select id={`${modalId}-turno`} value={form.turno} onChange={e => setForm({...form, turno: e.target.value})} className="field">{TURNOS.map(t => <option key={t}>{t}</option>)}</select></Field>
+                        <Field id={`${modalId}-qtd`} label="Qtde Volume"><input id={`${modalId}-qtd`} type="number" min="0" value={form.qtdVolume} onChange={e => setForm({...form, qtdVolume: e.target.value})} className="field font-mono" /></Field>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                        <Field label="Data/Hora Início" required><input required type="datetime-local" value={form.dataInicio} onChange={e => setForm({...form, dataInicio: e.target.value})} className="field font-mono text-xs" /></Field>
-                        <Field label="Data/Hora Fim" required><input required type="datetime-local" value={form.dataFim} onChange={e => setForm({...form, dataFim: e.target.value})} className="field font-mono text-xs" /></Field>
+                        <Field id={`${modalId}-ini`} label="Data/Hora Início" required><input id={`${modalId}-ini`} required type="datetime-local" value={form.dataInicio} onChange={e => setForm({...form, dataInicio: e.target.value})} className="field font-mono text-xs" /></Field>
+                        <Field id={`${modalId}-fim`} label="Data/Hora Fim" required><input id={`${modalId}-fim`} required type="datetime-local" value={form.dataFim} onChange={e => setForm({...form, dataFim: e.target.value})} className="field font-mono text-xs" /></Field>
                     </div>
-                    <Field label="Notas Fiscais"><input value={form.notasFiscais} onChange={e => setForm({...form, notasFiscais: e.target.value})} className="field" placeholder="NF-001234, NF-001235" /></Field>
+                    <Field id={`${modalId}-nfs`} label="Notas Fiscais"><input id={`${modalId}-nfs`} value={form.notasFiscais} onChange={e => setForm({...form, notasFiscais: e.target.value})} className="field" placeholder="NF-001234, NF-001235" /></Field>
                     <div className="grid grid-cols-2 gap-3 pt-2">
                         <button type="button" onClick={onClose} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                        <button type="submit" className="py-3 bg-secondary text-primary font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-1.5"><Save className="w-3.5 h-3.5" /> Salvar</button>
+                        <button type="submit" className="py-3 bg-secondary text-primary font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-1.5 focus:ring-4 focus:ring-secondary/20 outline-none"><Save className="w-3.5 h-3.5" aria-hidden="true" /> Salvar</button>
                     </div>
                 </form>
             </div>
@@ -138,11 +167,14 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
     );
 }
 
-function Field({ label, required, children }) {
+function Field({ id, label, required, children }) {
     return (
         <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}{required && ' *'}</label>
-            {React.cloneElement(children, { className: 'w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all' })}
+            <label htmlFor={id} className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}{required && ' *'}</label>
+            {React.cloneElement(children, { 
+                id,
+                className: 'w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all' 
+            })}
         </div>
     );
 }
@@ -152,20 +184,34 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
     const cfg = STATUS_CFG[agenda.status];
     const trans = TRANSITION_MAP[agenda.status];
 
+    const modalId = useId();
+
+    useEffect(() => {
+        const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
+
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div 
+                role="dialog" 
+                aria-modal="true" 
+                aria-labelledby={`${modalId}-title`}
+                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" 
+                onClick={e => e.stopPropagation()}
+            >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: cfg.bg, border: `2px solid ${cfg.border}` }}>
-                            <Truck className="w-5 h-5" style={{ color: cfg.color }} />
+                            <Truck className="w-5 h-5" style={{ color: cfg.color }} aria-hidden="true" />
                         </div>
                         <div>
-                            <h3 className="text-base font-black">{agenda.transportadora}</h3>
+                            <h3 id={`${modalId}-title`} className="text-base font-black">{agenda.transportadora}</h3>
                             <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: cfg.color }}>{cfg.label}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" /></button>
+                    <button onClick={onClose} aria-label="Fechar modal" className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                 </div>
                 <div className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
@@ -200,13 +246,13 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
 
                     {/* Botão de transição */}
                     {trans && (
-                        <button onClick={() => onTransition(agenda.id, trans.next)} className="w-full py-3.5 font-black rounded-xl text-[10px] tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 text-white" style={{ backgroundColor: STATUS_CFG[trans.next]?.color || '#3B82F6' }}>
-                            <trans.icon className="w-4 h-4" /> {trans.label}
+                        <button onClick={() => onTransition(agenda.id, trans.next)} className="w-full py-3.5 font-black rounded-xl text-[10px] tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 text-white focus:ring-4 focus:ring-slate-900/10 outline-none" style={{ backgroundColor: STATUS_CFG[trans.next]?.color || '#3B82F6' }}>
+                            <trans.icon className="w-4 h-4" aria-hidden="true" /> {trans.label}
                         </button>
                     )}
                     {!trans && (
-                        <div className="w-full py-3.5 bg-success/10 text-success font-black rounded-xl text-[10px] tracking-widest uppercase text-center flex items-center justify-center gap-2">
-                            <CheckCircle2 className="w-4 h-4" /> Agenda Finalizada
+                        <div role="status" className="w-full py-3.5 bg-success/10 text-success font-black rounded-xl text-[10px] tracking-widest uppercase text-center flex items-center justify-center gap-2">
+                            <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> Agenda Finalizada
                         </div>
                     )}
                 </div>
@@ -218,7 +264,7 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
 function InfoCard({ icon: Icon, label, value }) {
     return (
         <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Icon className="w-2.5 h-2.5" /> {label}</p>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Icon className="w-2.5 h-2.5" aria-hidden="true" /> {label}</p>
             <p className="text-xs font-black truncate">{value}</p>
         </div>
     );
@@ -226,15 +272,39 @@ function InfoCard({ icon: Icon, label, value }) {
 
 // ========== POPUP TIPO ==========
 function TipoPopup({ x, y, onSelect, onClose }) {
+    const popupId = useId();
+    const firstBtnRef = useRef(null);
+
+    useEffect(() => {
+        const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+        window.addEventListener('keydown', handleEsc);
+        firstBtnRef.current?.focus();
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
+
     return (
         <div className="fixed inset-0 z-[85]" onClick={onClose}>
-            <div className="absolute bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-200 min-w-[220px]" style={{ top: y, left: x }} onClick={e => e.stopPropagation()}>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Qual o tipo de agendamento?</p>
-                <button onClick={() => onSelect('Recebimento')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all bg-blue-50/50 border border-blue-100">
-                    <ArrowDownLeft className="w-4 h-4 text-blue-500" /> Recebimento
+            <div 
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`${popupId}-title`}
+                className="absolute bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-200 min-w-[220px]" 
+                style={{ top: y, left: x }} 
+                onClick={e => e.stopPropagation()}
+            >
+                <p id={`${popupId}-title`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Qual o tipo de agendamento?</p>
+                <button 
+                    ref={firstBtnRef}
+                    onClick={() => onSelect('Recebimento')} 
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all bg-blue-50/50 border border-blue-100 focus:ring-4 focus:ring-blue-500/10 outline-none"
+                >
+                    <ArrowDownLeft className="w-4 h-4 text-blue-500" aria-hidden="true" /> Recebimento
                 </button>
-                <button onClick={() => onSelect('Expedição')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-green-50 hover:text-green-600 transition-all bg-green-50/50 border border-green-100">
-                    <ArrowUpRight className="w-4 h-4 text-green-500" /> Expedição
+                <button 
+                    onClick={() => onSelect('Expedição')} 
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-green-50 hover:text-green-600 transition-all bg-green-50/50 border border-green-100 focus:ring-4 focus:ring-green-500/10 outline-none"
+                >
+                    <ArrowUpRight className="w-4 h-4 text-green-500" aria-hidden="true" /> Expedição
                 </button>
             </div>
         </div>
@@ -320,7 +390,7 @@ export default function TransportSchedule() {
         return (
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
                 <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700">
-                    {DIAS_SEMANA.map(d => <div key={d} className="py-3 text-center text-[8px] font-black text-slate-400 uppercase tracking-widest">{d}</div>)}
+                    {DIAS_SEMANA.map(d => <th key={d} scope="col" className="py-3 text-center text-[8px] font-black text-slate-400 uppercase tracking-widest">{d}</th>)}
                 </div>
                 <div className="grid grid-cols-7">
                     {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} className="min-h-[100px] border-r border-b border-slate-100 dark:border-slate-800" />)}
@@ -357,11 +427,11 @@ export default function TransportSchedule() {
                 <table className="w-full border-collapse min-w-[600px]">
                     <thead>
                         <tr className="border-b border-slate-200 dark:border-slate-700">
-                            <th className="w-16 p-2 text-[7px] font-black text-slate-400 uppercase tracking-widest">Hora</th>
+                            <th scope="col" className="w-16 p-2 text-[7px] font-black text-slate-400 uppercase tracking-widest">Hora</th>
                             {visibleDays.map((d, i) => {
                                 const isToday = isSameDay(d, new Date());
                                 return (
-                                    <th key={i} className={`p-2 text-center ${isToday ? 'bg-primary/5' : ''}`}>
+                                    <th key={i} scope="col" className={`p-2 text-center ${isToday ? 'bg-primary/5' : ''}`}>
                                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{fmtBR(d)}</p>
                                     </th>
                                 );
@@ -410,7 +480,7 @@ export default function TransportSchedule() {
             {/* Cabeçalho */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight">Agenda de Transporte</h1>
+                    <h1 className="text-2xl font-black tracking-tight">3.3 Agendar Transportes</h1>
                     <p className="text-sm text-slate-500 font-medium">Controle de pátio e agendamento de veículos</p>
                 </div>
             </div>
@@ -421,12 +491,16 @@ export default function TransportSchedule() {
                     <button key={k} onClick={() => setView(k)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${view === k ? 'bg-secondary text-primary shadow-lg' : 'bg-slate-50 dark:bg-slate-900 text-slate-500 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'}`}>{v}</button>
                 ))}
                 <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
-                <button onClick={() => setSelectedDate(new Date())} className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-primary/10 text-primary hover:bg-primary/20 transition-all flex items-center gap-1.5"><RefreshCw className="w-3 h-3" /> Hoje</button>
+                <button onClick={() => setSelectedDate(new Date())} className="px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-primary/10 text-primary hover:bg-primary/20 transition-all flex items-center gap-1.5 focus:ring-4 focus:ring-primary/5 outline-none"><RefreshCw className="w-3 h-3" aria-hidden="true" /> Hoje</button>
                 <div className="flex-1" />
                 <div className="flex items-center gap-2">
-                    <button onClick={() => navigateDate(-1)} className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-secondary hover:text-primary transition-all"><ChevronLeft className="w-4 h-4" /></button>
+                    <button onClick={() => navigateDate(-1)} aria-label="Período anterior" className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-secondary hover:text-primary transition-all focus:ring-4 focus:ring-secondary/20 outline-none">
+                        <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+                    </button>
                     <span className="text-xs font-black min-w-[160px] text-center">{view === 'mensal' ? selectedDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : view === 'dia' ? selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }) : `${fmtBR(visibleDays[0])} — ${fmtBR(visibleDays[visibleDays.length - 1])}`}</span>
-                    <button onClick={() => navigateDate(1)} className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-secondary hover:text-primary transition-all"><ChevronRight className="w-4 h-4" /></button>
+                    <button onClick={() => navigateDate(1)} aria-label="Próximo período" className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-secondary hover:text-primary transition-all focus:ring-4 focus:ring-secondary/20 outline-none">
+                        <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                    </button>
                 </div>
             </div>
 

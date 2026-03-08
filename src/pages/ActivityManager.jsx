@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Activity,
   Users,
@@ -38,6 +38,9 @@ const STATUS_CFG = {
   'Pausada':      { color: 'text-amber-700  bg-amber-100  dark:bg-amber-900/30 dark:text-amber-400',  dot: 'bg-amber-400',                 bar: 'bg-amber-400' },
   'Finalizada':   { color: 'text-green-700  bg-green-100  dark:bg-green-900/30 dark:text-green-400',  dot: 'bg-green-500',                 bar: 'bg-green-500' },
 };
+
+/** Lista canônica de status — única fonte de verdade para KPIs e filtros. */
+const STATUS_LIST = ['Pendente', 'Em Execução', 'Pausada', 'Finalizada'];
 
 function StatusBadge({ status }) {
   const cfg = STATUS_CFG[status] || {};
@@ -165,18 +168,26 @@ function VincularModal({ atividade, onClose, onSave }) {
     );
   };
 
+  const firstFieldRef = useRef(null);
+  useEffect(() => { firstFieldRef.current?.focus(); }, []);
+
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="vincular-title"
+      className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-3xl overflow-hidden">
         <div className="bg-gradient-to-r from-blue-700 to-blue-600 px-7 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Users className="w-6 h-6 text-white" />
             <div>
               <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">{atividade.id} — {atividade.tipo}</p>
-              <h2 className="text-base font-black text-white uppercase">Vincular Operadores à Atividade</h2>
+              <h2 id="vincular-title" className="text-base font-black text-white uppercase">Vincular Operadores à Atividade</h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-7">
@@ -198,11 +209,18 @@ function VincularModal({ atividade, onClose, onSave }) {
 
             {/* Botões de transferência */}
             <div className="flex flex-col gap-3 shrink-0">
-              <button onClick={moverParaDireita} disabled={selEsq.length === 0}
+              <button
+                ref={firstFieldRef}
+                onClick={moverParaDireita}
+                disabled={selEsq.length === 0}
+                aria-label="Mover selecionados para atividade"
                 className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 active:scale-95 disabled:opacity-30 transition-all shadow-md">
                 <ArrowRight className="w-4 h-4" />
               </button>
-              <button onClick={moverParaEsquerda} disabled={selDir.length === 0}
+              <button
+                onClick={moverParaEsquerda}
+                disabled={selDir.length === 0}
+                aria-label="Remover selecionados da atividade"
                 className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-300 active:scale-95 disabled:opacity-30 transition-all">
                 <ArrowLeft className="w-4 h-4" />
               </button>
@@ -241,17 +259,22 @@ function PausarRetomarModal({ atividade, acao, onClose, onConfirm }) {
   const isPausar = acao === 'pausar';
   const handle = () => { setLoading(true); setTimeout(() => { onConfirm(atividade.id, acao); onClose(); }, 1200); };
   return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pausa-title"
+      className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
       <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-md overflow-hidden">
         <div className={cn('px-7 py-5 flex items-center justify-between', isPausar ? 'bg-amber-600' : 'bg-green-600')}>
           <div className="flex items-center gap-3">
             {isPausar ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white" />}
             <div>
               <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">{atividade.id}</p>
-              <h2 className="text-base font-black text-white uppercase">{isPausar ? 'Pausar' : 'Retomar'} Atividade</h2>
+              <h2 id="pausa-title" className="text-base font-black text-white uppercase">{isPausar ? 'Pausar' : 'Retomar'} Atividade</h2>
             </div>
           </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-7 space-y-5">
           <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl space-y-1.5">
@@ -282,7 +305,26 @@ function PausarRetomarModal({ atividade, acao, onClose, onConfirm }) {
 // ─── GAVETA: HISTÓRICO DE EXECUÇÃO ─────────────────────────────────
 function HistoricoDrawer({ atividade, onClose }) {
   const hist = HISTORICO[atividade.id] || [];
-  const durMin = atividade.inicio ? 142 : 0;
+
+  // Duração real: diferença entre agora e o horário de início (sem magic number 142)
+  const durMin = useMemo(() => {
+    if (!atividade.inicio) return 0;
+    // Formato dos dados mock: 'DD/MM HH:mm' ex: '22/02 08:10'
+    // Parseamos para comparar com o horário atual do sistema
+    try {
+      const [datePart, timePart] = atividade.inicio.split(' ');
+      const [day, month] = datePart.split('/').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+      const year = new Date().getFullYear();
+      const start = new Date(year, month - 1, day, hours, minutes);
+      const diffMs = Date.now() - start.getTime();
+      // Se a diferença for negativa ou irreal (>48h), retorna 0
+      if (diffMs < 0 || diffMs > 172800000) return 0;
+      return Math.floor(diffMs / 60000);
+    } catch {
+      return 0;
+    }
+  }, [atividade.inicio]);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -391,7 +433,13 @@ export default function ActivityManager() {
   const [filterSearch, setFilterSearch] = useState('');
   const [modal, setModal]             = useState(null);
   const [acao, setAcao]               = useState(null);
-  const [ticking, setTicking]         = useState(0);
+  const [ticking, setTicking]         = useState(0); // força re-render p/ relógio vivo
+
+  // Map O(1) para lookup de operador por id — evita O(n²) no map da tabela
+  const operadoresMap = useMemo(
+    () => new Map(TODOS_OPERADORES.map(o => [o.id, o])),
+    [] // TODOS_OPERADORES é constante de módulo
+  );
 
   // Relógio para atividades em execução
   useEffect(() => { const t = setInterval(() => setTicking(p => p + 1), 30000); return () => clearInterval(t); }, []);
@@ -418,7 +466,8 @@ export default function ActivityManager() {
     setSelectedId(null);
   };
 
-  const kpis = Object.fromEntries(['Pendente', 'Em Execução', 'Pausada', 'Finalizada'].map(s => [s, atividades.filter(a => a.status === s).length]));
+  // KPIs derivados dos status canônicos — nunca hardcoded
+  const kpis = Object.fromEntries(STATUS_LIST.map(s => [s, atividades.filter(a => a.status === s).length]));
 
   const canPausar  = selected?.status === 'Em Execução';
   const canRetomar = selected?.status === 'Pausada';
@@ -436,7 +485,7 @@ export default function ActivityManager() {
             </div>
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 4 — Movimentação Interna e Estoque</p>
-              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Gerenciador de Atividade</h1>
+              <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">3.4 Monitorar Atividades</h1>
               <p className="text-xs text-slate-400 font-medium mt-0.5">Painel de Supervisão · Monitoramento e redirecionamento do trabalho físico</p>
             </div>
           </div>
@@ -504,7 +553,7 @@ export default function ActivityManager() {
             className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-52" />
         </div>
         <div className="flex gap-1.5">
-          {['Todas', 'Pendente', 'Em Execução', 'Pausada', 'Finalizada'].map(s => (
+          {['Todas', ...STATUS_LIST].map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider transition-all',
                 filterStatus === s ? 'bg-secondary text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'
@@ -534,10 +583,20 @@ export default function ActivityManager() {
             )}
             {filtered.map(at => {
               const isSel = at.id === selectedId;
-              const ops = at.operadores.map(id => TODOS_OPERADORES.find(o => o.id === id)).filter(Boolean);
+              // O(1) via Map — sem find() linear por linha
+              const ops = at.operadores.map(id => operadoresMap.get(id)).filter(Boolean);
               return (
                 <tr key={at.id}
+                  role="row"
+                  tabIndex={0}
+                  aria-selected={isSel}
                   onClick={() => setSelectedId(at.id === selectedId ? null : at.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedId(at.id === selectedId ? null : at.id);
+                    }
+                  }}
                   className={cn(
                     'border-t border-slate-100 dark:border-slate-800 cursor-pointer transition-all',
                     at.status === 'Pausada' && 'bg-amber-50/30 dark:bg-amber-950/10',
@@ -548,7 +607,8 @@ export default function ActivityManager() {
                     <div className={cn('w-2 h-2 rounded-full mx-auto', isSel ? 'bg-secondary scale-150' : 'bg-transparent')} />
                   </td>
                   <td className="p-4">
-                    <code className="text-sm font-black text-blue-600">{at.id}</code>
+                    {/* span com font-mono em vez de code — sem significado semântico aqui */}
+                    <span className="text-sm font-black text-blue-600 font-mono">{at.id}</span>
                   </td>
                   <td className="p-4">
                     <span className="text-xs font-black text-slate-700 dark:text-slate-300">{at.tipo}</span>

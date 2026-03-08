@@ -176,7 +176,7 @@ export default function Companies() {
   const breadcrumbItems = [
     { label: 'WMS' },
     { label: 'Cadastrar' },
-    { label: isNew ? '6.1 Empresas — Novo' : selectedCompany ? `6.1 Empresas — ${formData.name || 'Editar'}` : '6.1 Empresas' },
+    { label: isNew ? '7.1 Empresas — Novo' : selectedCompany ? `7.1 Empresas — ${formData.name || 'Editar'}` : '7.1 Empresas' },
   ];
 
   const actionGroups = [
@@ -275,7 +275,7 @@ export default function Companies() {
             <Building2 className="w-5 h-5 text-black" />
           </div>
           <h1 className="text-xl font-black uppercase tracking-tight text-gray-800 dark:text-white">
-            6.1 Cadastro de Empresas
+            7.1 Cadastro de Empresas
           </h1>
           {dirty && (
             <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">

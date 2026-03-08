@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     Settings, 
     Globe, 
     Folder, 
     Key, 
     Copy, 
-    RefreshCw, 
     Check, 
     Server, 
     Database, 
@@ -19,6 +18,10 @@ export default function RestConfig() {
     const [isRestEnabled, setIsRestEnabled] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [copyFeedback, setCopyFeedback] = useState(false);
+    const copyTimeoutRef = useRef(null);
+
+    // Cleanup do timeout de feedback de cópia ao desmontar
+    useEffect(() => () => { if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current); }, []);
     const [config, setConfig] = useState({
         inputDir: 'C:\\WMS\\Integracoes\\Entrada',
         outputDir: 'C:\\WMS\\Integracoes\\Saida',
@@ -41,7 +44,8 @@ export default function RestConfig() {
         if (!apiKey) return;
         navigator.clipboard.writeText(apiKey);
         setCopyFeedback(true);
-        setTimeout(() => setCopyFeedback(false), 2000);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => setCopyFeedback(false), 2000);
     };
 
     const handleSave = () => {
@@ -54,7 +58,7 @@ export default function RestConfig() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black tracking-tight flex items-center gap-3">
-                        <Settings className="w-8 h-8 text-secondary" /> Configuração de Integração
+                        <Settings className="w-8 h-8 text-secondary" /> 9.5 Configurar APIs REST
                     </h1>
                     <p className="text-sm text-slate-500 font-medium italic">Setup de comunicação REST e diretórios de intercâmbio</p>
                 </div>
@@ -76,14 +80,23 @@ export default function RestConfig() {
                     
                     <div className="flex items-center gap-6 bg-white/5 p-6 rounded-3xl border border-white/10">
                         <div className="flex items-center gap-3">
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${!isRestEnabled ? 'text-white' : 'text-white/30'}`}>Intercâmbio Arquivo</span>
-                            <button 
+                            <span
+                              id="mode-file-label"
+                              className={`text-[10px] font-black uppercase tracking-widest ${!isRestEnabled ? 'text-white' : 'text-white/30'}`}
+                            >Intercâmbio Arquivo</span>
+                            <button
+                                role="switch"
+                                aria-checked={isRestEnabled}
+                                aria-label={isRestEnabled ? 'Modo atual: API REST — clique para usar Intercâmbio de Arquivo' : 'Modo atual: Intercâmbio de Arquivo — clique para usar API REST'}
                                 onClick={() => setIsRestEnabled(!isRestEnabled)}
-                                className={`w-14 h-7 rounded-full p-1 transition-all ${isRestEnabled ? 'bg-secondary' : 'bg-slate-700'}`}
+                                className={`w-14 h-7 rounded-full p-1 transition-all focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-transparent ${isRestEnabled ? 'bg-secondary' : 'bg-slate-700'}`}
                             >
-                                <div className={`w-5 h-5 rounded-full bg-primary transition-transform ${isRestEnabled ? 'translate-x-7' : ''}`} />
+                                <div className={`w-5 h-5 rounded-full bg-primary transition-transform ${isRestEnabled ? 'translate-x-7' : ''}`} aria-hidden="true" />
                             </button>
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${isRestEnabled ? 'text-secondary font-black' : 'text-white/30'}`}>API REST / JSON</span>
+                            <span
+                              id="mode-rest-label"
+                              className={`text-[10px] font-black uppercase tracking-widest ${isRestEnabled ? 'text-secondary font-black' : 'text-white/30'}`}
+                            >API REST / JSON</span>
                         </div>
                     </div>
                 </div>
@@ -102,23 +115,35 @@ export default function RestConfig() {
                     </div>
 
                     <div className="space-y-6">
-                        {['inputDir', 'outputDir', 'errorDir'].map((field, idx) => (
-                            <div key={field} className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                                    {field === 'inputDir' ? 'Diretório de Entrada (Importação)' : field === 'outputDir' ? 'Diretório de Saída (Exportação)' : 'Diretório de Erros'}
-                                </label>
-                                <div className="relative group">
-                                    <input 
-                                        type="text" 
-                                        value={config[field]}
-                                        disabled={isRestEnabled}
-                                        onChange={(e) => setConfig({...config, [field]: e.target.value})}
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 pl-12 text-sm font-bold outline-none focus:border-primary transition-all text-slate-600 dark:text-slate-300"
-                                    />
-                                    <Database className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                        {['inputDir', 'outputDir', 'errorDir'].map((field) => {
+                            const labelText = field === 'inputDir'
+                              ? 'Diretório de Entrada (Importação)'
+                              : field === 'outputDir'
+                              ? 'Diretório de Saída (Exportação)'
+                              : 'Diretório de Erros';
+                            const inputId = `dir-${field}`;
+                            return (
+                                <div key={field} className="space-y-2">
+                                    <label
+                                      htmlFor={inputId}
+                                      className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1"
+                                    >
+                                      {labelText}
+                                    </label>
+                                    <div className="relative group">
+                                        <input
+                                            id={inputId}
+                                            type="text"
+                                            value={config[field]}
+                                            disabled={isRestEnabled}
+                                            onChange={(e) => setConfig({ ...config, [field]: e.target.value })}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 pl-12 text-sm font-bold outline-none focus:border-primary transition-all text-slate-600 dark:text-slate-300"
+                                        />
+                                        <Database className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" aria-hidden="true" />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     {isRestEnabled && (
                         <div className="mt-6 p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center gap-3">
@@ -142,22 +167,24 @@ export default function RestConfig() {
 
                     <div className="space-y-6">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Endpoint Master da API</label>
+                            <label htmlFor="api-url" className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Endpoint Master da API</label>
                             <div className="relative">
-                                <input 
-                                    type="text" 
+                                <input
+                                    id="api-url"
+                                    type="text"
                                     value={config.apiUrl}
                                     disabled={!isRestEnabled}
+                                    onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}
                                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 pl-12 text-sm font-bold outline-none focus:border-secondary transition-all"
                                 />
-                                <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Server className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
                             </div>
                         </div>
 
                         <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                             <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Chave para Integração via Serviço Rest</label>
-                                <button 
+                                <label htmlFor="api-key" className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Chave para Integração via Serviço Rest</label>
+                                <button
                                     onClick={generateApiKey}
                                     className="text-[10px] font-black text-secondary uppercase hover:underline"
                                 >
@@ -165,19 +192,21 @@ export default function RestConfig() {
                                 </button>
                             </div>
                             <div className="relative group">
-                                <textarea 
-                                    readOnly 
+                                <textarea
+                                    id="api-key"
+                                    readOnly
                                     value={apiKey}
                                     placeholder="Nenhuma chave gerada..."
                                     className="w-full bg-slate-900 border-2 border-slate-800 rounded-2xl py-6 px-6 text-xs text-emerald-400 font-mono tracking-tighter outline-none focus:border-secondary transition-all resize-none h-24"
                                 />
                                 <div className="absolute top-2 right-2 flex items-center gap-2">
-                                    {copyFeedback && <span className="text-[8px] font-black text-secondary animate-in fade-in slide-in-from-right-2">COPIADO!</span>}
-                                    <button 
+                                    {copyFeedback && <span className="text-[8px] font-black text-secondary animate-in fade-in slide-in-from-right-2" aria-live="polite">COPIADO!</span>}
+                                    <button
                                         onClick={handleCopy}
+                                        aria-label={copyFeedback ? 'Chave copiada!' : 'Copiar chave API'}
                                         className="p-2 bg-white/10 hover:bg-secondary hover:text-primary rounded-xl transition-all"
                                     >
-                                        <Copy className="w-4 h-4" />
+                                        <Copy className="w-4 h-4" aria-hidden="true" />
                                     </button>
                                 </div>
                                 <div className="absolute bottom-4 left-6 flex items-center gap-2">
@@ -190,9 +219,16 @@ export default function RestConfig() {
                         <div className="p-6 bg-slate-50 dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-700 space-y-4">
                             <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Parâmetros Adicionais</h4>
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold">Timeout da Conexão</span>
+                                <label htmlFor="conn-timeout" className="text-xs font-bold">Timeout da Conexão</label>
                                 <div className="flex items-center gap-2">
-                                    <input type="number" defaultValue="30" className="w-16 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-lg py-1 px-2 text-center font-black text-xs" />
+                                    <input
+                                        id="conn-timeout"
+                                        type="number"
+                                        min="1"
+                                        value={config.timeout}
+                                        onChange={(e) => setConfig({ ...config, timeout: e.target.value })}
+                                        className="w-16 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-lg py-1 px-2 text-center font-black text-xs"
+                                    />
                                     <span className="text-[10px] font-black text-slate-400 uppercase">Segundos</span>
                                 </div>
                             </div>
