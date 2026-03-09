@@ -23,6 +23,7 @@ export default function SKUGenerator() {
   const [manualSku, setManualSku] = useState('');
   const [manualReference, setManualReference] = useState('');
   const [additionalDetails, setAdditionalDetails] = useState('');
+  const [manualCategory, setManualCategory] = useState('');
   const [generatedDescription, setGeneratedDescription] = useState('');
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
@@ -31,13 +32,14 @@ export default function SKUGenerator() {
 
   // Auto-generate SKU
   const generatedSku = useMemo(() => {
-    if (!vpType || !category) return '';
+    const activeCatValue = manualCategory || category;
+    if (!vpType || !activeCatValue) return '';
 
-    const parts = [vpType, category];
+    const parts = [vpType, activeCatValue];
     
     // Convert attributes to parts
     const attrValues = [];
-    const catObj = CATEGORIES.find(c => c.value === category);
+    const catObj = CATEGORIES.find(c => c.value === activeCatValue);
     
     if (catObj && catObj.attributes) {
       catObj.attributes.forEach(attrKey => {
@@ -49,7 +51,7 @@ export default function SKUGenerator() {
 
     if (attrValues.length > 0) {
       // Special logic for some categories (e.g. dimensions X separator)
-      if (['PTC', 'ROC', 'PORTA'].includes(category)) {
+      if (['PTC', 'ROC', 'PORTA'].includes(activeCatValue)) {
         parts.push(attrValues.join('X'));
       } else {
         parts.push(attrValues.join('-'));
@@ -58,11 +60,13 @@ export default function SKUGenerator() {
 
     // Add compatibility
     if (selectedCompatibility.length > 0) {
-      parts.push(selectedCompatibility.join('-'));
+      // Use GER instead of GERAL if that's what's selected
+      const compCodes = selectedCompatibility.map(c => c === 'GERAL' ? 'GER' : c);
+      parts.push(compCodes.join('-'));
     }
 
     return parts.join('-').replace(/-+/g, '-');
-  }, [vpType, category, attributes, selectedCompatibility]);
+  }, [vpType, category, attributes, selectedCompatibility, manualCategory]);
 
   useEffect(() => {
     setManualSku(generatedSku);
@@ -101,6 +105,7 @@ export default function SKUGenerator() {
     setStep(1);
     setManualReference('');
     setAdditionalDetails('');
+    setManualCategory('');
     setGeneratedDescription('');
   };
 
@@ -114,7 +119,7 @@ export default function SKUGenerator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vpType,
-          category,
+          category: manualCategory || category,
           attributes,
           selectedCompatibility,
           manualReference,
@@ -260,17 +265,14 @@ export default function SKUGenerator() {
                    <p className="text-[9px] font-bold text-slate-400 uppercase">Não encontrou a categoria?</p>
                    <div className="relative">
                       <input 
+                        value={manualCategory}
+                        onChange={e => {
+                          const val = e.target.value.toUpperCase();
+                          setManualCategory(val);
+                          if (val) setCategory(''); // Clear dropdown if typing manual
+                        }}
                         placeholder="Ex: FIX - Fixador"
                         className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-purple-400"
-                        onBlur={(e) => {
-                          if (e.target.value) {
-                             const [val, lab] = e.target.value.split('-').map(s => s.trim());
-                             if (val && lab) {
-                               // This is just a UI trick for now
-                               setCategory(val.toUpperCase());
-                             }
-                          }
-                        }}
                       />
                    </div>
                 </div>

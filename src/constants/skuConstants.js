@@ -79,5 +79,5 @@ export const COMPATIBILITY = [
   { value: 'CCM', label: 'CCM (Monarch)' },
   { value: 'CCB', label: 'CCB (BST)' },
   { value: 'CCZ', label: 'CCZ (XIZI)' },
-  { value: 'GERAL', label: 'Geral / Universal' },
+  { value: 'GER', label: 'Geral / Universal' },
 ];

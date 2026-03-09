@@ -58,29 +58,30 @@ app.post('/api/generate-description', async (req, res) => {
     - Detalhes adicionais: ${additionalDetails}
 
     DIRETRIZES:
-    1. O título deve ser em NEGRITO e conter o nome da categoria e dimensões principais.
-    2. Explique a FUNÇÃO NO SISTEMA da peça.
-    3. Crie uma seção de ESPECIFICAÇÕES TÉCNICAS em lista.
-    4. Adicione uma OBSERVAÇÃO TÉCNICA se relevante.
-    5. O tom deve ser profissional e técnico.
-    6. Formate em Markdown.
+    1. O título deve ser em NEGRITO e conter o nome da categoria e dimensões principais (ex: **NOME DO PRODUTO (DIMENSÕES) - Ref.: COMPATIBILIDADE**).
+    2. Logo abaixo do título, escreva uma descrição rica e detalhada da peça, especificando seu material, onde se encaixa e seu acabamento.
+    3. Crie uma seção de FUNÇÃO NO SISTEMA detalhando para que a peça serve e como ela funciona.
+    4. Crie uma seção de ESPECIFICAÇÕES TÉCNICAS em lista (Markdown).
+    5. Adicione uma OBSERVAÇÃO TÉCNICA com alertas de instalação ou substituição.
+    6. O tom deve ser profissional e de engenharia.
     7. NÃO use asteriscos triplos para negrito, use apenas duplos: **Texto**.
 
-    Exemplo de saída desejada:
-    "**Polia de Tração do Corrimão (587x30mm) - Ref.: CCS/CCO**
+    Exemplo de Excelência (Use este nível de detalhamento):
+    "**CAPA PROTETORA DE ENTRADA DO CORRIMÃO (HANDRAIL INLET COVER) — ESQUERDO**
     
-    A polia de tração é responsável por movimentar o corrimão da escada rolante...
+    Capa protetora em plástico instalada na caixa de entrada do corrimão da escada ou esteira rolante. Lado esquerdo. Cobre o ponto de acesso do corrimão à estrutura interna, prevenindo contato acidental com o mecanismo de acionamento e ocultando a abertura de forma esteticamente integrada à balaustrada.
     
     **FUNÇÃO NO SISTEMA**
-    Transmite o movimento do motor...
+    A Capa Protetora (também chamada Handrail Inlet Cover ou Handrail Entry Box) é a cobertura externa da caixa de entrada do corrimão. Funciona como barreira física contra intrusão de dedos e objetos na região do mecanismo de acionamento do corrimão.
     
     **ESPECIFICAÇÕES TÉCNICAS**
-    - Material: Alumínio
-    - Diâmetro: 587 mm
-    ...
+    - Material: Plástico de engenharia (resistente ao impacto e UV)
+    - Cor: Preto
+    - Lado: Esquerdo
+    - Compatibilidade: Escadas rolantes modelo XIZI (compatível com Otis)
     
     **OBSERVAÇÃO TÉCNICA**
-    Verificar desgaste..."`;
+    O part number identifica especificamente o lado esquerdo. Em caso de substituição, confirmar o side marking na peça original."`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
