@@ -7,9 +7,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
 // ─── CONFIGURAÇÃO DA IA ───────────────────────────────────────────────────────
-// Adicione VITE_GEMINI_KEY no arquivo .env para ativar a IA
-// Ex: VITE_GEMINI_KEY=AIzaSy...
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_KEY;
+// Adicione VITE_GEMINI_API_KEY no arquivo .env para ativar a IA
+// Ex: VITE_GEMINI_API_KEY=AIzaSy...
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const SYSTEM_PROMPT = `
 Você é o Assistente Logístico Inteligente do VerticalParts WMS.
