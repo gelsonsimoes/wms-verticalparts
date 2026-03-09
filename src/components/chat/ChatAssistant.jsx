@@ -1,26 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
+import { MessageSquare, X, Send, Bot, User, Loader2, Trash2, AlertTriangle } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-// GoogleGenerativeAI removido do frontend por segurança e compatibilidade
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// Migrando do Supabase Edge Functions para a VPS Própria (Motor WMS-API)
-const CHAT_AI_URL = `http://72.61.37.129:3001/api/chat`;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// ─── CONFIGURAÇÃO DA IA ───────────────────────────────────────────────────────
+// Adicione VITE_GEMINI_KEY no arquivo .env para ativar a IA
+// Ex: VITE_GEMINI_KEY=AIzaSy...
+const GEMINI_KEY = import.meta.env.VITE_GEMINI_KEY;
 
 const SYSTEM_PROMPT = `
 Você é o Assistente Logístico Inteligente do VerticalParts WMS.
-Sua missão é ajudar operadores, supervisores e gestores a usar 
+Sua missão é ajudar operadores, supervisores e gestores a usar
 o sistema com eficiência máxima.
 
-EMPRESA: VerticalParts — Especialista em elevadores, escadas rolantes, 
+EMPRESA: VerticalParts — Especialista em elevadores, escadas rolantes,
 esteiras rolantes e peças para transporte vertical.
 
 USUÁRIOS DO SISTEMA:
 - Danilo (Supervisor / Administrador)
-- Matheus (Expedição)  
+- Matheus (Expedição)
 - Thiago (Logística / Recebimento)
 
 PRODUTOS E SKUs REAIS (use sempre esses dados):
@@ -52,18 +53,24 @@ REGRAS DE COMPORTAMENTO:
 export default function ChatAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState(() => {
-    const saved = localStorage.getItem('vp_chat_history');
-    return saved ? JSON.parse(saved) : [
-      { role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }
-    ];
+    try {
+      const saved = localStorage.getItem('vp_chat_history');
+      return saved ? JSON.parse(saved) : [
+        { role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }
+      ];
+    } catch {
+      return [{ role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }];
+    }
   });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [aiStatus, setAiStatus] = useState('online'); 
+  const [aiStatus, setAiStatus] = useState(GEMINI_KEY ? 'online' : 'sem-chave');
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem('vp_chat_history', JSON.stringify(messages));
+    try {
+      localStorage.setItem('vp_chat_history', JSON.stringify(messages));
+    } catch { /* localStorage cheio */ }
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
@@ -71,43 +78,49 @@ export default function ChatAssistant() {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userText = input;
-    const userMsg = { role: 'user', content: userText };
-    setMessages(prev => [...prev, userMsg]);
+    const userText = input.trim();
+    // Captura histórico ANTES de adicionar a nova mensagem (para enviar ao Gemini)
+    const historySnapshot = messages.filter(m => m.content && m.role !== 'system');
+
+    setMessages(prev => [...prev, { role: 'user', content: userText }]);
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await fetch(CHAT_AI_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messages: messages.filter(m => m.content),
-          input: userText,
-          systemPrompt: SYSTEM_PROMPT
-        }),
+      if (!GEMINI_KEY) {
+        throw new Error('VITE_GEMINI_KEY não configurada. Adicione a chave no arquivo .env do projeto.');
+      }
+
+      const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-1.5-flash',
+        systemInstruction: SYSTEM_PROMPT,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Erro ${response.status}`);
-      }
+      // Converte histórico para o formato Gemini (roles: 'user' | 'model')
+      const geminiHistory = historySnapshot.map(m => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }],
+      }));
 
-      const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+      const chat = model.startChat({ history: geminiHistory });
+      const result = await chat.sendMessage(userText);
+      const text = result.response.text();
+
+      setMessages(prev => [...prev, { role: 'assistant', content: text }]);
       setAiStatus('online');
     } catch (error) {
-      console.error("Chat Error:", error);
-      let errorMsg = `⚠️ Erro: ${error.message || "Falha na comunicação com a IA"}`;
-      
-      if (error.message?.includes('429')) {
-        errorMsg = "⚠️ Limite de requisições atingido. Aguarde alguns segundos.";
-      } else if (error.message?.includes('fetch')) {
-        errorMsg = "⚠️ Erro de conexão com o servidor do chat (Supabase).";
+      console.error('Chat Error:', error);
+      let errorMsg = `⚠️ ${error.message || 'Falha na comunicação com a IA'}`;
+
+      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key')) {
+        errorMsg = '⚠️ Chave de API inválida. Verifique VITE_GEMINI_KEY no arquivo .env';
+      } else if (error.message?.includes('429') || error.message?.includes('quota')) {
+        errorMsg = '⚠️ Limite de requisições atingido. Aguarde alguns segundos e tente novamente.';
+      } else if (error.message?.includes('VITE_GEMINI_KEY')) {
+        errorMsg = '⚠️ IA não configurada. Contate o administrador do sistema para ativar o assistente.';
       }
-      
+
       setAiStatus('error');
       setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
     } finally {
@@ -116,10 +129,9 @@ export default function ChatAssistant() {
   };
 
   const handleClearHistory = () => {
-    if (window.confirm('Deseja apagar todo o histórico do chat?')) {
-      localStorage.removeItem('vp_chat_history');
-      setMessages([{ role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }]);
-    }
+    const initial = [{ role: 'assistant', content: 'Olá! Sou o assistente da VerticalParts. Como posso ajudar?' }];
+    localStorage.removeItem('vp_chat_history');
+    setMessages(initial);
   };
 
   return (
@@ -140,41 +152,69 @@ export default function ChatAssistant() {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                         </>
+                      ) : aiStatus === 'sem-chave' ? (
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
                       ) : (
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                       )}
                     </span>
                   </h3>
-                  <p className="text-[9px] text-primary font-bold uppercase">VerticalParts</p>
+                  <p className="text-[9px] text-primary font-bold uppercase">
+                    {aiStatus === 'online' ? 'VerticalParts · Gemini AI' :
+                     aiStatus === 'sem-chave' ? 'Chave não configurada' :
+                     'Erro de conexão'}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button 
-                  onClick={handleClearHistory} 
+                <button
+                  onClick={handleClearHistory}
                   title="Limpar conversa"
+                  aria-label="Limpar histórico do chat"
                   className="p-2 text-slate-500 hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
-                <button onClick={() => setIsOpen(false)} className="p-2 text-slate-500 hover:text-white transition-transform hover:rotate-90">
+                <button
+                  onClick={() => setIsOpen(false)}
+                  aria-label="Fechar chat"
+                  className="p-2 text-slate-500 hover:text-white transition-transform hover:rotate-90"
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
+            {/* Aviso sem chave */}
+            {aiStatus === 'sem-chave' && (
+              <div className="mx-4 mt-3 flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-[10px] text-amber-700 font-medium">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>IA não configurada. Adicione <code className="font-black">VITE_GEMINI_KEY</code> no <code>.env</code> e reinicie o servidor.</span>
+              </div>
+            )}
+
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50 dark:bg-slate-950">
               {messages.map((msg, idx) => (
-                <div key={idx} className={cn("flex", msg.role === 'user' ? "justify-end" : "justify-start")}>
+                <div key={idx} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                   <div className={cn(
-                    "max-w-[85%] p-4 rounded-3xl text-[12px] font-bold shadow-sm",
-                    msg.role === 'user' ? "bg-primary text-slate-950" : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border dark:border-slate-800"
+                    'max-w-[85%] p-4 rounded-3xl text-[12px] font-bold shadow-sm whitespace-pre-wrap',
+                    msg.role === 'user'
+                      ? 'bg-primary text-slate-950'
+                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border dark:border-slate-800'
                   )}>
                     {msg.content}
                   </div>
                 </div>
               ))}
-              {isLoading && <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-3xl p-4 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span className="text-[11px] text-slate-400 font-bold">Pensando...</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Input */}
@@ -182,10 +222,17 @@ export default function ChatAssistant() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Como preencher o Cross-docking?"
-                className="flex-1 bg-slate-100 dark:bg-slate-950 border-none rounded-xl px-4 py-2 text-[12px] font-bold outline-none focus:ring-2 focus:ring-primary"
+                placeholder={aiStatus === 'sem-chave' ? 'IA não configurada...' : 'Como preencher o Cross-docking?'}
+                disabled={aiStatus === 'sem-chave'}
+                aria-label="Mensagem para o assistente"
+                className="flex-1 bg-slate-100 dark:bg-slate-950 border-none rounded-xl px-4 py-2 text-[12px] font-bold outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
-              <button type="submit" className="bg-primary text-slate-950 p-3 rounded-xl shadow-lg active:scale-95 transition-all">
+              <button
+                type="submit"
+                disabled={isLoading || !input.trim() || aiStatus === 'sem-chave'}
+                aria-label="Enviar mensagem"
+                className="bg-primary text-slate-950 p-3 rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 <Send className="w-5 h-5" />
               </button>
             </form>
@@ -195,9 +242,11 @@ export default function ChatAssistant() {
         {/* Trigger */}
         <button
           onClick={() => setIsOpen(!isOpen)}
+          aria-label={isOpen ? 'Fechar assistente' : 'Abrir assistente IA'}
+          title="Assistente Logístico VerticalParts"
           className={cn(
-            "w-16 h-16 rounded-[1.8rem] bg-slate-900 text-primary shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group border-2 border-primary/20",
-            isOpen && "rotate-90 bg-primary text-slate-900 border-none"
+            'w-16 h-16 rounded-[1.8rem] bg-slate-900 text-primary shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group border-2 border-primary/20',
+            isOpen && 'rotate-90 bg-primary text-slate-900 border-none'
           )}
         >
           {isOpen ? <X className="w-7 h-7" /> : <Bot className="w-8 h-8" />}
