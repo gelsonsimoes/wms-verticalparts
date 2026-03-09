@@ -1,8 +1,9 @@
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Zap, Info, Copy, CheckCircle, QrCode, Trash2, 
   Settings, Layers, ChevronRight, Package, Scale, 
   Search, ShieldCheck, AlertCircle, RefreshCw, Save,
-  Maximize2, FileText, Download, Printer
+  Maximize2, FileText, Download, Printer, Sparkles, Loader2, Check
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -21,6 +22,9 @@ export default function SKUGenerator() {
   const [selectedCompatibility, setSelectedCompatibility] = useState([]);
   const [manualSku, setManualSku] = useState('');
   const [manualReference, setManualReference] = useState('');
+  const [additionalDetails, setAdditionalDetails] = useState('');
+  const [generatedDescription, setGeneratedDescription] = useState('');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [step, setStep] = useState(1);
@@ -96,6 +100,37 @@ export default function SKUGenerator() {
     setShowQRCode(false);
     setStep(1);
     setManualReference('');
+    setAdditionalDetails('');
+    setGeneratedDescription('');
+  };
+
+  const generateAIDescription = async () => {
+    if (!manualSku) return;
+    
+    setIsGeneratingAI(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vpType,
+          category,
+          attributes,
+          selectedCompatibility,
+          manualReference,
+          additionalDetails
+        })
+      });
+
+      const data = await response.json();
+      if (data.description) {
+        setGeneratedDescription(data.description);
+      }
+    } catch (error) {
+      console.error("Error generating AI description:", error);
+    } finally {
+      setIsGeneratingAI(false);
+    }
   };
 
   const handleCompatibilityToggle = (value) => {
@@ -453,31 +488,69 @@ export default function SKUGenerator() {
                </button>
              </div>
              
-             <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 min-h-[120px]">
-                   {manualSku ? (
-                     <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">
-                        <strong className="text-slate-900 dark:text-white not-italic uppercase block mb-1">
-                          {activeCategory?.label || 'Componente'} ({activeCategory?.value || 'CAT'})
-                        </strong>
-                        Produto técnico padronizado para {manualSku.startsWith('VPEL') ? 'ELEVADORES' : 'ESCADA ROLANTE'}. 
-                        Possui características de {Object.entries(attributes).map(([k, v]) => `${ATTRIBUTE_FIELDS[k]?.label}: ${v}`).join(', ')}.
-                        Compatível com sistemas {selectedCompatibility.join(' / ') || 'Multimarcas'}.
-                        {manualReference && <span className="block mt-2 font-bold text-slate-500">{manualReference}</span>}
-                     </div>
+              <div className="space-y-4">
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                       <Info className="w-3 h-3" /> Detalhes Adicionais (IA)
+                    </label>
+                    <textarea 
+                      value={additionalDetails}
+                      onChange={e => setAdditionalDetails(e.target.value)}
+                      placeholder="Fale mais sobre este item: aplicação, particularidades..."
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-[11px] font-medium outline-none focus:border-amber-400 min-h-[60px]"
+                    />
+                 </div>
+
+                 <button 
+                   onClick={generateAIDescription}
+                   disabled={!manualSku || isGeneratingAI}
+                   className="w-full py-4 bg-slate-900 text-white dark:bg-white dark:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+                 >
+                   {isGeneratingAI ? (
+                     <Loader2 className="w-4 h-4 animate-spin" />
                    ) : (
-                     <p className="text-[10px] text-slate-400 italic text-center mt-8">Preencha os campos para ver a descrição básica.</p>
+                     <Sparkles className="w-4 h-4 text-amber-400" />
                    )}
-                </div>
-                
-                <button 
-                  disabled={!manualSku}
-                  className="w-full py-4 border-2 border-slate-900 dark:border-slate-700 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white dark:hover:bg-slate-700 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                  Gerar Descrição Completa
-                </button>
-             </div>
+                   {isGeneratingAI ? 'Gerando...' : 'Gerar Descrição com IA'}
+                 </button>
+
+                 <div className="relative group/desc">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 min-h-[120px]">
+                      {generatedDescription ? (
+                        <textarea 
+                          value={generatedDescription}
+                          onChange={e => setGeneratedDescription(e.target.value)}
+                          className="w-full bg-transparent text-[11px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed outline-none min-h-[180px] resize-none"
+                        />
+                      ) : (
+                        <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">
+                           <strong className="text-slate-900 dark:text-white not-italic uppercase block mb-1">
+                             {activeCategory?.label || 'Componente'} ({activeCategory?.value || 'CAT'})
+                           </strong>
+                           Produto técnico padronizado para {manualSku?.startsWith('VPEL') ? 'ELEVADORES' : 'ESCADA ROLANTE'}. 
+                           Possui características de {Object.entries(attributes).map(([k, v]) => `${ATTRIBUTE_FIELDS[k]?.label}: ${v}`).join(', ')}.
+                           Compatível com sistemas {selectedCompatibility.join(' / ') || 'Multimarcas'}.
+                           {manualReference && <span className="block mt-2 font-bold text-slate-500">{manualReference}</span>}
+                        </div>
+                      )}
+                    </div>
+                    {generatedDescription && (
+                      <button 
+                        onClick={() => { copy(generatedDescription); setIsCopied(true); setTimeout(() => setIsCopied(false), 2000); }}
+                        className="absolute top-2 right-2 p-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur rounded-lg border border-slate-200 dark:border-slate-700 opacity-0 group-hover/desc:opacity-100 transition-opacity"
+                        title="Copiar texto gerado"
+                      >
+                        {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                      </button>
+                    )}
+                 </div>
+                 
+                 {!generatedDescription && (
+                    <p className="text-[9px] text-slate-400 text-center italic">
+                       A visualização acima é um resumo. Use o botão de IA para uma descrição completa e técnica.
+                    </p>
+                 )}
+              </div>
           </div>
         </div>
       </div>
