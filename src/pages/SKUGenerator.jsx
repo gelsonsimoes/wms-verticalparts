@@ -109,7 +109,7 @@ export default function SKUGenerator() {
     
     setIsGeneratingAI(true);
     try {
-      const response = await fetch('http://localhost:3001/api/generate-description', {
+      const response = await fetch('http://72.61.37.129:3001/api/generate-description', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

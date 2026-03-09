@@ -6,8 +6,8 @@ import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// URL da Edge Function que criamos no Supabase — agora dinâmica
-const CHAT_AI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
+// Migrando do Supabase Edge Functions para a VPS Própria (Motor WMS-API)
+const CHAT_AI_URL = `http://72.61.37.129:3001/api/chat`;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SYSTEM_PROMPT = `
@@ -81,9 +81,7 @@ export default function ChatAssistant() {
       const response = await fetch(CHAT_AI_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           messages: messages.filter(m => m.content),
