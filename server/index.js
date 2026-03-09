@@ -46,42 +46,44 @@ app.post('/api/generate-description', async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const prompt = `Você é um especialista em descrições técnicas de peças para elevadores e escadas rolantes da VerticalParts. 
-    Com base nas informações abaixo, gere uma descrição técnica completa e padronizada.
+    const prompt = `Você é um Engenheiro Sênior da VerticalParts, especialista em documentação técnica.
+    Sua tarefa é transformar dados de um produto em uma descrição técnica de ALTA QUALIDADE, rica e profissional.
 
-    Informações do produto:
-    - Tipo: ${vpType}
+    DADOS TÉCNICOS:
+    - Identificador: ${vpType}
     - Categoria: ${category}
     - Atributos: ${JSON.stringify(attributes)}
-    - Compatibilidade: ${selectedCompatibility?.join(', ') || 'N/A'}
-    - Referência: ${manualReference}
-    - Detalhes adicionais: ${additionalDetails}
+    - Compatibilidade: ${selectedCompatibility?.join(', ') || 'Multimarcas'}
+    - Referência: ${manualReference || 'N/A'}
 
-    DIRETRIZES:
-    1. O título deve ser em NEGRITO e conter o nome da categoria e dimensões principais (ex: **NOME DO PRODUTO (DIMENSÕES) - Ref.: COMPATIBILIDADE**).
-    2. Logo abaixo do título, escreva uma descrição rica e detalhada da peça, especificando seu material, onde se encaixa e seu acabamento.
-    3. Crie uma seção de FUNÇÃO NO SISTEMA detalhando para que a peça serve e como ela funciona.
-    4. Crie uma seção de ESPECIFICAÇÕES TÉCNICAS em lista (Markdown).
-    5. Adicione uma OBSERVAÇÃO TÉCNICA com alertas de instalação ou substituição.
-    6. O tom deve ser profissional e de engenharia.
-    7. NÃO use asteriscos triplos para negrito, use apenas duplos: **Texto**.
+    TEXTO DO OPERADOR (PRIORIDADE MÁXIMA): 
+    "${additionalDetails || '(Nenhum detalhe adicional fornecido)'}"
 
-    Exemplo de Excelência (Use este nível de detalhamento):
-    "**CAPA PROTETORA DE ENTRADA DO CORRIMÃO (HANDRAIL INLET COVER) — ESQUERDO**
+    REGRAS DE OURO:
+    1. PRIORIDADE: Use o "TEXTO DO OPERADOR" como base para a descrição narrativa. Se ele disse que a peça vai no "topo do carro para manutenção", você deve escrever algo como: "Equipamento crítico projetado para instalação no topo da cabina (carro), permitindo manobras seguras de inspeção e manutenção pelo técnico habilitado."
+    2. TÍTULO: Em negrito, contendo a categoria e marca principal.
+    3. ESTRUTURA: 
+       - Breve introdução comercial/técnica (3-4 linhas).
+       - Seção **FUNÇÃO NO SISTEMA**: Explique para que serve.
+       - Seção **ESPECIFICAÇÕES TÉCNICAS**: Lista com os atributos fornecidos.
+       - Seção **OBSERVAÇÃO TÉCNICA**: Alertas de instalação ou compatibilidade.
+    4. TOM: Use linguagem de engenharia (ex: use "interface", "acoplamento", "balaustrada", "cabina", "manobra").
+
+    EXEMPLO DE ESTILO:
+    "**BOTOEIRA DE INSPEÇÃO INTEGRADA - Ref.: ${selectedCompatibility?.join('/') || 'GER'}**
     
-    Capa protetora em plástico instalada na caixa de entrada do corrimão da escada ou esteira rolante. Lado esquerdo. Cobre o ponto de acesso do corrimão à estrutura interna, prevenindo contato acidental com o mecanismo de acionamento e ocultando a abertura de forma esteticamente integrada à balaustrada.
+    A Botoeira de Inspeção da VerticalParts é um componente de controle redundante essencial para a segurança operacional. ${additionalDetails ? `Conforme especificado, ${additionalDetails}` : ''}.
     
     **FUNÇÃO NO SISTEMA**
-    A Capa Protetora (também chamada Handrail Inlet Cover ou Handrail Entry Box) é a cobertura externa da caixa de entrada do corrimão. Funciona como barreira física contra intrusão de dedos e objetos na região do mecanismo de acionamento do corrimão.
+    Atua como interface de comando manual para o técnico durante manobras de manutenção preventiva e corretiva, permitindo o movimento da cabina em velocidade reduzida...
     
     **ESPECIFICAÇÕES TÉCNICAS**
-    - Material: Plástico de engenharia (resistente ao impacto e UV)
-    - Cor: Preto
-    - Lado: Esquerdo
-    - Compatibilidade: Escadas rolantes modelo XIZI (compatível com Otis)
+    - Identificador: ${vpType}
+    - Categoria: ${category}
+    ${Object.entries(attributes).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
     
     **OBSERVAÇÃO TÉCNICA**
-    O part number identifica especificamente o lado esquerdo. Em caso de substituição, confirmar o side marking na peça original."`;
+    Instalação simplificada via conectores padrão conforme manual de fábrica."`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
