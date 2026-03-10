@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useId, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../services/supabaseClient';
 import { 
   User, 
   Plus, 
@@ -71,16 +72,49 @@ export default function UsersPage() {
     });
   };
 
-  const handleSendInvite = () => {
+  const handleSendInvite = async () => {
     if (!formData.email || !formData.email.includes('@')) {
       showToast('E-mail válido é obrigatório para enviar convite.', 'error');
       return;
     }
-    showToast(`Convite de acesso enviado para ${formData.email}!`, 'success');
+    try {
+      // signInWithOtp com shouldCreateUser=true funciona como convite:
+      // envia um magic link para o e-mail, criando a conta se não existir
+      const { error } = await supabase.auth.signInWithOtp({
+        email: formData.email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: `${window.location.origin}/redefinir-senha`,
+          data: {
+            nomeUsuario: formData.nomeUsuario,
+            cargo: formData.cargo,
+            nivel: formData.nivel,
+          },
+        },
+      });
+      if (error) throw error;
+      showToast(`Convite enviado para ${formData.email}! O usuário receberá um link de acesso.`, 'success');
+    } catch (err) {
+      console.error('Erro ao enviar convite:', err);
+      showToast(`Erro ao enviar convite: ${err.message}`, 'error');
+    }
   };
 
-  const handleResetPassword = () => {
-    showToast(`Link de redefinição enviado para ${formData.email}`, 'info');
+  const handleResetPassword = async () => {
+    if (!formData.email || !formData.email.includes('@')) {
+      showToast('Selecione um usuário com e-mail cadastrado.', 'error');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      });
+      if (error) throw error;
+      showToast(`Link de redefinição de senha enviado para ${formData.email}`, 'success');
+    } catch (err) {
+      console.error('Erro ao resetar senha:', err);
+      showToast(`Erro ao enviar link: ${err.message}`, 'error');
+    }
   };
 
   const handleNew = () => {

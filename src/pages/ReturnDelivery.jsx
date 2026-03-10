@@ -207,7 +207,7 @@ function ModalCancelar({ count, onClose, onConfirm }) {
 function DetailGrid({ devId, itens, onChangeItem, isLocked }) {
   return (
     <tr>
-      <td colSpan={8} className="p-0">
+      <td colSpan={9} className="p-0">
         <div className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-b-2 border-secondary/30 animate-in slide-in-from-top-1 duration-200">
           {/* Sub-header */}
           <div className="flex items-center gap-2 px-6 py-2 border-b border-slate-200 dark:border-slate-700">
@@ -284,8 +284,9 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
     responsavel: 'Danilo',
     dataSolicitacao: new Date().toISOString().slice(0,10),
   });
-  const set = (k,v) => setForm(f=>({...f,[k]:v}));
-  const num = String(totalExistente + 1).padStart(3,'0');
+  const [erros, setErros] = useState({});
+  const set = (k,v) => { setForm(f=>({...f,[k]:v})); setErros(er=>({...er,[k]:undefined})); };
+  const num = String(totalExistente + 1).padStart(4,'0');
   const idGerado = `INS-2026-${num}`;
 
   useEffect(() => {
@@ -301,9 +302,11 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
   }, []);
 
   const salvar = () => {
-    if (!form.ordemCliente || !form.nfOriginal || !form.depositante) {
-      alert('Preencha OC, NF e Depositante.'); return;
-    }
+    const novosErros = {};
+    if (!form.ordemCliente.trim()) novosErros.ordemCliente = 'Obrigatório';
+    if (!form.nfOriginal.trim())   novosErros.nfOriginal   = 'Obrigatório';
+    if (!form.depositante.trim())  novosErros.depositante  = 'Obrigatório';
+    if (Object.keys(novosErros).length > 0) { setErros(novosErros); return; }
     onSalvar({
       id: 'DEV-' + Date.now(),
       idInsucesso: idGerado,
@@ -354,8 +357,13 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
                   value={form[k]}
                   onChange={e=>set(k,e.target.value)}
                   placeholder={placeholder}
-                  className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none transition-all dark:bg-slate-800"
+                  aria-invalid={!!erros[k]}
+                  className={cn(
+                    "w-full border-2 rounded-xl px-3 py-2 text-xs font-bold outline-none transition-all dark:bg-slate-800",
+                    erros[k] ? 'border-red-400 focus:border-red-500' : 'border-slate-200 dark:border-slate-700 focus:border-secondary'
+                  )}
                 />
+                {erros[k] && <p className="text-[9px] text-red-500 font-bold">{erros[k]}</p>}
               </div>
             ))}
             <div className="space-y-1">
@@ -439,7 +447,7 @@ export default function ReturnDelivery() {
        d.depositante.toLowerCase().includes(search.toLowerCase()))
     ), [devs, filtro, search]);
 
-  const selecionados = devs.filter(d => d.selecionado);
+  const selecionados = useMemo(() => devs.filter(d => d.selecionado), [devs]);
 
   // ── Seleção ─────────────────────────────────────────────────────
   const toggleSel = (id) => setDevs(ds => ds.map(d => d.id === id ? { ...d, selecionado: !d.selecionado } : d));
@@ -469,28 +477,33 @@ export default function ReturnDelivery() {
   const handleImport = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const fileName = file.name; // captura antes do timeout (evita referência ao evento sintético)
     setImporting(true);
     clearTimeout(importTimeoutRef.current);
     importTimeoutRef.current = setTimeout(() => {
-      const novo = {
-        id: 'DEV-' + Date.now(),
-        idInsucesso: 'INS-2026-' + String(devs.length + 1).padStart(3, '0'),
-        dataSolicitacao: new Date().toISOString().slice(0, 10),
-        ordemCliente: 'OC-' + Math.floor(46000 + Math.random() * 1000),
-        nfOriginal: 'NF-' + Math.floor(46000 + Math.random() * 1000),
-        depositante: 'Importado via CRN',
-        status: 'Pendente',
-        itens: [
-          { id: 'IMP-I1', codigoProd: 'IMP-001', descricao: file.name.replace(/\.[^/.]+$/, '') + ' — Item importado', qtDevolvida: 1, estadoPeca: 'Bom', setorDestino: 'TRIAGEM-A' },
-        ],
-        expanded: true,
-        selecionado: false,
-      };
-      setDevs(ds => [novo, ...ds]);
+      // Usa setDevs funcional para ler o length atualizado e evitar colisão de IDs
+      setDevs(ds => {
+        const novo = {
+          id: 'DEV-' + Date.now(),
+          idInsucesso: 'INS-2026-' + String(ds.length + 1).padStart(4, '0'),
+          dataSolicitacao: new Date().toISOString().slice(0, 10),
+          ordemCliente: 'OC-' + Math.floor(46000 + Math.random() * 1000),
+          nfOriginal: 'NF-' + Math.floor(46000 + Math.random() * 1000),
+          depositante: 'Importado via CRN',
+          status: 'Pendente',
+          itens: [
+            { id: 'IMP-I1-' + Date.now(), codigoProd: 'IMP-001', descricao: fileName.replace(/\.[^/.]+$/, '') + ' — Item importado', qtDevolvida: 1, estadoPeca: 'Bom', setorDestino: 'TRIAGEM-A' },
+          ],
+          expanded: true,
+          selecionado: false,
+        };
+        return [novo, ...ds];
+      });
       setImporting(false);
-      showToast(`Arquivo "${file.name}" importado. 1 devolução criada.`);
-      e.target.value = '';
+      showToast(`Arquivo "${fileName}" importado. 1 devolução criada.`);
     }, 1400);
+    // Reset o input após disparar (fora do timeout para não depender do evento)
+    e.target.value = '';
   };
 
   // ── Executar Devolução ──────────────────────────────────────────
@@ -539,12 +552,12 @@ export default function ReturnDelivery() {
   };
 
   // ── KPIs ─────────────────────────────────────────────────────────
-  const kpis = [
+  const kpis = useMemo(() => [
     { label:'Pendentes',   val: devs.filter(d=>d.status==='Pendente').length,   color:'text-amber-500' },
     { label:'Executando',  val: devs.filter(d=>d.status==='Executando').length,  color:'text-blue-500'  },
     { label:'Finalizadas', val: devs.filter(d=>d.status==='Finalizada').length,  color:'text-green-600' },
     { label:'Canceladas',  val: devs.filter(d=>d.status==='Cancelada').length,   color:'text-red-600'   },
-  ];
+  ], [devs]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in duration-700">
@@ -635,26 +648,37 @@ export default function ReturnDelivery() {
 
         <div className="flex-1" />
 
-        <button onClick={() => setModal('nova')}
+        <button
+          onClick={() => setModal('nova')}
+          title="Cria manualmente uma nova solicitação de devolução ou insucesso de entrega"
           className="flex items-center gap-1.5 px-4 py-2 bg-[#1A1A1A] text-[#FFD700] border-2 border-[#FFD700]/30 rounded-xl text-xs font-black hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all">
           <Plus className="w-3.5 h-3.5"/>Nova Devolução
         </button>
 
         {/* Importar CRN */}
-        <button onClick={() => fileRef.current?.click()} disabled={importing}
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          title="Importa arquivo de retorno do transportador (.crn, .csv, .xml, .txt) e cria uma devolução automaticamente"
           className="flex items-center gap-1.5 px-4 py-2 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-secondary hover:text-secondary rounded-xl text-xs font-black transition-all disabled:opacity-40">
           {importing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
           {importing ? 'Importando...' : 'Importar Arquivo de Devolução (CRN)'}
         </button>
 
         {/* Executar */}
-        <button onClick={handleExecutar} disabled={selecionados.filter(d=>d.status==='Pendente').length === 0}
+        <button
+          onClick={handleExecutar}
+          disabled={selecionados.filter(d=>d.status==='Pendente').length === 0}
+          title="Inicia o remanejamento das peças para os setores de triagem. Apenas devoluções Pendentes são processadas"
           className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 active:scale-95 transition-all shadow-md disabled:opacity-40">
           <Play className="w-3.5 h-3.5" />Executar Devolução
         </button>
 
         {/* Cancelar */}
-        <button onClick={handleCancelar} disabled={selecionados.filter(d=>['Pendente','Executando'].includes(d.status)).length === 0}
+        <button
+          onClick={handleCancelar}
+          disabled={selecionados.filter(d=>['Pendente','Executando'].includes(d.status)).length === 0}
+          title="Cancela as devoluções selecionadas (Pendentes ou Executando). As peças permanecem na doca até nova instrução do supervisor"
           className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 active:scale-95 transition-all shadow-md disabled:opacity-40">
           <Ban className="w-3.5 h-3.5" />Cancelar Devolução
         </button>
@@ -776,7 +800,7 @@ export default function ReturnDelivery() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center">
+                  <td colSpan={9} className="p-10 text-center">
                     <RotateCcw className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                     <p className="text-slate-400 text-xs font-bold">Nenhuma devolução encontrada.</p>
                   </td>

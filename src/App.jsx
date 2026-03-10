@@ -6,6 +6,7 @@ import { AppProvider } from './context/AppContext';
 import ChatAssistant from './components/chat/ChatAssistant';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import RedefinirSenha from './pages/RedefinirSenha';
 import { supabase } from './services/supabaseClient';
 import { appRoutes } from './routes';
 import { Loader2 } from 'lucide-react';
@@ -159,6 +160,11 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
   };
+
+  // Rotas públicas (sem autenticação — renderiza antes do auth check)
+  if (window.location.pathname === '/redefinir-senha') {
+    return <RedefinirSenha />;
+  }
 
   // Enquanto resolvemos a resposta Async do Supabase:
   if (isCheckingAuth) {

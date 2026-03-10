@@ -17,7 +17,8 @@ import {
   ClipboardList,
   AlertTriangle,
   Camera,
-  Search
+  Search,
+  Tag
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
