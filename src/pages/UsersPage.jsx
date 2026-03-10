@@ -84,7 +84,7 @@ export default function UsersPage() {
         email: formData.email,
         options: {
           shouldCreateUser: true,
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.origin}/redefinir-senha`,
           data: {
             nomeUsuario: formData.nomeUsuario,
             cargo: formData.cargo,
