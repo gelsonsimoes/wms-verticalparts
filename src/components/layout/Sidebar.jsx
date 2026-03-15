@@ -320,10 +320,10 @@ export default function Sidebar({ toggleSidebar: parentToggleSidebar }) {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile overlay — z-[39] fica abaixo do sidebar (z-40) para não bloquear cliques no menu */}
       {!collapsed && (
         <div
-          className="fixed inset-0 bg-black/40 z-[49] lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/40 z-[39] lg:hidden backdrop-blur-sm"
           onClick={handleNavigate}
           aria-hidden="true"
         />
