@@ -250,9 +250,9 @@ export default function RoadWeighingStation() {
   const [activeScale, setActiveScale] = useState(SCALES[0]);
   const [showScaleDropdown, setShowScaleDropdown] = useState(false);
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
-  const [currentWeight, setCurrentWeight] = useState(tara === null ? 8420 : 31560);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [tara, setTara] = useState(null);
+  const [currentWeight, setCurrentWeight] = useState(8420);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [bruto, setBruto] = useState(null);
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
