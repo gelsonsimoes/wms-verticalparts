@@ -23,15 +23,15 @@ import {
   Send,
   Users,
   ChevronDown,
+  LayoutGrid,
 } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import ActionPane from '../components/ui/ActionPane';
 import DataGrid from '../components/ui/DataGrid';
 import FastTab from '../components/ui/FastTab';
 
-// ─── Modal de Convite com seleção de Grupo ────────────────────────────────────
-// ─── (placeholder para PAGE_SECTIONS removida — grupos gerenciados em UserGroups.jsx)
-const _REMOVED_PAGE_SECTIONS = [
+// eslint-disable-next-line no-unused-vars
+const PAGE_SECTIONS = [
   {
     section: '2. OPERAR', items: [
       { path: '/operacao/cruzar-docas',           label: '2.1 Cruzar Docas' },
