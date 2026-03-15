@@ -71,7 +71,7 @@ export default function WavePickingWizard() {
             return {
               id: `PED-${1000 + i}`,
               nf: `NF-55${40 + i}`,
-              depositante: ['Danilo', 'Matheus', 'Thiago', 'VerticalParts'][Math.floor(Math.random() * 4)],
+              depositante: ['Operador', 'Operador', 'Operador', 'VerticalParts'][Math.floor(Math.random() * 4)],
               rota: ['SP - Interior', 'RJ - Capital', 'MG - BH', 'SP - Capital'][Math.floor(Math.random() * 4)],
               transportadora: ['Correios SEDEX', 'Jadlog', 'Total Express'][Math.floor(Math.random() * 3)],
               pecas: totalPecas,
@@ -373,7 +373,7 @@ export default function WavePickingWizard() {
                     onChange={(e) => setFormData({...formData, depositante: e.target.value})}
                   >
                     <option>Todos os Responsáveis</option>
-                    <option>Danilo</option>
+                    <option>Operador</option>
                     <option>Matheus</option>
                     <option>Thiago</option>
                     <option>VerticalParts</option>

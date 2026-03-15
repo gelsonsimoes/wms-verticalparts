@@ -219,7 +219,7 @@ export default function FinancialDashboard() {
                         <TrendingUp className="w-5 h-5 text-emerald-500" aria-hidden="true" />
                     </div>
                     <p className="text-[11px] font-bold text-slate-500">
-                        Os dados refletem o faturamento consolidado de peças (ex: <span className="text-secondary font-black italic">VPER-ESS-NY-27MM</span>) e serviços logísticos prestados a depositantes como <span className="text-secondary font-black italic">Danilo Simões</span> e <span className="text-secondary font-black italic">Matheus Expedição</span>.
+                        Os dados refletem o faturamento consolidado de peças (ex: <span className="text-secondary font-black italic">VPER-ESS-NY-27MM</span>) e serviços logísticos prestados a depositantes como <span className="text-secondary font-black italic">Operador</span> e <span className="text-secondary font-black italic">Matheus Expedição</span>.
                     </p>
                 </div>
                 <button

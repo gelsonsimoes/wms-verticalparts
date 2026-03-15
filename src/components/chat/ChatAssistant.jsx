@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MessageSquare, X, Send, Bot, User, Loader2, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-// GoogleGenerativeAI removido do frontend por segurança e compatibilidade
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
@@ -20,7 +20,7 @@ EMPRESA: VerticalParts — Especialista em elevadores, escadas rolantes,
 esteiras rolantes e peças para transporte vertical.
 
 USUÁRIOS DO SISTEMA:
-- Danilo (Supervisor / Administrador)
+- Operador (Supervisor / Administrador)
 - Matheus (Expedição)  
 - Thiago (Logística / Recebimento)
 
@@ -51,6 +51,7 @@ REGRAS DE COMPORTAMENTO:
 `;
 
 export default function ChatAssistant() {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState(() => {
     const saved = localStorage.getItem('vp_chat_history');
@@ -87,7 +88,8 @@ export default function ChatAssistant() {
         body: JSON.stringify({
           messages: messages.filter(m => m.content),
           input: userText,
-          systemPrompt: SYSTEM_PROMPT
+          systemPrompt: SYSTEM_PROMPT,
+          currentPage: location.pathname,
         }),
       });
 
@@ -106,7 +108,7 @@ export default function ChatAssistant() {
       if (error.message?.includes('429')) {
         errorMsg = "⚠️ Limite de requisições atingido. Aguarde alguns segundos.";
       } else if (error.message?.includes('fetch')) {
-        errorMsg = "⚠️ Erro de conexão com o servidor do chat (Supabase).";
+        errorMsg = "⚠️ Erro de conexão com o servidor. Verifique sua internet.";
       }
       
       setAiStatus('error');

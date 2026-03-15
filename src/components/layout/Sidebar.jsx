@@ -51,6 +51,7 @@ import {
   HelpCircle,
   Inbox,
   Zap,
+  ClipboardList,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 import Tooltip from "../ui/Tooltip";
@@ -185,6 +186,7 @@ const NAVIGATION = [
     items: [
       { label: "11.1 Gerenciar Usuários",        icon: User,         path: "/seguranca/usuarios" },
       { label: "11.2 Definir Grupos de Acesso",  icon: Shield,       path: "/seguranca/grupos" },
+      { label: "11.3 Histórico de Atividades",   icon: ClipboardList, path: "/seguranca/historico" },
     ],
   },
 ];

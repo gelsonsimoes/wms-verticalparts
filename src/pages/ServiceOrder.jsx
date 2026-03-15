@@ -5,11 +5,11 @@ import { clsx } from 'clsx';
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
 const MOCK_OS = [
-  { num: 'OS-2026-001', type: 'Inspeção', equip: 'Escada Rolante - Shopping ABC', resp: 'Danilo', status: 'Concluída', data: '25/02/2026', prazo: '26/02/2026' },
+  { num: 'OS-2026-001', type: 'Inspeção', equip: 'Escada Rolante - Shopping ABC', resp: "Operador", status: 'Concluída', data: '25/02/2026', prazo: '26/02/2026' },
   { num: 'OS-2026-002', type: 'Manutenção', equip: 'Esteira de Picking (WMS)', resp: 'Matheus', status: 'Em Andamento', data: '26/02/2026', prazo: '27/02/2026' },
   { num: 'OS-2026-003', type: 'Instalação', equip: 'Barreira Infravermelha VEPEL-BPI-174FX', resp: 'Thiago', status: 'Aberta', data: '26/02/2026', prazo: '28/02/2026' },
   { num: 'OS-2026-004', type: 'Manutenção', equip: 'Botoeira de Inspeção VEPEL-BTI', resp: 'Thiago', status: 'Aberta', data: '26/02/2026', prazo: '01/03/2026' },
-  { num: 'OS-2026-005', type: 'Inspeção', equip: 'Paleteiras Elétricas Doca 3', resp: 'Danilo', status: 'Cancelada', data: '20/02/2026', prazo: '22/02/2026' }
+  { num: 'OS-2026-005', type: 'Inspeção', equip: 'Paleteiras Elétricas Doca 3', resp: "Operador", status: 'Cancelada', data: '20/02/2026', prazo: '22/02/2026' }
 ];
 
 export default function ServiceOrder() {
@@ -196,7 +196,7 @@ export default function ServiceOrder() {
                     onChange={e => setForm(f => ({ ...f, responsavel: e.target.value }))}
                     className="w-full bg-slate-50 border-none rounded-[1rem] px-4 py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-[#ffcd00] outline-none"
                   >
-                     <option value="danilo">Danilo</option>
+                     <option value="operador">Operador</option>
                      <option value="matheus">Matheus</option>
                      <option value="thiago">Thiago</option>
                   </select>

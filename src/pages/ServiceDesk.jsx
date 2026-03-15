@@ -7,7 +7,7 @@ function cn(...inputs) { return twMerge(clsx(inputs)); }
 const MOCK_TICKETS = [
   { id: 'TKT-1082', titulo: 'Erro ao bipar SKU da Barreira no picking', cat: 'Operacional', prio: 'Alta', sol: 'Matheus', status: 'Aberto', data: '26/02/2026' },
   { id: 'TKT-1081', titulo: 'Impressora de etiquetas travando', cat: 'Hardware', prio: 'Média', sol: 'Thiago', status: 'Em Atendimento', data: '26/02/2026' },
-  { id: 'TKT-1080', titulo: 'Solicitação de acesso módulo Financeiro', cat: 'Acessos', prio: 'Baixa', sol: 'Danilo', status: 'Resolvido', data: '26/02/2026' },
+  { id: 'TKT-1080', titulo: 'Solicitação de acesso módulo Financeiro', cat: 'Acessos', prio: 'Baixa', sol: "Operador", status: 'Resolvido', data: '26/02/2026' },
   { id: 'TKT-1079', titulo: 'Layout da NFe quebrando no monitor', cat: 'Sistema', prio: 'Média', sol: 'Matheus', status: 'Em Atendimento', data: '25/02/2026' },
 ];
 

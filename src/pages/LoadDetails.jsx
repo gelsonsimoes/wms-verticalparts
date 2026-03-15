@@ -28,7 +28,7 @@ export default function LoadDetails() {
     weight: '450.00 kg',
     destination: 'LOG-DIST-VELOZ',
     origin: 'WH-MAIN-SP',
-    driver: 'Danilo Silva',
+    driver: 'Operador',
     plate: 'VTP-2026'
   });
 

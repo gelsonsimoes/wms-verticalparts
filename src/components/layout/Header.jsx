@@ -1,16 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Bell, Search, Menu, LogOut, Settings, User, 
-  Package, Zap, MapPin, ChevronRight, Loader2 
+import {
+  Bell, Search, Menu, LogOut, Settings, User,
+  Package, Zap, MapPin, ChevronRight, Loader2,
+  Smartphone, Download, Copy, Check, X
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useApp } from '../../context/AppContext';
 import { supabase } from '../../services/supabaseClient';
+
+const APK_URL = 'https://github.com/gelsonsimoes/WMS_VerticalParts_Mobile/releases/download/v4.3.25/app-release.apk';
+
+function AppDownloadModal({ onClose }) {
+  const [copied, setCopied] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(APK_URL);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div ref={ref} className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
+        {/* Header */}
+        <div className="bg-[var(--vp-primary)] px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-black" />
+            <span className="font-black text-sm uppercase tracking-widest text-black">App Mobile</span>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-black/10 rounded transition-colors">
+            <X className="w-4 h-4 text-black" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 flex flex-col items-center gap-4">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest text-center">
+            Escaneie com a câmera do celular
+          </p>
+
+          {/* QR Code */}
+          <div className="p-3 border-2 border-[var(--vp-primary)] rounded-xl bg-white shadow-inner">
+            <QRCodeSVG
+              value={APK_URL}
+              size={180}
+              bgColor="#ffffff"
+              fgColor="#0a0a0a"
+              level="M"
+              imageSettings={{
+                src: '/img/logo amarelosvg.svg',
+                x: undefined,
+                y: undefined,
+                height: 28,
+                width: 28,
+                excavate: true,
+              }}
+            />
+          </div>
+
+          <p className="text-[10px] text-gray-400 text-center leading-relaxed">
+            Android · v4.3.25 · 30.8 MB<br/>
+            Aceite "instalar de fontes desconhecidas" se solicitado
+          </p>
+
+          {/* Botões */}
+          <div className="w-full flex flex-col gap-2">
+            <a
+              href={APK_URL}
+              download
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--vp-primary)] text-black rounded-lg font-black text-xs uppercase tracking-widest hover:bg-[#F2C94C] transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Baixar APK
+            </a>
+            <button
+              onClick={handleCopy}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border border-gray-200 text-gray-600 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors"
+            >
+              {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Link copiado!' : 'Copiar link (WhatsApp)'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Header({ toggleSidebar, onLogout, session }) {
   const navigate = useNavigate();
   const { currentUser } = useApp();
   const user = session || currentUser;
+
+  const [showAppModal, setShowAppModal] = useState(false);
 
   // ─── Lógica de Busca Global ──────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,6 +190,7 @@ export default function Header({ toggleSidebar, onLogout, session }) {
   }, []);
 
   return (
+    <>
     <header className="sticky top-0 z-30 bg-white border-b border-[var(--vp-border)] px-6 py-3 flex items-center justify-between shadow-sm">
       {/* Left Section: Menu Toggle + Logo */}
       <div className="flex items-center gap-4">
@@ -185,6 +276,16 @@ export default function Header({ toggleSidebar, onLogout, session }) {
 
       {/* Right Section: Status, Notifications & User */}
       <div className="flex items-center gap-4">
+        {/* App Download Button */}
+        <button
+          onClick={() => setShowAppModal(true)}
+          title="Baixar App Mobile"
+          className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-black text-[var(--vp-primary)] rounded-sm border border-[var(--vp-primary)]/30 hover:bg-[var(--vp-primary)] hover:text-black transition-colors group"
+        >
+          <Smartphone className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-black uppercase tracking-widest">App</span>
+        </button>
+
         {/* Status Badge */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-800 rounded-sm border border-green-200">
           <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse" />
@@ -237,5 +338,8 @@ export default function Header({ toggleSidebar, onLogout, session }) {
         </div>
       </div>
     </header>
+
+    {showAppModal && <AppDownloadModal onClose={() => setShowAppModal(false)} />}
+    </>
   );
 }

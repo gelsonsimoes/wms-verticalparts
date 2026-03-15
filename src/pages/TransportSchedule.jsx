@@ -145,7 +145,7 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <Field id={`${modalId}-transp`} label="Transportadora" required><input id={`${modalId}-transp`} required value={form.transportadora} onChange={e => setForm({...form, transportadora: e.target.value})} className="field" placeholder="Transvip Logística" /></Field>
-                        <Field id={`${modalId}-motorista`} label="Motorista"><input id={`${modalId}-motorista`} value={form.motorista} onChange={e => setForm({...form, motorista: e.target.value})} className="field" placeholder="Ex: Danilo" /></Field>
+                        <Field id={`${modalId}-motorista`} label="Motorista"><input id={`${modalId}-motorista`} value={form.motorista} onChange={e => setForm({...form, motorista: e.target.value})} className="field" placeholder="Ex: Operador" /></Field>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                         <Field id={`${modalId}-veiculo`} label="Veículo (Placa)"><input id={`${modalId}-veiculo`} value={form.veiculo} onChange={e => setForm({...form, veiculo: e.target.value.toUpperCase()})} className="field font-mono" placeholder="ABC-1234" /></Field>

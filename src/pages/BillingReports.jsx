@@ -66,7 +66,7 @@ function formatCell(col, value) {
 
 const REPORT_DATA = {
   '/faturamento/embalagem': [
-    { id: 'emb-1', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Danilo (Supervisor)',  Setor: 'Segurança',    Local: 'A-10-01', 'Descrição do Produto': 'Barreira de Proteção Infravermelha', 'Qtd Unidade': 450 },
+    { id: 'emb-1', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Operador',  Setor: 'Segurança',    Local: 'A-10-01', 'Descrição do Produto': 'Barreira de Proteção Infravermelha', 'Qtd Unidade': 450 },
     { id: 'emb-2', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Matheus (Expedição)', Setor: 'Peças',        Local: 'A-10-02', 'Descrição do Produto': 'Escova de Segurança Nylon 27mm',      'Qtd Unidade': 120 },
     { id: 'emb-3', isoDate: '2026-02-22', Armazém: 'CD-02', Data: '22/02/2026', Depositante: 'Thiago (Logística)', Setor: 'Almoxarifado', Local: 'B-05-01', 'Descrição do Produto': 'Pallet de Aço Inox 1000mm',           'Qtd Unidade': 85  },
   ],
@@ -84,7 +84,7 @@ const REPORT_DATA = {
   ],
   '/financeiro/calcular-diarias': [
     { id: 'bil-1', isoDate: '2026-02-22', Depositante: 'VerticalParts Oficial', 'Saldo Palete': 450,  'Saldo Peso (Kg)': 1200,  'Saldo Unidade': 12500, 'Vencimento Ciclo': '05/03/2026', 'Valor Acumulado': 45850.22 },
-    { id: 'bil-2', isoDate: '2026-02-21', Depositante: 'Danilo (Logística)',     'Saldo Palete': 1240, 'Saldo Peso (Kg)': 15000, 'Saldo Unidade': 48000, 'Vencimento Ciclo': '10/03/2026', 'Valor Acumulado': 92300.50 },
+    { id: 'bil-2', isoDate: '2026-02-21', Depositante: 'Operador',     'Saldo Palete': 1240, 'Saldo Peso (Kg)': 15000, 'Saldo Unidade': 48000, 'Vencimento Ciclo': '10/03/2026', 'Valor Acumulado': 92300.50 },
   ],
 };
 

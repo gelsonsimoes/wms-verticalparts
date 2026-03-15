@@ -7,7 +7,7 @@ const MOCK_NFE = [
   { num: '45893', serie: '1', emitente: 'VerticalParts Matriz',    dest: 'Condomínio Residencial Topz', valor: 'R$  3.150,00', data: '26/02/2026', status: 'Pendente' },
   { num: '45894', serie: '1', emitente: 'VerticalParts Matriz',    dest: 'Manutenção Expressa Ltda',    valor: 'R$  8.900,00', data: '26/02/2026', status: 'Cancelada' },
   { num: '45895', serie: '1', emitente: 'VerticalParts Filial SP', dest: 'Shopping Center XYZ',         valor: 'R$ 42.100,50', data: '26/02/2026', status: 'Autorizada' },
-  { num: '45896', serie: '1', emitente: 'VerticalParts Matriz',    dest: 'Técnico Danilo',              valor: 'R$    850,00', data: '26/02/2026', status: 'Denegada' },
+  { num: '45896', serie: '1', emitente: 'VerticalParts Matriz',    dest: 'Técnico Operador',              valor: 'R$    850,00', data: '26/02/2026', status: 'Denegada' },
 ];
 
 // Mapeamento de status para classes de badge

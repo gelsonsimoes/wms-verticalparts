@@ -32,8 +32,8 @@ export function AppProvider({ children }) {
 
     const [isTvMode, setIsTvMode] = useState(false);
     const [currentUser, setCurrentUser] = useState({
-        usuario: 'danilo.supervisor',
-        nome: 'Danilo',
+        usuario: 'operador',
+        nome: 'Operador',
         role: 'gestor' // 'operador', 'planejador', 'gestor'
     });
 
@@ -132,10 +132,10 @@ export function AppProvider({ children }) {
     const [users, setUsers] = useState(() => {
         const saved = localStorage.getItem('vparts_users');
         return saved ? JSON.parse(saved) : [
-            { id: 1, usuario: 'danilo.supervisor', nomeUsuario: 'Danilo', email: 'danilo@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES', 'SUPERVISORES'], cargo: 'Supervisor', hasTransactions: true },
-            { id: 2, usuario: 'matheus.oper', nomeUsuario: 'Matheus', email: 'matheus@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Expedição', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Operador', hasTransactions: true },
-            { id: 3, usuario: 'thiago.almox', nomeUsuario: 'Thiago', email: 'thiago@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Almoxarifado', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Almox', hasTransactions: false },
-            { id: 4, usuario: 'gelson.estrat', nomeUsuario: 'Gelson', email: 'gelson@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Estratégia', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], cargo: 'Estratégias e Processos', hasTransactions: false },
+            { id: 1, usuario: 'operador.01', nomeUsuario: 'Operador', email: 'operador01@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Logística', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES', 'SUPERVISORES'], cargo: 'Supervisor', hasTransactions: true },
+            { id: 2, usuario: 'operador.02', nomeUsuario: 'Operador', email: 'operador02@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Expedição', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Operador', hasTransactions: true },
+            { id: 3, usuario: 'operador.03', nomeUsuario: 'Operador', email: 'operador03@verticalparts.com.br', status: 'Ativo', nivel: 'Operador', departamento: 'Almoxarifado', entidade: 'VerticalParts Matriz', grupos: ['OPERADORES'], cargo: 'Almox', hasTransactions: false },
+            { id: 4, usuario: 'operador.04', nomeUsuario: 'Operador', email: 'operador04@verticalparts.com.br', status: 'Ativo', nivel: 'Administrador', departamento: 'Estratégia', entidade: 'VerticalParts Matriz', grupos: ['ADMINISTRADORES'], cargo: 'Estratégias e Processos', hasTransactions: false },
         ];
     });
 
@@ -162,10 +162,10 @@ export function AppProvider({ children }) {
     const [transportSchedules, setTransportSchedules] = useState(() => {
         const saved = localStorage.getItem('vparts_transport_schedules');
         return saved ? JSON.parse(saved) : [
-            { id: 1, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Transvip Logística', motorista: 'Danilo (Supervisor)', veiculo: 'ABC-1234', dataInicio: '2026-02-22T08:00', dataFim: '2026-02-22T10:00', turno: 'Manhã', qtdVolume: 45, notasFiscais: 'NF-001234, NF-001235', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T15:30', usuario: 'danilo.supervisor' }] },
-            { id: 2, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 03', transportadora: 'RodoExpress', motorista: 'Matheus (Expedição)', veiculo: 'DEF-5678', dataInicio: '2026-02-22T10:00', dataFim: '2026-02-22T12:00', turno: 'Manhã', qtdVolume: 120, notasFiscais: 'NF-005500', status: 'veiculo_recepcionado', historico: [{ status: 'agendado', data: '2026-02-20T10:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T09:45', usuario: 'matheus.expedicao' }] },
-            { id: 3, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 02', transportadora: 'Patrus Transportes', motorista: 'Thiago (Logística)', veiculo: 'GHI-9012', dataInicio: '2026-02-22T14:00', dataFim: '2026-02-22T16:00', turno: 'Tarde', qtdVolume: 80, notasFiscais: 'NF-007788, NF-007789, NF-007790', status: 'veiculo_patio', historico: [{ status: 'agendado', data: '2026-02-19T11:00', usuario: 'danilo.supervisor' }, { status: 'veiculo_recepcionado', data: '2026-02-22T13:30', usuario: 'matheus.expedicao' }, { status: 'veiculo_patio', data: '2026-02-22T13:45', usuario: 'thiago.logistica' }] },
-            { id: 4, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Jadlog', motorista: 'Danilo (Supervisor)', veiculo: 'JKL-3456', dataInicio: '2026-02-23T08:00', dataFim: '2026-02-23T10:00', turno: 'Manhã', qtdVolume: 30, notasFiscais: 'NF-009900', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T16:00', usuario: 'danilo.supervisor' }] },
+            { id: 1, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Transvip Logística', motorista: 'Operador', veiculo: 'ABC-1234', dataInicio: '2026-02-22T08:00', dataFim: '2026-02-22T10:00', turno: 'Manhã', qtdVolume: 45, notasFiscais: 'NF-001234, NF-001235', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T15:30', usuario: 'operador' }] },
+            { id: 2, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 03', transportadora: 'RodoExpress', motorista: 'Operador', veiculo: 'DEF-5678', dataInicio: '2026-02-22T10:00', dataFim: '2026-02-22T12:00', turno: 'Manhã', qtdVolume: 120, notasFiscais: 'NF-005500', status: 'veiculo_recepcionado', historico: [{ status: 'agendado', data: '2026-02-20T10:00', usuario: 'operador' }, { status: 'veiculo_recepcionado', data: '2026-02-22T09:45', usuario: 'operador' }] },
+            { id: 3, tipo: 'Recebimento', depositante: 'VerticalParts Matriz', doca: 'DOCA 02', transportadora: 'Patrus Transportes', motorista: 'Operador', veiculo: 'GHI-9012', dataInicio: '2026-02-22T14:00', dataFim: '2026-02-22T16:00', turno: 'Tarde', qtdVolume: 80, notasFiscais: 'NF-007788, NF-007789, NF-007790', status: 'veiculo_patio', historico: [{ status: 'agendado', data: '2026-02-19T11:00', usuario: 'operador' }, { status: 'veiculo_recepcionado', data: '2026-02-22T13:30', usuario: 'operador' }, { status: 'veiculo_patio', data: '2026-02-22T13:45', usuario: 'operador' }] },
+            { id: 4, tipo: 'Expedição', depositante: 'VerticalParts Matriz', doca: 'DOCA 01', transportadora: 'Jadlog', motorista: 'Operador', veiculo: 'JKL-3456', dataInicio: '2026-02-23T08:00', dataFim: '2026-02-23T10:00', turno: 'Manhã', qtdVolume: 30, notasFiscais: 'NF-009900', status: 'agendado', historico: [{ status: 'agendado', data: '2026-02-21T16:00', usuario: 'operador' }] },
         ];
     });
 

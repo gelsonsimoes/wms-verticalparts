@@ -160,7 +160,7 @@ function DeleteModal({ code, onConfirm, onClose }) {
 }
 
 // ─── Modal de Cadastro / Edição ───────────────────────────────────────────────
-function AddressModal({ addr, existingCodes, onSave, onClose }) {
+function AddressModal({ addr, existingCodes, onSave, onClose, onDelete }) {
     const isEdit = !!addr?.id;
 
     const [form, setForm] = useState(
@@ -337,20 +337,31 @@ function AddressModal({ addr, existingCodes, onSave, onClose }) {
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-5 py-2 text-sm font-bold bg-yellow-400 hover:bg-yellow-300 text-slate-900 rounded-xl flex items-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 outline-none"
-                    >
-                        <Save className="w-4 h-4" aria-hidden="true" />
-                        Salvar
-                    </button>
+                <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                    {isEdit && onDelete ? (
+                        <button
+                            onClick={() => onDelete(addr)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-500 border border-red-200 hover:bg-red-50 rounded-xl transition-colors"
+                        >
+                            <Trash2 className="w-4 h-4" aria-hidden="true" />
+                            Excluir
+                        </button>
+                    ) : <div />}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            className="px-5 py-2 text-sm font-bold bg-yellow-400 hover:bg-yellow-300 text-slate-900 rounded-xl flex items-center gap-2 transition-colors focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 outline-none"
+                        >
+                            <Save className="w-4 h-4" aria-hidden="true" />
+                            Salvar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -765,6 +776,7 @@ export default function AddressManagement() {
                     existingCodes={existingCodes}
                     onSave={handleSave}
                     onClose={() => setModal(null)}
+                    onDelete={(addr) => { setModal(null); setDeleteTarget(addr); }}
                 />
             )}
 

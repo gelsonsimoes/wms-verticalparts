@@ -23,9 +23,9 @@ const WarehouseVisualMap = () => {
     const { slots, loading, error } = useWarehouseMap();
 
     const aisles = [
-        { id: 'R1', name: 'Rua 1', color: 'emerald', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', label: 'bg-emerald-500', zone: 'Alta Rotatividade (Picking)' },
-        { id: 'R2', name: 'Rua 2', color: 'amber', bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', label: 'bg-amber-500', zone: 'Pulmão Médio' },
-        { id: 'R3', name: 'Rua 3', color: 'rose', bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', label: 'bg-rose-500', zone: 'Estocagem Longa (Aéreo)' }
+        { id: 'R1', name: 'Rua 1', color: 'emerald', bg: 'bg-emerald-500/25', border: 'border-emerald-400/50', hoverBg: 'hover:bg-emerald-400/40', hoverBorder: 'hover:border-emerald-300/70', text: 'text-emerald-300', label: 'bg-emerald-500', zone: 'Alta Rotatividade (Picking)' },
+        { id: 'R2', name: 'Rua 2', color: 'amber', bg: 'bg-amber-500/25', border: 'border-amber-400/50', hoverBg: 'hover:bg-amber-400/40', hoverBorder: 'hover:border-amber-300/70', text: 'text-amber-300', label: 'bg-amber-500', zone: 'Pulmão Médio' },
+        { id: 'R3', name: 'Rua 3', color: 'rose', bg: 'bg-rose-500/25', border: 'border-rose-400/50', hoverBg: 'hover:bg-rose-400/40', hoverBorder: 'hover:border-rose-300/70', text: 'text-rose-300', label: 'bg-rose-500', zone: 'Estocagem Longa (Aéreo)' }
     ];
 
     const getPpsForAisle = (aisleId) => {
@@ -66,9 +66,9 @@ const WarehouseVisualMap = () => {
                 className={`
                     group relative w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-300
                     border ${aisle.border}
-                    ${occupied 
-                        ? 'bg-red-600/90 border-red-400 scale-[0.98] shadow-[inset_0_0_15px_rgba(0,0,0,0.5)]' 
-                        : `${aisle.bg} ${aisle.text} hover:scale-110 hover:z-10 cursor-pointer`
+                    ${occupied
+                        ? 'bg-red-600/90 border-red-400 scale-[0.98] shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                        : `${aisle.bg} ${aisle.text} ${aisle.hoverBg} ${aisle.hoverBorder} hover:scale-110 hover:z-10 cursor-pointer`
                     }
                     ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black z-20 scale-110 !border-white' : ''}
                 `}
@@ -76,7 +76,7 @@ const WarehouseVisualMap = () => {
                 {occupied ? (
                     <X size={24} className="text-white opacity-80 group-hover:opacity-100 transition-opacity" strokeWidth={3} />
                 ) : (
-                    <span className="text-[9px] font-black opacity-30 group-hover:opacity-100">{String(pos).padStart(2, '0')}</span>
+                    <span className="text-[9px] font-semibold text-white/70 group-hover:text-white">{String(pos).padStart(2, '0')}</span>
                 )}
             </div>
         );
@@ -243,6 +243,25 @@ const WarehouseVisualMap = () => {
                         </div>
                     )}
 
+                    {/* Legenda global */}
+                    <div className="flex gap-5 mb-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-sm bg-emerald-500/25 border border-emerald-400/50" />
+                            <span className="text-xs text-slate-300">Livre (R1)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-sm bg-amber-500/25 border border-amber-400/50" />
+                            <span className="text-xs text-slate-300">Livre (R2)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-sm bg-rose-500/25 border border-rose-400/50" />
+                            <span className="text-xs text-slate-300">Livre (R3)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-sm bg-red-600/90 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                            <span className="text-xs text-slate-300">Ocupado</span>
+                        </div>
+                    </div>
                     <div className="flex flex-col gap-12 overflow-x-auto pb-10 custom-scrollbar">
                         {aisles.filter(a => selectedAisle === 'ALL' || a.id === selectedAisle).map(aisle => (
                             <div key={aisle.id} className="flex flex-col gap-6">
@@ -271,7 +290,7 @@ const WarehouseVisualMap = () => {
                                 <div className="flex flex-col gap-4">
                                     {getPpsForAisle(aisle.id).map((pp, idx) => (
                                         <React.Fragment key={pp}>
-                                            <div className="bg-black/40 border border-white/5 rounded-2xl p-6 relative overflow-hidden group/pp">
+                                            <div className="bg-[#0f172a] border border-slate-700 rounded-2xl p-6 relative overflow-hidden group/pp shadow-2xl">
                                                 {/* PP Background ID decoration */}
                                                 <div className="absolute -right-4 -top-8 text-6xl font-black text-white/[0.02] select-none pointer-events-none">{pp}</div>
                                                 

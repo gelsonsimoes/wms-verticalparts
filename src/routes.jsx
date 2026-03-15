@@ -93,6 +93,7 @@ const SefazCertificates = lazy(() => import('./pages/SefazCertificates'));
 // 11. SEGURANÇA
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const UserGroups = lazy(() => import('./pages/UserGroups'));
+const ActivityHistory = lazy(() => import('./pages/AuditLogs'));
 
 // Exportação do array de rotas
 export const appRoutes = [
@@ -188,4 +189,5 @@ export const appRoutes = [
   // SEGURANÇA
   { path: '/seguranca/usuarios', element: <UsersPage />, meta: { codigo: '11.1', titulo: 'Gerenciar Usuários' } },
   { path: '/seguranca/grupos', element: <UserGroups />, meta: { codigo: '11.2', titulo: 'Definir Grupos de Acesso' } },
+  { path: '/seguranca/historico', element: <ActivityHistory />, meta: { codigo: '11.3', titulo: 'Histórico de Atividades' } },
 ];

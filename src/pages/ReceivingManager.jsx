@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  PackageSearch, 
-  Filter, 
-  Calendar, 
-  FileText, 
-  Boxes, 
-  Truck, 
-  CheckCircle2, 
-  AlertCircle, 
-  Plus, 
-  RotateCcw, 
-  Barcode, 
-  Hash, 
-  X, 
+import {
+  PackageSearch,
+  Filter,
+  Calendar,
+  FileText,
+  Boxes,
+  Truck,
+  CheckCircle2,
+  AlertCircle,
+  Plus,
+  RotateCcw,
+  Barcode,
+  Hash,
+  X,
   Zap,
   ClipboardList,
   AlertTriangle,
   Camera,
-  Search
+  Search,
+  Tag
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -237,7 +238,6 @@ export default function ReceivingManager() {
                 disabled={!selectedOR}
                 onClick={() => {
                   setOrdens(prev => prev.map(o => o.id === selectedOR ? {...o, conferidos: 0} : o));
-                  setScanLog([]);
                   alert('Recontagem iniciada. Conferidos resetados para 0.');
                 }} />
 

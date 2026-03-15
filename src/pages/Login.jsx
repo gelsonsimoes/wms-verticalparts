@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, LogIn, AlertCircle, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 const APP_VERSION = 'v4.2.1';
@@ -13,14 +13,33 @@ export default function Login({ onLogin }) {
     const [showSenha,    setShowSenha]    = useState(false);
     const [error,        setError]        = useState('');
     const [loading,      setLoading]      = useState(false);
-    // Estado para controle de foco sem manipulação direta do DOM
     const [focusedField, setFocusedField] = useState(null);
 
-    // Ref para limpeza do timeout e prevenção de memory leak
+    // Estados para "Esqueceu a senha?"
+    const [mode,         setMode]         = useState('login'); // 'login' | 'forgot' | 'forgot-sent'
+    const [resetEmail,   setResetEmail]   = useState('');
+
     const timeoutRef = useRef(null);
     useEffect(() => {
         return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
     }, []);
+
+    const handleForgot = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!resetEmail.trim()) return;
+        setLoading(true);
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+            resetEmail.trim(),
+            { redirectTo: 'https://wmsverticalparts.com.br/auth/reset-password' }
+        );
+        setLoading(false);
+        if (resetError) {
+            setError(resetError.message);
+        } else {
+            setMode('forgot-sent');
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -70,6 +89,113 @@ export default function Login({ onLogin }) {
             ? 'border-[#FFD700]'
             : 'border-white/10';
 
+    // ── Tela: E-mail enviado ──────────────────────────────────────
+    if (mode === 'forgot-sent') {
+        return (
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1A1A1A' }}>
+                <div className="w-full max-w-sm mx-4 text-center">
+                    <div className="rounded-3xl p-8 border" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(34,197,94,0.3)' }}>
+                        <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                        <h2 className="text-xl font-black text-white mb-2">E-mail Enviado!</h2>
+                        <p className="text-slate-400 text-sm mb-1">Verifique a caixa de entrada de:</p>
+                        <p className="text-yellow-400 font-black text-sm mb-4">{resetEmail}</p>
+                        <p className="text-slate-500 text-xs mb-6">Clique no link do e-mail para redefinir sua senha. Verifique também a pasta de spam.</p>
+                        <button
+                            onClick={() => { setMode('login'); setResetEmail(''); setError(''); }}
+                            className="w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest bg-primary text-secondary hover:bg-primary-hover transition-all flex items-center justify-center gap-2"
+                        >
+                            <ArrowLeft className="w-4 h-4" /> Voltar ao Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Tela: Esqueceu a senha ────────────────────────────────────
+    if (mode === 'forgot') {
+        return (
+            <div className="min-h-screen flex items-center justify-center relative overflow-hidden" style={{ backgroundColor: '#1A1A1A' }}>
+                <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+                    <div className="absolute top-0 left-0 w-96 h-96 rounded-full opacity-5"
+                        style={{ background: 'radial-gradient(circle, #FFD700 0%, transparent 70%)', transform: 'translate(-30%, -30%)' }} />
+                    <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-5"
+                        style={{ background: 'radial-gradient(circle, #FFD700 0%, transparent 70%)', transform: 'translate(30%, 30%)' }} />
+                </div>
+                <div className="relative w-full max-w-sm mx-4">
+                    <div className="text-center mb-8">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 overflow-hidden">
+                            <img src="/img/logo_amarelo.svg" alt="VerticalParts Logo" className="w-full h-full object-contain" />
+                        </div>
+                        <h1 className="text-2xl font-black text-white tracking-tight">VerticalParts</h1>
+                        <p className="text-xs font-bold mt-1 text-primary tracking-[0.2em]">WAREHOUSE MANAGEMENT SYSTEM</p>
+                    </div>
+                    <div className="rounded-3xl p-8 border" style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,215,0,0.15)', backdropFilter: 'blur(20px)' }}>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-yellow-500/10 rounded-lg">
+                                <Mail className="w-5 h-5 text-yellow-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-base font-black text-white uppercase tracking-tight">Redefinir Senha</h2>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Enviaremos um link por e-mail</p>
+                            </div>
+                        </div>
+                        <form onSubmit={handleForgot} className="space-y-5" noValidate>
+                            <div>
+                                <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                                    E-mail cadastrado
+                                </label>
+                                <input
+                                    type="email"
+                                    value={resetEmail}
+                                    onChange={e => setResetEmail(e.target.value)}
+                                    onFocus={() => setFocusedField('reset')}
+                                    onBlur={() => setFocusedField(null)}
+                                    placeholder="seu@email.com"
+                                    autoFocus
+                                    required
+                                    className={`${INPUT_BASE} border-2 ${focusedField === 'reset' ? 'border-[#FFD700]' : 'border-white/10'}`}
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+                                />
+                            </div>
+                            {error && (
+                                <div role="alert" className="flex items-center gap-2 text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    {error}
+                                </div>
+                            )}
+                            <button
+                                type="submit"
+                                disabled={loading || !resetEmail.trim()}
+                                className="w-full py-3 rounded-xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed bg-primary text-secondary hover:bg-primary-hover"
+                            >
+                                {loading ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        Enviando...
+                                    </span>
+                                ) : (
+                                    <><Mail className="w-4 h-4" /> Enviar Link</>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { setMode('login'); setError(''); }}
+                                className="w-full text-center text-[11px] font-bold text-slate-500 hover:text-yellow-400 transition-colors uppercase tracking-widest flex items-center justify-center gap-1"
+                            >
+                                <ArrowLeft className="w-3 h-3" /> Voltar ao Login
+                            </button>
+                        </form>
+                    </div>
+                    <p className="text-center text-xs text-slate-600 mt-6 font-medium">
+                        VerticalParts WMS · {APP_VERSION} · {new Date().getFullYear()}
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Tela: Login normal ────────────────────────────────────────
     return (
         <div
             className="min-h-screen flex items-center justify-center relative overflow-hidden"
@@ -220,6 +346,15 @@ export default function Login({ onLogin }) {
                                     Entrar
                                 </>
                             )}
+                        </button>
+
+                        {/* Link "Esqueceu a senha?" */}
+                        <button
+                            type="button"
+                            onClick={() => { setMode('forgot'); setError(''); }}
+                            className="w-full text-center text-[11px] font-bold text-slate-500 hover:text-yellow-400 transition-colors uppercase tracking-widest mt-1"
+                        >
+                            Esqueceu a senha?
                         </button>
                     </form>
                 </div>

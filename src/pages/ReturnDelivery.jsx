@@ -281,7 +281,7 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
     nfOriginal: '',
     depositante: '',
     tipoDevolucao: 'Insucesso de Entrega',
-    responsavel: 'Danilo',
+    responsavel: "Operador",
     dataSolicitacao: new Date().toISOString().slice(0,10),
   });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -377,7 +377,7 @@ function ModalNovaDevolucao({ onClose, onSalvar, totalExistente }) {
                 onChange={e=>set('responsavel',e.target.value)}
                 className="w-full border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl px-3 py-2 text-xs font-bold outline-none dark:bg-slate-800"
               >
-                {['Danilo','Matheus','Thiago'].map(r=><option key={r}>{r}</option>)}
+                {['Operador','Operador','Operador'].map(r=><option key={r}>{r}</option>)}
               </select>
             </div>
             <div className="col-span-2 space-y-1">
