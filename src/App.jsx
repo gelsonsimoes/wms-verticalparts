@@ -63,12 +63,14 @@ function App() {
       }
       
       return {
-        id: authUser.id,
-        login: profile?.employee_id || authUser.email,
-        nome: profile?.nome || authUser.email.split('@')[0],
-        role: profile?.role || 'gestor',
-        nivel: profile?.role === 'gestor' ? 'Administrador' : 'Operador',
-        email: authUser.email,
+        id:                 authUser.id,
+        login:              profile?.employee_id || authUser.email,
+        nome:               profile?.nome || authUser.email.split('@')[0],
+        role:               profile?.role || 'gestor',
+        nivel:              profile?.role === 'gestor' ? 'Administrador' : 'Operador',
+        email:              authUser.email,
+        // null = sem restrição (admin); array = rotas permitidas
+        paginas_permitidas: profile?.paginas_permitidas ?? null,
       };
     } catch (e) {
       if (e.message === 'DB_TIMEOUT') {
@@ -141,6 +143,13 @@ function App() {
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (supabaseSession?.user) {
           console.log('[App] onAuthStateChange: buscando perfil para', supabaseSession.user.id);
+          // Usuário convidado que ainda não trocou a senha → forçar UpdatePassword
+          if (supabaseSession.user.user_metadata?.must_change_password) {
+            if (window.location.pathname !== '/auth/update-password') {
+              window.location.href = '/auth/update-password';
+            }
+            return;
+          }
           const userData = await fetchUserProfile(supabaseSession.user);
           console.log('[App] onAuthStateChange: perfil carregado, setando session');
           if (isMounted) setSession(userData);
@@ -184,7 +193,7 @@ function App() {
   }
 
   return (
-    <AppProvider>
+    <AppProvider session={session}>
       <Router>
         <div className="flex min-h-screen bg-white text-[var(--vp-text-data)] font-sans">
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />

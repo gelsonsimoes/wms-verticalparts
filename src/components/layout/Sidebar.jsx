@@ -295,6 +295,19 @@ export default function Sidebar({ toggleSidebar: parentToggleSidebar }) {
     }
   }, []);
 
+  // Filtra a navegação pelas páginas que o usuário tem permissão de ver.
+  // null = sem restrição (gestor/admin vê tudo).
+  const visibleNav = React.useMemo(() => {
+    const allowed = currentUser?.paginas_permitidas;
+    if (!allowed) return NAVIGATION;
+    return NAVIGATION
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => allowed.includes(item.path)),
+      }))
+      .filter(group => group.items.length > 0);
+  }, [currentUser?.paginas_permitidas]);
+
   // toggleSection: lógica sequencial — sem side-effects dentro de updaters
   const toggleSection = useCallback((sectionTitle) => {
     if (collapsed) {
@@ -405,7 +418,7 @@ export default function Sidebar({ toggleSidebar: parentToggleSidebar }) {
 
         {/* Navegação */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar py-2">
-          {NAVIGATION.map((group) => (
+          {visibleNav.map((group) => (
             <NavGroup
               key={group.title}
               group={group}

@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -92,6 +93,66 @@ app.post('/api/generate-description', async (req, res) => {
   } catch (error) {
     console.error("AI Generation Error:", error);
     res.status(500).json({ error: "Falha ao gerar descrição técnica." });
+  }
+});
+
+// ── Endpoint: Convidar usuário via Supabase Admin ─────────────
+// Requer SUPABASE_SERVICE_ROLE_KEY no .env do servidor
+app.post('/api/invite-user', async (req, res) => {
+  const { email, employee_id, nome, cargo, paginas_permitidas } = req.body;
+
+  if (!email || !nome) {
+    return res.status(400).json({ error: 'email e nome são obrigatórios.' });
+  }
+
+  const supabaseUrl  = process.env.VITE_SUPABASE_URL  || process.env.SUPABASE_URL;
+  const serviceKey   = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceKey) {
+    return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY não configurada no servidor.' });
+  }
+
+  const adminSupabase = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+
+  try {
+    // 1. Convida pelo e-mail — must_change_password força troca na 1ª entrada
+    const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${process.env.SITE_URL || 'https://wmsverticalparts.com.br'}/auth/callback`,
+      data: {
+        employee_id: employee_id || email.split('@')[0],
+        full_name: nome,
+        must_change_password: true,
+      }
+    });
+
+    if (inviteError) {
+      return res.status(400).json({ error: inviteError.message });
+    }
+
+    const authUserId = inviteData?.user?.id;
+
+    // 2. Cria/atualiza registro em operadores com UUID do auth + permissões de página
+    if (authUserId) {
+      const { error: dbError } = await adminSupabase.from('operadores').upsert({
+        id:                 authUserId,
+        employee_id:        employee_id || email.split('@')[0],
+        nome,
+        email,
+        cargo:              cargo || 'Operador',
+        role:               'operador',
+        paginas_permitidas: paginas_permitidas || [],
+        status:             'Ativo',
+      }, { onConflict: 'id' });
+
+      if (dbError) console.error('[invite-user] DB upsert error:', dbError.message);
+    }
+
+    res.json({ success: true, userId: authUserId });
+  } catch (err) {
+    console.error('[invite-user] Erro:', err);
+    res.status(500).json({ error: err.message || 'Erro interno ao enviar convite.' });
   }
 });
 

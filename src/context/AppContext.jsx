@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect } from 'react';
 // eslint-disable-next-line react-refresh/only-export-components
 export const AppContext = createContext();
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, session }) {
     // Global States
     const RUAS = ['R1', 'R2', 'R3'];
     const PP_POR_RUA = { R1: ['PP1','PP2'], R2: ['PP3','PP4'], R3: ['PP5'] };
@@ -32,10 +32,19 @@ export function AppProvider({ children }) {
     });
 
     const [isTvMode, setIsTvMode] = useState(false);
-    const [currentUser, setCurrentUser] = useState({
+    // currentUser derivado da session Supabase (App.jsx) — fallback para dev sem auth
+    const [currentUser, setCurrentUser] = useState(() => session ? {
+        id:                 session.id,
+        usuario:            session.login,
+        nome:               session.nome,
+        role:               session.role,
+        email:              session.email,
+        paginas_permitidas: session.paginas_permitidas ?? null, // null = acesso total
+    } : {
         usuario: 'danilo.supervisor',
         nome: 'Danilo',
-        role: 'gestor' // 'operador', 'planejador', 'gestor'
+        role: 'gestor',
+        paginas_permitidas: null,
     });
 
     const [companies, setCompanies] = useState(() => {
