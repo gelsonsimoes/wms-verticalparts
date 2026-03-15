@@ -81,6 +81,7 @@ const NAVIGATION = [
       { label: "2.19 Ordem de Serviço",          icon: Wrench,        path: "/operacao/ordem-servico" },
       { label: "2.20 Gestão de Seguros",         icon: ShieldCheck,   path: "/operacao/gestao-seguros" },
       { label: "2.21 Pesagem Rodoviária",        icon: Scale,         path: "/operacao/pesagem-rodoviaria" },
+      { label: "2.22 Gerenciamento de Pedidos",  icon: ListTodo,      path: "/operacao/gerenciamento-pedidos" },
     ],
   },
   {

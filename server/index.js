@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
@@ -92,6 +93,56 @@ app.post('/api/generate-description', async (req, res) => {
   } catch (error) {
     console.error("AI Generation Error:", error);
     res.status(500).json({ error: "Falha ao gerar descrição técnica." });
+  }
+});
+
+// ── Convidar novo usuário via Supabase Admin ──────────────────────────────────
+app.post('/api/invite-user', async (req, res) => {
+  const { email, nome, cargo, employee_id, grupo_acesso_id, paginas_permitidas } = req.body;
+
+  const supabaseUrl     = process.env.VITE_SUPABASE_URL;
+  const serviceRoleKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return res.status(500).json({ error: 'Variáveis de ambiente do servidor não configuradas.' });
+  }
+
+  try {
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // 1. Convite via Supabase Auth
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+      email,
+      { data: { must_change_password: true, nome, cargo } }
+    );
+    if (inviteError) throw inviteError;
+
+    const userId = inviteData.user.id;
+
+    // 2. Upsert na tabela operadores
+    const operadorData = {
+      id:          userId,
+      nome,
+      email,
+      cargo:       cargo       || 'Operador',
+      employee_id: employee_id || email.split('@')[0],
+      role:        'operador',
+      ativo:       true,
+    };
+    if (grupo_acesso_id)    operadorData.grupo_acesso_id    = grupo_acesso_id;
+    if (paginas_permitidas) operadorData.paginas_permitidas = paginas_permitidas;
+
+    const { error: upsertError } = await supabaseAdmin
+      .from('operadores')
+      .upsert(operadorData);
+    if (upsertError) throw upsertError;
+
+    res.json({ success: true, user_id: userId });
+  } catch (error) {
+    console.error('Invite error:', error);
+    res.status(500).json({ error: error.message || 'Falha ao convidar usuário.' });
   }
 });
 

@@ -6,8 +6,9 @@ import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-// Migrando do Supabase Edge Functions para a VPS Própria (Motor WMS-API)
-const CHAT_AI_URL = `http://72.61.37.129:3001/api/chat`;
+// URL do backend Express (Railway em produção, localhost em dev)
+const API_BASE    = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const CHAT_AI_URL = `${API_BASE}/api/chat`;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SYSTEM_PROMPT = `

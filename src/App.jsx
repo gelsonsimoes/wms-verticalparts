@@ -6,6 +6,7 @@ import { AppProvider } from './context/AppContext';
 import ChatAssistant from './components/chat/ChatAssistant';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import { supabase } from './services/supabaseClient';
 import { appRoutes } from './routes';
 import { Loader2 } from 'lucide-react';
@@ -39,7 +40,7 @@ function App() {
 
     try {
       // Timeout de 7s — se o banco não responder, usa dados básicos
-      const result = await Promise.race([
+      await Promise.race([
         supabase
           .from('operadores')
           .select('*')
@@ -50,19 +51,29 @@ function App() {
         )
       ]);
 
-      const { data: profile, error } = result;
-      
+      // Busca o perfil + grupo de acesso via join
+      const { data: profile, error } = await supabase
+        .from('operadores')
+        .select('*, grupos_acesso(paginas)')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
       if (error) {
         console.warn("[App] Perfil não encontrado no DB (fallback ativo) ", error);
       }
-      
+
+      const isGestor = profile?.role === 'gestor';
+
       return {
-        id: authUser.id,
-        login: profile?.employee_id || authUser.email,
-        nome: profile?.nome || authUser.email.split('@')[0],
-        role: profile?.role || 'gestor',
-        nivel: profile?.role === 'gestor' ? 'Administrador' : 'Operador',
-        email: authUser.email,
+        id:                 authUser.id,
+        login:              profile?.employee_id || authUser.email,
+        nome:               profile?.nome || authUser.email.split('@')[0],
+        role:               profile?.role || 'gestor',
+        nivel:              isGestor ? 'Administrador' : 'Operador',
+        email:              authUser.email,
+        grupo_acesso_id:    profile?.grupo_acesso_id ?? null,
+        // null = sem restrição (gestor); array de paths = páginas do grupo
+        paginas_permitidas: isGestor ? null : (profile?.grupos_acesso?.paginas ?? []),
       };
     } catch (e) {
       if (e.message === 'DB_TIMEOUT') {
@@ -135,6 +146,13 @@ function App() {
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (supabaseSession?.user) {
           console.log('[App] onAuthStateChange: buscando perfil para', supabaseSession.user.id);
+          // Usuário convidado que ainda não trocou a senha → forçar UpdatePassword
+          if (supabaseSession.user.user_metadata?.must_change_password) {
+            if (window.location.pathname !== '/auth/update-password') {
+              window.location.href = '/auth/update-password';
+            }
+            return;
+          }
           const userData = await fetchUserProfile(supabaseSession.user);
           console.log('[App] onAuthStateChange: perfil carregado, setando session');
           if (isMounted) setSession(userData);
@@ -160,6 +178,13 @@ function App() {
     setSession(null);
   };
 
+  // Rotas de autenticação: interceptar ANTES do check de sessão
+  // Necessário para o fluxo de convite e reset de senha via Supabase
+  const currentPath = window.location.pathname;
+  if (currentPath === '/auth/callback' || currentPath === '/auth/reset-password') {
+    return <AuthCallbackPage />;
+  }
+
   // Enquanto resolvemos a resposta Async do Supabase:
   if (isCheckingAuth) {
     return <FallbackLoader />;
@@ -171,7 +196,7 @@ function App() {
   }
 
   return (
-    <AppProvider>
+    <AppProvider session={session}>
       <Router>
         <div className="flex min-h-screen bg-white text-[var(--vp-text-data)] font-sans">
           <Sidebar isOpen={isSidebarOpen} toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
