@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useId, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
     Shield, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight,
     CheckSquare, Square, Smartphone, Monitor, Globe, Warehouse, Activity,

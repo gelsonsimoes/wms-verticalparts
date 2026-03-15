@@ -22,10 +22,9 @@ import {
   AlertTriangle,
   Scissors,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../utils/cn';
 
-function cn(...i) { return twMerge(clsx(i)); }
+
 
 // ─── CORES ABC ──────────────────────────────────────────────────────
 const ABC_CFG = {
@@ -87,15 +86,13 @@ function DonutChart({ data, label }) {
   const cx = 100, cy = 100, r = 75, stroke = 30;
   const circumference = 2 * Math.PI * r;
 
-  let accumulated = 0;
-  const slices = data.map(d => {
-    const pct   = d.value / total;
-    const dash  = circumference * pct;
-    const gap   = circumference - dash;
-    const offset = circumference * (1 - accumulated) - circumference * 0.25;
-    accumulated += pct;
-    return { ...d, dash, gap, offset, pct };
-  });
+  const chartData = data.reduce(({ items, acc }, d) => {
+    const pct    = d.value / total;
+    const dash   = circumference * pct;
+    const gap    = circumference - dash;
+    const offset = circumference * (1 - acc) - circumference * 0.25;
+    return { items: [...items, { ...d, dash, gap, offset, pct }], acc: acc + pct };
+  }, { items: [], acc: 0 }).items;
 
   const [hovered, setHovered] = useState(null);
 
@@ -105,7 +102,7 @@ function DonutChart({ data, label }) {
         {/* fundo */}
         <circle cx={cx} cy={cy} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-slate-100 dark:text-slate-800" />
 
-        {slices.map((s, i) => (
+        {chartData.map((s, i) => (
           <circle key={i} cx={cx} cy={cy} r={r} fill="none"
             stroke={s.color}
             strokeWidth={hovered === i ? stroke + 6 : stroke}
@@ -120,16 +117,16 @@ function DonutChart({ data, label }) {
 
         {/* Centro */}
         <text x={cx} y={cy - 10} textAnchor="middle" fontSize="28" fontWeight="900" fill="currentColor" className="text-slate-800 dark:text-white">
-          {hovered !== null ? `${Math.round(slices[hovered].pct * 100)}%` : total}
+          {hovered !== null ? `${Math.round(chartData[hovered].pct * 100)}%` : total}
         </text>
         <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#64748b" fontWeight="700">
-          {hovered !== null ? slices[hovered].label : label}
+          {hovered !== null ? chartData[hovered].label : label}
         </text>
       </svg>
 
       {/* Legenda */}
       <div className="flex gap-4 mt-2">
-        {slices.map((s, i) => (
+        {chartData.map((s, i) => (
           <div key={i} className="flex items-center gap-1.5 cursor-pointer" onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
             <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
             <div>
@@ -358,12 +355,7 @@ function EstoqueSintetico() {
     setTimeout(() => setPdfMsg(false), 3000);
   };
 
-  function exportCSV(rows, filename, headers, mapper) {
-    const csv = '\uFEFF' + [headers.join(';'), ...rows.map(r => mapper(r).join(';'))].join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'application/vnd.ms-excel;charset=utf-8;' }));
-    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-  }
+
 
   return (
     <div className="space-y-4">
@@ -426,7 +418,6 @@ function EstoqueSintetico() {
           <tbody>
             {filtered.map(row => {
               const estCfg = ESTADO_CFG[row.estado] || ESTADO_CFG['Bom'];
-              const isAvar = row.estado !== 'Bom';
               return (
                 <tr key={row.id}
                   className={cn('border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border-l-4',

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useId } from 'react';
+import React, { useState, useMemo, useId } from 'react';
 import {
   Users,
   Search,
@@ -58,7 +58,7 @@ function Field({ label, children, className }) {
 const inputCls = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
 export default function CustomerCatalog() {
-  const [customers, setCustomers] = useState([
+  const [customers] = useState([
     { id: 1, razao_social: 'VerticalParts Manutenção LTDA', nome_fantasia: 'VP Manutenção', cnpj: '12.345.678/0001-99', email: 'contato@vp.com.br', telefone: '(11) 98888-7777', cidade: 'São Paulo', uf: 'SP', status: 'Ativo' },
     { id: 2, razao_social: 'Condomínio Edifício Horizon', nome_fantasia: 'Ed. Horizon', cnpj: '98.765.432/0001-00', email: 'adm@horizon.com.br', telefone: '(11) 3333-2222', cidade: 'Barueri', uf: 'SP', status: 'Ativo' },
   ]);

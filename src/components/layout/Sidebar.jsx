@@ -52,7 +52,7 @@ import {
   Inbox,
   Zap,
 } from "lucide-react";
-import { useApp } from "../../context/AppContext";
+import { useApp } from "../../hooks/useApp";
 import Tooltip from "../ui/Tooltip";
 
 const NAVIGATION = [
@@ -182,8 +182,9 @@ const NAVIGATION = [
     title: "11. SEGURANÇA",
     icon: Shield,
     items: [
-      { label: "11.1 Gerenciar Usuários",        icon: User,         path: "/seguranca/usuarios" },
-      { label: "11.2 Definir Grupos de Acesso",  icon: Shield,       path: "/seguranca/grupos" },
+      { label: "11.1 Gerenciar Usuários",           icon: User,         path: "/seguranca/usuarios" },
+      { label: "11.2 Definir Grupos de Acesso",   icon: Shield,       path: "/seguranca/grupos" },
+      { label: "11.3 Relatório de Colaboradores", icon: FileText,     path: "/seguranca/relatorio-colaboradores" },
     ],
   },
 ];
@@ -315,7 +316,7 @@ export default function Sidebar({ toggleSidebar: parentToggleSidebar }) {
       .join("")
       .slice(0, 2)
       .toUpperCase();
-  }, [currentUser?.nome]);
+  }, [currentUser]);
 
   return (
     <>

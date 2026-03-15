@@ -456,10 +456,13 @@ export default function AddressManagement() {
 
     // Sincronizar page quando filtro reduz totalPages — estado real corrigido, não só UI
     useEffect(() => {
-        if (page > totalPages) setPage(totalPages);
-    }, [totalPages]); // eslint-disable-line react-hooks/exhaustive-deps
+        if (page > totalPages && totalPages > 0) {
+            setTimeout(() => setPage(totalPages), 0);
+        }
+    }, [totalPages, page]);
 
-    const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+    const currentPage = Math.min(page, Math.max(1, totalPages));
+    const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     // ── Estatísticas (sem useMemo, dados globais, não dependem de filtros)
     const stats = {

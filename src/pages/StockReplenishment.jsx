@@ -1,4 +1,4 @@
-import React, { useState, useId, useRef, useEffect } from 'react';
+import React, { useState, useId } from 'react';
 import {
   RefreshCw,
   ArrowLeftRight,

@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, Truck, Navigation, Warehouse, 
   Box, Package, ChevronRight, Check, Play
 } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 export default function WavePickingWizard() {
   const wizardId = useId();
@@ -13,7 +13,7 @@ export default function WavePickingWizard() {
   const [filterAvailable, setFilterAvailable] = useState(false);
 
   // Armazenam os dados reais retornados do banco (ou mock inteligente em memória)
-  const [allProducts, setAllProducts] = useState([]);
+  const [, setAllProducts] = useState([]);
   const [dynamicOrders, setDynamicOrders] = useState([]);
 
   const [formData, setFormData] = useState({
@@ -36,7 +36,7 @@ export default function WavePickingWizard() {
   });
 
   // Colmeias para efeito de simulação visual (Poderia vir do banco tabela `colmeias` futuramente)
-  const [colmeias, setColmeias] = useState([
+  const [colmeias] = useState([
     { id: 'COL-01', status: 'Disponível', ocupacao: 0 },
     { id: 'COL-02', status: 'Parcial', ocupacao: 45 },
     { id: 'COL-03', status: 'Disponível', ocupacao: 0 },

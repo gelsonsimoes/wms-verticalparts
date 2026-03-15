@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));

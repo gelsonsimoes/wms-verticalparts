@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
     ClipboardList, ArrowRight, Clock, CheckCircle2, CalendarDays,
     AlertCircle, Play, Package, MapPin, ScanBarcode, History,
@@ -56,7 +56,9 @@ export default function PickingManagement() {
         if (savedOrderId && view === 'LIST') {
             const order = orders.find(o => o.id === savedOrderId);
             if (order && order.status !== 'Concluído') {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setSelectedOrder(order);
+                // eslint-disable-next-line react-hooks/set-state-in-effect
                 setView('ACTIVE');
             }
         }

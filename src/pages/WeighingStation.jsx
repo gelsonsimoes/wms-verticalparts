@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Scale, 
   RefreshCcw, 
@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../services/supabaseClient';
-import { useApp } from '../context/AppContext';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -25,8 +25,6 @@ function cn(...inputs) {
 
 export default function WeighingStation() {
   const { serialDevices } = useApp();
-  const selectId = useId();
-  
   // State
   const [mode, setMode] = useState('OUTBOUND'); // INBOUND or OUTBOUND
   const [activeScale, setActiveScale] = useState('');

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -289,7 +289,7 @@ function ModalAutorizacaoSupervisor({ count, onClose, onAutorizado }) {
     setTimeout(() => setShaking(false), 450);
   };
 
-  const handleErroCredencial = () => {
+  const _handleErroCredencial = () => {
     setErro('Credenciais inválidas. Acesso negado.');
     setSenha('');
     triggerShake();

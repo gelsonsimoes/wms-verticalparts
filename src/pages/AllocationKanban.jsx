@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // eslint-disable-line no-unused-vars
 import {
   GripVertical,
   MapPin,
@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 // ─── Utils ───────────────────────────────────────────────────────────────────
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -406,7 +406,7 @@ import { useSearchParams } from 'react-router-dom';
 export default function AllocationKanban() {
   const [searchParams] = useSearchParams();
   const [tasks,          setTasks]          = useState([]);
-  const [loading,        setLoading]        = useState(true);
+  const [, setLoading]        = useState(true);
   const [confirmModal,   setConfirmModal]   = useState(null);
   const [detalhesModal,  setDetalhesModal]  = useState(null);
   const [novaTarefaOpen, setNovaTarefaOpen] = useState(false);

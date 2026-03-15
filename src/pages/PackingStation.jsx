@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
     Package,
     Search,

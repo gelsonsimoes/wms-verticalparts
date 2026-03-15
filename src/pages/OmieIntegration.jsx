@@ -10,11 +10,37 @@ import {
     Link2,
 } from 'lucide-react';
 
+
 // ─── Mapa de classes estáticas por cor — Tailwind não processa template strings ─────
 const STAT_COLOR_CLASSES = {
     primary: 'bg-primary/10 border-primary/20 text-primary',
     success: 'bg-green-100 border-green-200 text-green-600',
 };
+
+// Toggle acessível como componente interno
+function Toggle({ id, checked, onChange, label, description }) {
+    return (
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col">
+                <label htmlFor={id} className="text-sm font-bold cursor-pointer">{label}</label>
+                <span className="text-[10px] text-slate-400 font-bold">{description}</span>
+            </div>
+            <button
+                id={id}
+                role="switch"
+                aria-checked={checked}
+                onClick={() => onChange(!checked)}
+                aria-label={label}
+                className={`relative w-12 h-6 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${checked ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}
+            >
+                <span
+                    className={`block w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-0'}`}
+                    aria-hidden="true"
+                />
+            </button>
+        </div>
+    );
+}
 
 export default function OmieIntegration() {
     const [isSyncing, setIsSyncing] = useState(false);
@@ -48,30 +74,7 @@ export default function OmieIntegration() {
         { label: 'Latência Omie Cloud',           value: '45ms',  icon: Activity,       color: 'primary' },
     ];
 
-    // Toggle acessível como componente interno
-    function Toggle({ id, checked, onChange, label, description }) {
-        return (
-            <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="flex flex-col">
-                    <label htmlFor={id} className="text-sm font-bold cursor-pointer">{label}</label>
-                    <span className="text-[10px] text-slate-400 font-bold">{description}</span>
-                </div>
-                <button
-                    id={id}
-                    role="switch"
-                    aria-checked={checked}
-                    onClick={() => onChange(!checked)}
-                    aria-label={label}
-                    className={`relative w-12 h-6 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${checked ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'}`}
-                >
-                    <span
-                        className={`block w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-0'}`}
-                        aria-hidden="true"
-                    />
-                </button>
-            </div>
-        );
-    }
+
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">

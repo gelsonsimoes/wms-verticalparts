@@ -39,7 +39,7 @@ const HIST_MOCK = [
 ];
 
 // ===== MODAL SUPERVISOR =====
-function SupervisorModal({ divergencia, pesoNota, pesoBruto, onClose, onConfirm }) {
+function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm }) {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [motivo, setMotivo] = useState('');
@@ -250,7 +250,7 @@ export default function RoadWeighingStation() {
   const [activeScale, setActiveScale] = useState(SCALES[0]);
   const [showScaleDropdown, setShowScaleDropdown] = useState(false);
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
-  const [currentWeight, setCurrentWeight] = useState(0);
+  const [currentWeight, setCurrentWeight] = useState(tara === null ? 8420 : 31560);
   const [isCapturing, setIsCapturing] = useState(false);
   const [tara, setTara] = useState(null);
   const [bruto, setBruto] = useState(null);
@@ -271,7 +271,7 @@ export default function RoadWeighingStation() {
 
   // Simula oscilação da balança
   useEffect(() => {
-    const base = isCapturing ? 0 : (tara === null ? 800 : 31200);
+    const _base = isCapturing ? 0 : (tara === null ? 800 : 31200);
     const interval = setInterval(() => {
       if (!isCapturing) {
         setCurrentWeight(prev => {
@@ -283,10 +283,7 @@ export default function RoadWeighingStation() {
     return () => clearInterval(interval);
   }, [isCapturing, tara]);
 
-  // Ao montar, inicializa o peso simulado
-  useEffect(() => {
-    setCurrentWeight(tara === null ? 8420 : 31560);
-  }, [tara]);
+
 
   const handleCapture = () => {
     setIsCapturing(true);
@@ -647,7 +644,7 @@ export default function RoadWeighingStation() {
           pesoNota={selectedVehicle.pesoNota}
           pesoBruto={bruto || 0}
           onClose={() => setShowSupervisorModal(false)}
-          onConfirm={(motivo) => { setShowSupervisorModal(false); setLiberado(true); }}
+          onConfirm={(_motivo) => { setShowSupervisorModal(false); setLiberado(true); }}
         />
       )}
       {showHistoryModal && <HistoryModal onClose={() => setShowHistoryModal(false)} />}

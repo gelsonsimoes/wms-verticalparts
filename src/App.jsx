@@ -6,6 +6,7 @@ import { AppProvider } from './context/AppContext';
 import ChatAssistant from './components/chat/ChatAssistant';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
+import AuthCallbackPage from './pages/AuthCallbackPage';
 import { supabase } from './services/supabaseClient';
 import { appRoutes } from './routes';
 import { Loader2 } from 'lucide-react';
@@ -39,7 +40,7 @@ function App() {
 
     try {
       // Timeout de 7s — se o banco não responder, usa dados básicos
-      const result = await Promise.race([
+      await Promise.race([
         supabase
           .from('operadores')
           .select('*')
@@ -50,7 +51,12 @@ function App() {
         )
       ]);
 
-      const { data: profile, error } = result;
+      // Busca o perfil na tabela 'operadores'
+      const { data: profile, error } = await supabase
+        .from('operadores')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
       
       if (error) {
         console.warn("[App] Perfil não encontrado no DB (fallback ativo) ", error);
@@ -159,6 +165,13 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
   };
+
+  // Rotas de autenticação: interceptar ANTES do check de sessão
+  // Necessário para o fluxo de convite e reset de senha via Supabase
+  const currentPath = window.location.pathname;
+  if (currentPath === '/auth/callback' || currentPath === '/auth/reset-password') {
+    return <AuthCallbackPage />;
+  }
 
   // Enquanto resolvemos a resposta Async do Supabase:
   if (isCheckingAuth) {

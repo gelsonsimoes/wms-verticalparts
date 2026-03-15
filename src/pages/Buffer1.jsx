@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import { Search, Monitor, X, ArrowRight, Layers, Box } from 'lucide-react';
 
@@ -24,7 +24,7 @@ const dadosBuffer1 = [
 
 const Buffer1 = () => {
     const location = useLocation();
-    const { isTvMode } = useApp();
+    useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [hoveredPos, setHoveredPos] = useState(null);
 

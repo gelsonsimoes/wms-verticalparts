@@ -55,10 +55,10 @@ const STATUS_STYLES = {
 };
 
 export default function FileIntegration() {
-    const [selectedId,   setSelectedId]   = useState(null);
+    const [selectedId,   setSelectedId]   = useState('INT-4421');
     const [showUploader, setShowUploader] = useState(false);
     const [showLogs,     setShowLogs]     = useState(false);
-    const [uploadMsg,    setUploadMsg]    = useState(null); // substitui alert() do drop
+    const [, setUploadMsg]    = useState(null); // substitui alert() do drop
     const [retryMsg,     setRetryMsg]     = useState(null); // substitui alert() do retry
     const [filters, setFilters] = useState({
         status: ['Todos'],
@@ -70,11 +70,6 @@ export default function FileIntegration() {
 
     const clickTimeoutRef = useRef(null);
     const clickCountRef   = useRef(0);
-
-    // Seleção automática da primeira linha com erro
-    useEffect(() => {
-        if (!selectedId) setSelectedId('INT-4421');
-    }, []);
 
     // Cleanup do timeout ao desmontar — evita memory leak
     useEffect(() => {

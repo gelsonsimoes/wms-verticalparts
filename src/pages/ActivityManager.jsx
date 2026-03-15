@@ -303,7 +303,7 @@ function PausarRetomarModal({ atividade, acao, onClose, onConfirm }) {
 }
 
 // ─── GAVETA: HISTÓRICO DE EXECUÇÃO ─────────────────────────────────
-function HistoricoDrawer({ atividade, onClose }) {
+function HistoricoDrawer({ atividade, onClose, now }) {
   const hist = HISTORICO[atividade.id] || [];
 
   // Duração real: diferença entre agora e o horário de início (sem magic number 142)
@@ -317,14 +317,14 @@ function HistoricoDrawer({ atividade, onClose }) {
       const [hours, minutes] = timePart.split(':').map(Number);
       const year = new Date().getFullYear();
       const start = new Date(year, month - 1, day, hours, minutes);
-      const diffMs = Date.now() - start.getTime();
+      const diffMs = now - start.getTime();
       // Se a diferença for negativa ou irreal (>48h), retorna 0
       if (diffMs < 0 || diffMs > 172800000) return 0;
       return Math.floor(diffMs / 60000);
     } catch {
       return 0;
     }
-  }, [atividade.inicio]);
+  }, [atividade.inicio, now]);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -433,7 +433,7 @@ export default function ActivityManager() {
   const [filterSearch, setFilterSearch] = useState('');
   const [modal, setModal]             = useState(null);
   const [acao, setAcao]               = useState(null);
-  const [ticking, setTicking]         = useState(0); // força re-render p/ relógio vivo
+  const [now, setNow]                 = useState(() => Date.now()); // força re-render p/ relógio vivo
 
   // Map O(1) para lookup de operador por id — evita O(n²) no map da tabela
   const operadoresMap = useMemo(
@@ -442,7 +442,7 @@ export default function ActivityManager() {
   );
 
   // Relógio para atividades em execução
-  useEffect(() => { const t = setInterval(() => setTicking(p => p + 1), 30000); return () => clearInterval(t); }, []);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
 
   const selected = atividades.find(a => a.id === selectedId);
 
@@ -660,7 +660,7 @@ export default function ActivityManager() {
       {/* MODAIS & GAVETA */}
       {modal === 'vincular'  && selected && <VincularModal atividade={selected} onClose={() => setModal(null)} onSave={handleVincular} />}
       {modal === 'pausa'     && selected && <PausarRetomarModal atividade={selected} acao={acao} onClose={() => setModal(null)} onConfirm={handlePausarRetomar} />}
-      {modal === 'historico' && selected && <HistoricoDrawer atividade={selected} onClose={() => setModal(null)} />}
+      {modal === 'historico' && selected && <HistoricoDrawer atividade={selected} onClose={() => setModal(null)} now={now} />}
     </div>
   );
 }

@@ -33,7 +33,7 @@ const PERIOD_OPTIONS = ['Diário', 'Semanal', 'Mensal'];
 
 export default function IntegrationWaves() {
   const [activeTab,    setActiveTab]    = useState('integration'); // 'integration' | 'waves'
-  const [integrations, setIntegrations] = useState(INITIAL_INTEGRATIONS);
+  const [integrations] = useState(INITIAL_INTEGRATIONS);
   const [waveSaved,    setWaveSaved]    = useState(false);
 
   // Wave Config State

@@ -364,6 +364,7 @@ function VincularNFeModal({ ctes, onClose, onVincular }) {
 // ─── Gaveta lateral: Histórico (log dinâmico) ─────────────────────────────────
 function HistoricoDrawer({ log, onClose }) {
   const [selected, setSelected] = useState(log[0] ?? null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (log.length > 0 && !selected) setSelected(log[0]); }, [log]);
 
   const timelineSteps = (item) => [

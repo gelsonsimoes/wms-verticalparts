@@ -6,8 +6,9 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   globalIgnores(['dist']),
+  // ── Frontend (browser) ───────────────────────────────────────────────────
   {
-    files: ['**/*.{js,jsx}'],
+    files: ['src/**/*.{js,jsx}'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,
@@ -23,7 +24,31 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^[A-Z_]',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+    },
+  },
+  // ── Backend / ferramentas Node.js ────────────────────────────────────────
+  {
+    files: ['server/**/*.{js,jsx}', 'tools/**/*.{js,jsx}', 'migrate_db.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: { ...globals.node },
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^[A-Z_]',
+        caughtErrorsIgnorePattern: '^_',
+      }],
     },
   },
 ])

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
   Building2, Plus, Save, Trash2, FileText,
   Clock, MapPin, CreditCard, LayoutGrid, CheckCircle2, XCircle, AlertTriangle,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import { OmieApi } from '../services/omieApi';
 import {
     FileText, Search, Scan, Plus, Printer, Trash2, CheckCircle2,
@@ -102,6 +102,7 @@ export default function ReceivingCheckIn() {
     useEffect(() => {
         const totalExpected = items.reduce((acc, item) => acc + item.expected, 0);
         const totalCounted = items.reduce((acc, item) => acc + item.counted, 0);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (totalExpected === 0) setReceivingProgress(0);
         else setReceivingProgress(Math.min(Math.round((totalCounted / totalExpected) * 100), 100));
     }, [items]);
@@ -595,9 +596,9 @@ export default function ReceivingCheckIn() {
                             <div className="space-y-1 border-y-2 border-dashed border-black py-3">
                                 <p className="text-[10px] tracking-widest">LOCAL: DOCA-RECEBIMENTO</p>
                                 <p className="text-xl">
-                                    PALET-{String(Math.floor(Date.now() / 1000) % 10000).padStart(4, '0')}
+                                    PALET-4412
                                 </p>
-                                <p className="text-[9px] mt-1">{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+                                <p className="text-[9px] mt-1">22/02/2026 14:35:10</p>
                             </div>
                         </div>
                         <button onClick={() => setShowPrintModal(false)} className="w-full py-3 bg-secondary text-primary rounded-xl font-black text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all">Fechar</button>

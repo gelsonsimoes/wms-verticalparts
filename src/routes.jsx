@@ -93,6 +93,11 @@ const SefazCertificates = lazy(() => import('./pages/SefazCertificates'));
 // 11. SEGURANÇA
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 const UserGroups = lazy(() => import('./pages/UserGroups'));
+const CollaboratorReport = lazy(() => import('./pages/CollaboratorReport'));
+
+// 12. AUTH (FLUXOS DE ACESSO)
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const UpdatePassword = lazy(() => import('./pages/UpdatePassword'));
 
 // Exportação do array de rotas
 export const appRoutes = [
@@ -188,4 +193,9 @@ export const appRoutes = [
   // SEGURANÇA
   { path: '/seguranca/usuarios', element: <UsersPage />, meta: { codigo: '11.1', titulo: 'Gerenciar Usuários' } },
   { path: '/seguranca/grupos', element: <UserGroups />, meta: { codigo: '11.2', titulo: 'Definir Grupos de Acesso' } },
+  { path: '/seguranca/relatorio-colaboradores', element: <CollaboratorReport />, meta: { codigo: '11.3', titulo: 'Relatório de Colaboradores' } },
+
+  // AUTH
+  { path: '/auth/callback', element: <AuthCallback /> },
+  { path: '/auth/update-password', element: <UpdatePassword /> },
 ];

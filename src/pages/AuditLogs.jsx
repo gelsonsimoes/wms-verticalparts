@@ -28,7 +28,7 @@ function cn(...i) { return twMerge(clsx(i)); }
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Converte 'DD/MM/YYYY HH:mm' → Date (para comparação correta) */
-function parseDateBR(str) {
+function _parseDateBR(str) {
   if (!str) return null;
   const [datePart, timePart = '00:00'] = str.split(' ');
   const [d, m, y] = datePart.split('/');

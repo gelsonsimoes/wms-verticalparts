@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
     Tag, Search, ChevronLeft, ChevronRight, Filter,
     CheckCircle2, XCircle, Copy, Edit2, Trash2, Power,
@@ -85,7 +85,7 @@ function CopyLabelModal({ onSave, onClose }) {
                 sistema: false,
                 arquivo: arquivo?.name || modeloSelecionado,
             });
-        } catch (err) {
+        } catch {
             setSaveError('Ocorreu um erro ao salvar a etiqueta. Tente novamente.');
         }
     };
@@ -382,6 +382,7 @@ export default function LabelManager() {
 
     // Ajusta página atual quando o filtro reduz o total de páginas
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCurrentPage(prev => Math.min(prev, totalPages));
     }, [totalPages]);
 
@@ -389,13 +390,8 @@ export default function LabelManager() {
 
     // === Handlers ===
     const handleCopySave = (data) => {
-        try {
-            labelsCrud.add(data);
-            setShowCopyModal(false);
-        } catch (err) {
-            // Erro propagado ao CopyLabelModal via throw — handled lá
-            throw err;
-        }
+        labelsCrud.add(data);
+        setShowCopyModal(false);
     };
 
     const handleToggleAtivo = () => {

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import React, { useState, useMemo, useId, useRef } from 'react';
+import { useApp } from '../hooks/useApp';
 import {
     Layers,
     Plus,

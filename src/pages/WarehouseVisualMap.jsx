@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import { useWarehouseMap } from '../hooks/useWarehouseMap';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import { Box, Layers, MapPin, Search, Monitor, X, Info, Filter, ArrowRight, Loader2 } from 'lucide-react';
@@ -8,7 +8,7 @@ import { Box, Layers, MapPin, Search, Monitor, X, Info, Filter, ArrowRight, Load
 const WarehouseVisualMap = () => {
     const [searchParams] = useSearchParams();
     const location = useLocation();
-    const { isTvMode } = useApp();
+    useApp();
     const [searchTerm, setSearchTerm] = useState(() => searchParams.get('endereco') || '');
     const [selectedAisle, setSelectedAisle] = useState('ALL');
     const [hoveredPos, setHoveredPos] = useState(null);
@@ -16,11 +16,12 @@ const WarehouseVisualMap = () => {
     // Sincroniza busca se o parâmetro da URL mudar (ex: via busca global)
     useEffect(() => {
         const addr = searchParams.get('endereco');
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (addr) setSearchTerm(addr);
     }, [searchParams]);
 
     // Conecta com o Supabase Realtime
-    const { slots, loading, error } = useWarehouseMap();
+    const { slots, loading } = useWarehouseMap();
 
     const aisles = [
         { id: 'R1', name: 'Rua 1', color: 'emerald', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', label: 'bg-emerald-500', zone: 'Alta Rotatividade (Picking)' },
@@ -50,7 +51,7 @@ const WarehouseVisualMap = () => {
         return slots[id];
     };
 
-    const StatusBox = ({ aisleId, pp, level, pos, isOdd }) => {
+    const StatusBox = ({ aisleId, pp, level, pos, _isOdd }) => {
         const data = getAddressData(aisleId, pp, level, pos);
         const occupied = data?.status === 'ocupado';
         const aisle = aisles.find(a => a.id === aisleId);

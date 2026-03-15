@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Waves, 
   Filter, 
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -103,7 +103,7 @@ const SLALabel = ({ label, data }) => (
 
 export default function WaveSLADashboard() {
   const [filter, setFilter] = useState('Todas');
-  const [waves, setWaves] = useState(MOCK_WAVES);
+  const [waves] = useState(MOCK_WAVES);
   const { isTvMode, setIsTvMode } = useApp();
 
   const filteredWaves = waves.filter(w => {

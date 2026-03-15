@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 export function useWarehouseMap() {
   const [slots, setSlots]       = useState({});

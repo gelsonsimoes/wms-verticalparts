@@ -34,23 +34,21 @@ import {
   Eye,
   EyeOff,
   BarChart3,
+  LayoutGrid,
+  FileText
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...i) { return twMerge(clsx(i)); }
-
-// ─── ENUMS ────────────────────────────────────────────────────────────
-const TIPOS    = ['Peça', 'Conjunto', 'Serviço', 'Embalagem', 'Consumível'];
-const FAMILIAS = ['Motor', 'Freio', 'Cabine', 'Contrapeso', 'Guia de Corrediça', 'Painel Elétrico', 'Porta', 'Cabos e Cintas', 'Escada Rolante', 'Segurança', 'Sinalização', 'Outros'];
-const MARCAS   = ['Atlas Schindler', 'Otis', 'ThyssenKrupp', 'Kone', 'Mitsubishi', 'Hidra', 'Genérico', 'Importado'];
-const UNIDADES = ['PC', 'UN', 'KG', 'MT', 'M2', 'M3', 'LT', 'CX', 'PAR', 'JG', 'KIT', 'RL', 'SC', 'BD', 'FD', 'GL', 'TB', 'PT'];
-const REGRAS_EXP = [
-  { value: 'FIFO', label: 'FIFO — First In, First Out', desc: 'Expede o lote mais antigo primeiro.' },
-  { value: 'LIFO', label: 'LIFO — Last In, First Out',  desc: 'Expede o lote mais recente primeiro.' },
-  { value: 'LOC',  label: 'Sequência de Locais',        desc: 'Expede conforme a posição física do endereço (rua → coluna → nível).' },
-];
-const APRESEN  = ['1x1 (Unitário)', '6x1', '12x1', '24x1', 'Caixa Master'];
+import { useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabaseClient';
+import { cn } from '../utils/cn';
+import Tooltip from '../components/ui/Tooltip';
+import { 
+  TIPOS, 
+  FAMILIAS, 
+  MARCAS, 
+  UNIDADES, 
+  REGRAS_EXP, 
+  APRESEN 
+} from '../mock/productCatalogData';
 
 // ─── GERADOR EAN-13 simples ──────────────────────────────────────────
 function gerarEAN13() {
@@ -61,231 +59,182 @@ function gerarEAN13() {
   return digits.join('');
 }
 
-// ─── DADOS MOCK ───────────────────────────────────────────────────────
-const PRODUTOS_INIT = [
-  {
-    id: 'P001', codigo: 'VEPEL-BPI-174FX', descricao: 'Barreira de Proteção Infravermelha (174 Feixes)',
-    tipo: 'Peça', familia: 'Segurança', marca: 'Genérico', movimentaEstoque: true,
-    observacao: 'Barreira de segurança infravermelha com 174 feixes para portas de elevadores.',
-    regraExpedicao: 'FIFO', locaisPreferidos: 'R1_PP1_CL001_N001',
-    embalagens: [
-      { id:'e1', barcode:'7891234560001', apresentacao:'1x1 (Unitário)', fator:1,  lastro:10, camada:5, pesoBruto:2.500 },
-    ],
-  },
-  {
-    id: 'P002', codigo: 'VPER-ESS-NY-27MM', descricao: 'Escova de Segurança (Nylon - Base 27mm)',
-    tipo: 'Peça', familia: 'Escada Rolante', marca: 'Genérico', movimentaEstoque: true,
-    observacao: 'Escova de segurança em nylon com base de 27mm para degraus de escada rolante.',
-    regraExpedicao: 'FIFO', locaisPreferidos: 'R1_PP2_CL010_N001',
-    embalagens: [
-      { id:'e3', barcode:'7891234560010', apresentacao:'1x1 (Unitário)', fator:1, lastro:5, camada:3, pesoBruto:1.200 },
-    ],
-  },
-  {
-    id: 'P003', codigo: 'VPER-PAL-INO-1000', descricao: 'Pallet de Aço Inox (1000mm)',
-    tipo: 'Conjunto', familia: 'Escada Rolante', marca: 'Genérico', movimentaEstoque: true,
-    observacao: 'Degrau (Pallet) completo em aço inox para escadas rolantes de 1000mm.',
-    regraExpedicao: 'LOC', locaisPreferidos: 'R2_PP1_CL001_N001',
-    embalagens: [
-      { id:'e4', barcode:'7891234560020', apresentacao:'1x1 (Unitário)', fator:1, lastro:1, camada:1, pesoBruto:15.200 },
-    ],
-  },
-  {
-    id: 'P004', codigo: 'VPER-INC-ESQ', descricao: 'InnerCap (Esquerdo) - Ref.: VERTICALPARTS',
-    tipo: 'Peça', familia: 'Escada Rolante', marca: 'Genérico', movimentaEstoque: true,
-    observacao: 'Capa interna esquerda para acabamento de escadas rolantes.',
-    regraExpedicao: 'FIFO', locaisPreferidos: 'R1_PP3_CL005_N002',
-    embalagens: [
-      { id:'e5', barcode:'7891234560030', apresentacao:'1x1 (Unitário)', fator:1, lastro:10, camada:10, pesoBruto:0.450 },
-    ],
-  },
-  {
-    id: 'P005', codigo: 'VPER-LUM-LED-VRD-24V', descricao: 'Luminária em LED Verde 24V',
-    tipo: 'Peça', familia: 'Sinalização', marca: 'Genérico', movimentaEstoque: true,
-    observacao: 'Luminária indicativa de LED verde 24V para sinalização de poço ou cabine.',
-    regraExpedicao: 'FIFO', locaisPreferidos: 'R1_PP1_CL002_N005',
-    embalagens: [
-      { id:'e6', barcode:'7891234560040', apresentacao:'1x1 (Unitário)', fator:1, lastro:20, camada:5, pesoBruto:0.150 },
-    ],
-  },
-];
-
-import { useSearchParams } from 'react-router-dom';
-import { supabase } from '../services/supabaseClient';
-
 // ─── INPUT HELPER ─────────────────────────────────────────────────────
-// Gera um id único por instância (React 18+) e vincula label→input
-function Field({ label, children, className }) {
+function Field({ label, children, className, tooltip }) {
   const id = useId();
   return (
-    <div className={cn('space-y-1', className)}>
-      <label htmlFor={id} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
+    <div className={cn('space-y-1.5', className)}>
+      <label htmlFor={id} className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+        {label}
+        {tooltip && <Tooltip text={tooltip}><Info className="w-3 h-3 text-slate-300" /></Tooltip>}
+      </label>
       {React.cloneElement(React.Children.only(children), { id })}
     </div>
   );
 }
 
-const inputCls = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed";
-const selectCls = inputCls + " appearance-none cursor-pointer";
+const inputCls = "w-full px-4 py-2.5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 focus:border-[var(--vp-primary)] rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm";
+const selectCls = cn(inputCls, "appearance-none cursor-pointer pr-10");
 
-// ─── COMPONENTE DE AJUDA (TOOLTIP) ────────────────────────────
-const HelpTip = ({ text, position = 'top' }) => (
-  <div className="group relative inline-block ml-1.5 focus:outline-none shrink-0" tabIndex="0">
-    <Info className="w-3 h-3 text-slate-400 hover:text-secondary cursor-help transition-colors" />
-    <div className={cn(
-      "absolute hidden group-hover:block z-[100] w-48 p-2.5 text-[10px] font-bold leading-tight text-white bg-slate-900 border border-slate-700 rounded-xl shadow-2xl animate-in fade-in zoom-in duration-200 pointer-events-none",
-      position === 'top' ? "bottom-full left-1/2 -translate-x-1/2 mb-2" : "top-full left-1/2 -translate-x-1/2 mt-2"
-    )}>
-      {text}
-      <div className={cn(
-        "absolute left-1/2 -translate-x-1/2 border-4",
-        position === 'top' 
-          ? "top-full border-t-slate-900 border-x-transparent border-b-transparent" 
-          : "bottom-full border-b-slate-900 border-x-transparent border-t-transparent"
-      )} />
-    </div>
-  </div>
-);
-
+// ─── ABA DADOS DO PRODUTO ─────────────────────────────────────────────
 // ─── ABA DADOS DO PRODUTO ─────────────────────────────────────────────
 function TabDados({ prod, onChange }) {
   return (
-    <div className="space-y-5">
-      {/* Identificação */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Field label={<span className="flex items-center">Código do Produto (SKU) <HelpTip text="Identificador único no ERP Omie. Sincronizado automaticamente." /></span>}>
-          <input value={prod.codigo} onChange={e => onChange('codigo', e.target.value)}
-            className={inputCls} placeholder="Ex: 4001003534" />
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Field label="Código SKU" tooltip="Identificador único Omie" className="md:col-span-1">
+          <input 
+            value={prod.codigo} 
+            onChange={e => onChange('codigo', e.target.value.toUpperCase())}
+            className={inputCls} 
+            placeholder="Ex: 4001003534" 
+          />
         </Field>
-        <Field label={<span className="flex items-center">Unidade <HelpTip text="Unidade de medida principal (PC, UN, KG). Vem do Omie." /></span>}>
-          <select value={prod.unidade || 'PC'} onChange={e => onChange('unidade', e.target.value)} className={selectCls}>
-            {UNIDADES.map(u => <option key={u}>{u}</option>)}
+        <Field label="Unidade" className="md:col-span-1">
+          <select 
+            value={prod.unidade || 'PC'} 
+            onChange={e => onChange('unidade', e.target.value)} 
+            className={selectCls}
+          >
+            {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         </Field>
-        <Field label="Tipo">
-          <select value={prod.tipo} onChange={e => onChange('tipo', e.target.value)} className={selectCls}>
-            {TIPOS.map(t => <option key={t}>{t}</option>)}
+        <Field label="Tipo" className="md:col-span-1">
+          <select 
+            value={prod.tipo} 
+            onChange={e => onChange('tipo', e.target.value)} 
+            className={selectCls}
+          >
+            {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </Field>
-        <Field label={<span className="flex items-center">Descrição <HelpTip text="Nome completo do produto para etiquetas e conferência." /></span>} className="col-span-2 md:col-span-3">
-          <input value={prod.descricao} onChange={e => onChange('descricao', e.target.value)}
-            className={inputCls} placeholder="Descrição completa do produto..." />
-        </Field>
-        <Field label={<span className="flex items-center">Código NCM <HelpTip text="Campo fiscal obrigatório. Importado automaticamente do cadastro Omie." /></span>}>
-          <input value={prod.ncm || ''} onChange={e => onChange('ncm', e.target.value)}
-            className={inputCls + " font-mono"} placeholder="Ex: 7318.19.00" maxLength={13} />
-        </Field>
-        <Field label="Família">
-          <select value={prod.familia} onChange={e => onChange('familia', e.target.value)} className={selectCls}>
-            {FAMILIAS.map(f => <option key={f}>{f}</option>)}
+        <Field label="Família" className="md:col-span-1">
+          <select 
+            value={prod.familia} 
+            onChange={e => onChange('familia', e.target.value)} 
+            className={selectCls}
+          >
+            {FAMILIAS.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </Field>
-        <Field label="Marca">
-          <select value={prod.marca} onChange={e => onChange('marca', e.target.value)} className={selectCls}>
-            {MARCAS.map(m => <option key={m}>{m}</option>)}
+
+        <Field label="Descrição Completa" className="md:col-span-4" tooltip="Nome do produto para etiquetas">
+          <input 
+            value={prod.descricao} 
+            onChange={e => onChange('descricao', e.target.value)}
+            className={inputCls} 
+            placeholder="Ex: Barreira de Proteção Infravermelha..." 
+          />
+        </Field>
+
+        <Field label="NCM" className="md:col-span-1">
+          <input 
+            value={prod.ncm || ''} 
+            onChange={e => onChange('ncm', e.target.value)}
+            className={cn(inputCls, "font-mono")} 
+            placeholder="Ex: 7318.19.00" 
+            maxLength={13} 
+          />
+        </Field>
+        <Field label="Marca" className="md:col-span-1">
+          <select 
+            value={prod.marca} 
+            onChange={e => onChange('marca', e.target.value)} 
+            className={selectCls}
+          >
+            {MARCAS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
+        </Field>
+        <Field label="Local Estoque Omie" className="md:col-span-2" tooltip="Local de referência no ERP">
+          <input 
+            value={prod.local_estoque || ''} 
+            onChange={e => onChange('local_estoque', e.target.value)}
+            className={inputCls} 
+            placeholder="Ex: VERTICAL CD CENTRAL" 
+          />
         </Field>
       </div>
 
-      {/* Dimensões e Peso */}
-      <div>
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-          <Ruler className="w-3.5 h-3.5" />Dimensões e Peso
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Field label={
-            <span className="flex items-center gap-1.5 ring-offset-2 ring-primary/20">
-              Peso Bruto (kg) *
-              {!prod.peso_bruto && <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />}
-            </span>
-          }>
-            <input 
-              type="number" 
-              min="0" 
-              step="0.001" 
-              value={prod.peso_bruto || ''} 
-              onChange={e => onChange('peso_bruto', +e.target.value)}
-              className={cn(inputCls, !prod.peso_bruto && "border-red-400 focus:border-red-500")} 
-              placeholder="0.000" 
-              required
-            />
+      <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2 mb-6">
+          <Ruler className="w-4 h-4 text-[var(--vp-primary)]" />
+          <h3 className="text-[11px] font-black uppercase text-slate-800 dark:text-slate-200 tracking-widest">Dimensões e Volumetria</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+          <Field label="Peso Bruto (kg)" className={cn(!prod.peso_bruto && "ring-2 ring-red-500/10 rounded-xl")}>
+            <div className="relative">
+              <input 
+                type="number" step="0.001" 
+                value={prod.peso_bruto || ''} 
+                onChange={e => onChange('peso_bruto', +e.target.value)}
+                className={cn(inputCls, !prod.peso_bruto && "border-red-200 focus:border-red-500")} 
+                placeholder="0.000" 
+              />
+              {!prod.peso_bruto && <AlertCircle className="w-3.5 h-3.5 text-red-500 absolute right-3 top-1/2 -translate-y-1/2" />}
+            </div>
           </Field>
           <Field label="Peso Líquido (kg)">
-            <input type="number" min="0" step="0.001" value={prod.peso_liquido || ''} onChange={e => onChange('peso_liquido', +e.target.value)}
-              className={inputCls} placeholder="0.000" />
+            <input type="number" step="0.001" value={prod.peso_liquido || ''} onChange={e => onChange('peso_liquido', +e.target.value)} className={inputCls} placeholder="0.000" />
           </Field>
           <Field label="Altura (cm)">
-            <input type="number" min="0" step="0.1" value={prod.altura || ''} onChange={e => onChange('altura', +e.target.value)}
-              className={inputCls} placeholder="0.0" />
+            <input type="number" step="0.1" value={prod.altura || ''} onChange={e => onChange('altura', +e.target.value)} className={inputCls} placeholder="0.0" />
           </Field>
           <Field label="Largura (cm)">
-            <input type="number" min="0" step="0.1" value={prod.largura || ''} onChange={e => onChange('largura', +e.target.value)}
-              className={inputCls} placeholder="0.0" />
+            <input type="number" step="0.1" value={prod.largura || ''} onChange={e => onChange('largura', +e.target.value)} className={inputCls} placeholder="0.0" />
           </Field>
-          <Field label="Profundidade (cm)">
-            <input type="number" min="0" step="0.1" value={prod.profundidade || ''} onChange={e => onChange('profundidade', +e.target.value)}
-              className={inputCls} placeholder="0.0" />
+          <Field label="Prod. (cm)">
+            <input type="number" step="0.1" value={prod.profundidade || ''} onChange={e => onChange('profundidade', +e.target.value)} className={inputCls} placeholder="0.0" />
           </Field>
         </div>
-        {(prod.altura > 0 && prod.largura > 0 && prod.profundidade > 0) && (
-          <div className="mt-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2 text-[10px] font-bold text-slate-500 flex items-center gap-2">
-            <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
-            Cubagem: <strong className="text-secondary">{((prod.altura * prod.largura * prod.profundidade) / 1000000).toFixed(4)} m³</strong>
+        {prod.altura > 0 && prod.largura > 0 && prod.profundidade > 0 && (
+          <div className="mt-4 inline-flex items-center gap-2.5 px-4 py-2 bg-slate-900 rounded-lg text-white shadow-lg">
+            <Grid3X3 className="w-4 h-4 text-[var(--vp-primary)]" />
+            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Cubagem:</span>
+            <span className="text-sm font-black text-[var(--vp-primary)] tracking-tight">
+              {((prod.altura * prod.largura * prod.profundidade) / 1000000).toFixed(4)} m³
+            </span>
           </div>
         )}
       </div>
 
-      {/* Local de Estoque + Crossdocking */}
-      <div className="grid grid-cols-2 gap-4">
-        <Field label={<span className="flex items-center">Local de Estoque (Omie) <HelpTip text="Endereço de referência no Omie. Serve como guia para alocação no WMS." /></span>}>
-          <input value={prod.local_estoque || ''} onChange={e => onChange('local_estoque', e.target.value)}
-            className={inputCls} placeholder="Ex: VERTICAL MP - Estoque Próprio" />
-        </Field>
-        <Field label={<span className="flex items-center">Dias de Crossdocking <HelpTip text="Tempo máximo permitido na área de transbordo (Recebimento → Expedição Direta)." /></span>}>
-          <input type="number" min="0" value={prod.dias_crossdocking || 0} onChange={e => onChange('dias_crossdocking', +e.target.value)}
-            className={inputCls} />
+      <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+        <Field label="Observações Técnicas / Internas">
+          <textarea 
+            value={prod.observacao} 
+            onChange={e => onChange('observacao', e.target.value)} 
+            rows={3}
+            className={cn(inputCls, "resize-none leading-relaxed")} 
+            placeholder="Detalhes adicionais importantes para a operação..." 
+          />
         </Field>
       </div>
 
-      {/* Observações */}
-      <Field label="Observações">
-        <textarea value={prod.observacao} onChange={e => onChange('observacao', e.target.value)} rows={2}
-          className={inputCls + " resize-none"} placeholder="Detalhes adicionais, especificações técnicas..." />
-      </Field>
-
-      {/* Movimenta Estoque */}
-      <div className={cn('border-2 rounded-2xl p-4 flex items-start gap-4 transition-all',
-        prod.movimentaEstoque ? 'border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800/50' : 'border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/50'
+      <div className={cn(
+        'p-6 rounded-2xl border-2 transition-all flex items-start gap-4',
+        prod.movimentaEstoque 
+          ? 'bg-green-50/30 border-green-100 dark:bg-green-950/10 dark:border-green-900/40' 
+          : 'bg-amber-50/30 border-amber-100 dark:bg-amber-950/10 dark:border-amber-900/40'
       )}>
         <button
-          role="checkbox"
-          aria-checked={prod.movimentaEstoque}
-          aria-label={prod.movimentaEstoque ? 'Movimenta estoque físico — clique para desativar' : 'Não movimenta estoque — clique para ativar'}
           onClick={() => onChange('movimentaEstoque', !prod.movimentaEstoque)}
-          className={cn('w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all',
-            prod.movimentaEstoque ? 'bg-green-600 border-green-600' : 'border-amber-400 bg-white dark:bg-slate-800'
+          className={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-lg',
+            prod.movimentaEstoque ? 'bg-green-600 text-white' : 'bg-amber-500 text-white'
           )}
+          aria-label="Alternar movimentação de estoque"
         >
-          {prod.movimentaEstoque && <Check className="w-3.5 h-3.5 text-white" aria-hidden="true" />}
+          {prod.movimentaEstoque ? <Check className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
         </button>
         <div>
-          <p className={cn('text-sm font-black flex items-center', prod.movimentaEstoque ? 'text-green-700 dark:text-green-400' : 'text-amber-700 dark:text-amber-400')}>
-            Movimenta Estoque Físico
-            <HelpTip text="Define se o item gera saldo físico no armazém ou se é apenas um serviço não estocável." />
+          <h4 className={cn('text-sm font-black uppercase tracking-tight', prod.movimentaEstoque ? 'text-green-700' : 'text-amber-700')}>
+            {prod.movimentaEstoque ? 'Item com Estoque Físico' : 'Item do Tipo Serviço'}
+          </h4>
+          <p className="text-xs font-medium text-slate-500 mt-1">
+            {prod.movimentaEstoque 
+              ? 'Este SKU será endereçado, conferido e auditado no armazém.' 
+              : 'Este item não gera ocupação física no armazém (ex: mão de obra, taxas).'}
           </p>
-          {prod.movimentaEstoque
-            ? <p className="text-[10px] text-green-600 dark:text-green-500 mt-0.5 font-medium">Este item é uma <strong>peça / produto físico</strong> — entra e sai do estoque do armazém.</p>
-            : <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5 font-medium">Este item é um <strong>serviço</strong> — não gera movimentação ou endereçamento físico.</p>
-          }
         </div>
-      </div>
-
-      {/* Nota de Negócio */}
-      <div className="flex items-start gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
-        <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-slate-400 font-medium">
-          <strong className="text-slate-600 dark:text-slate-300">Regra VerticalParts:</strong> Este sistema não utiliza data de validade/vencimento. O controle de qualidade opera via <strong className="text-slate-600 dark:text-slate-300">Avarias e Desmembramento de Peças</strong>.
-        </p>
       </div>
     </div>
   );
@@ -294,356 +243,243 @@ function TabDados({ prod, onChange }) {
 // ─── ABA EMBALAGENS ───────────────────────────────────────────────────
 function TabEmbalagens({ prod, onChange }) {
   const [copied, setCopied] = useState(null);
-  const [newRow, setNewRow] = useState(false);
-  const [editRow, setEditRow] = useState(null); // { barcode, apresentacao, fator, lastro, camada, pesoBruto }
+  const [editRow, setEditRow] = useState(null);
 
-  const emptyRow = () => ({ id: 'emb_' + crypto.randomUUID(), barcode:'', apresentacao: APRESEN[0], fator:1, lastro:1, camada:1, pesoBruto:0 });
-
-  const startNew = () => { setEditRow(emptyRow()); setNewRow(true); };
-
-  const gerarBarcode = () => {
-    // Garante unicidade: gera até encontrar um EAN que não exista nas embalagens do produto
-    let bc;
-    const existentes = new Set(prod.embalagens.map(e => e.barcode));
-    let tentativas = 0;
-    do { bc = gerarEAN13(); tentativas++; } while (existentes.has(bc) && tentativas < 20);
-    setEditRow(r => ({ ...r, barcode: bc }));
-  };
-
-  const copyBarcode = (bc) => {
-    navigator.clipboard?.writeText(bc).catch(() => {});
+  const handleCopy = (bc) => {
+    navigator.clipboard.writeText(bc);
     setCopied(bc);
     setTimeout(() => setCopied(null), 2000);
   };
 
   const saveRow = () => {
-    // Validação dos campos obrigatórios e limites lógicos
     if (!editRow.barcode) return;
-    if (editRow.fator    < 1) return;
-    if (editRow.lastro   < 1) return;
-    if (editRow.camada   < 1) return;
-    if (editRow.pesoBruto < 0) return;
-    const embs = [...prod.embalagens];
-    if (newRow) {
-      embs.push(editRow);
+    const embs = [...(prod.embalagens || [])];
+    const existingIdx = embs.findIndex(e => e.id === editRow.id);
+    
+    if (existingIdx === -1) {
+      const newEmb = { ...editRow, id: 'emb_' + crypto.randomUUID() };
+      embs.push(newEmb);
     } else {
-      const idx = embs.findIndex(e => e.id === editRow.id);
-      if (idx >= 0) embs[idx] = editRow;
+      embs[existingIdx] = editRow;
     }
+    
     onChange('embalagens', embs);
     setEditRow(null);
-    setNewRow(false);
   };
 
-  const removeRow = (id) => onChange('embalagens', prod.embalagens.filter(e => e.id !== id));
-
-  const startEdit = (emb) => { setEditRow({ ...emb }); setNewRow(false); };
-
-  const cancelEdit = () => { setEditRow(null); setNewRow(false); };
+  const removeRow = (id) => onChange('embalagens', (prod.embalagens || []).filter(e => e.id !== id));
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-          <Box className="w-3.5 h-3.5" />{prod.embalagens.length} embalagem(ns) cadastrada(s)
-        </p>
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Configuração de Volume</h3>
         {!editRow && (
-          <button onClick={startNew}
-            className="flex items-center gap-1.5 px-4 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
-            <Plus className="w-3.5 h-3.5" />Nova Embalagem
+          <button 
+            onClick={() => setEditRow({ id: 'temp_' + Date.now(), barcode: '', apresentacao: APRESEN[0], fator: 1, lastro: 1, camada: 1, pesoBruto: 0 })}
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--vp-primary)] text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-105 transition-all shadow-lg active:scale-95"
+          >
+            <Plus className="w-4 h-4" />Nova Embalagem
           </button>
         )}
       </div>
 
-      {/* Editor inline */}
       {editRow && (
-        <div className="bg-secondary/5 border-2 border-secondary/30 rounded-2xl p-5 space-y-4">
-          <p className="text-[10px] font-black text-secondary uppercase tracking-widest">{newRow ? '➕ Nova Embalagem' : '✏️ Editando Embalagem'}</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {/* Código de Barras */}
-            <Field label="Código de Barras (EAN)" className="col-span-2 md:col-span-2">
+        <div className="p-8 bg-slate-900 rounded-3xl border border-slate-800 space-y-8 shadow-2xl animate-in zoom-in-95 duration-300">
+          <div className="flex items-center gap-3">
+            <Box className="w-6 h-6 text-[var(--vp-primary)]" />
+            <h4 className="text-lg font-black text-white uppercase tracking-tight">Editor de Unidade Logística</h4>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Field label="Cód. de Barras (EAN)" className="md:col-span-2">
               <div className="flex gap-2">
-                <input value={editRow.barcode} onChange={e => setEditRow(r => ({ ...r, barcode: e.target.value }))}
-                  className={inputCls + " font-mono tracking-widest"} placeholder="Ex: 7891234560001" maxLength={14} />
-                <button
-                  onClick={gerarBarcode}
-                  aria-label="Gerar código de barras EAN-13 automático"
-                  className="shrink-0 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-[10px] font-black transition-all flex items-center gap-1.5 whitespace-nowrap"
+                <input 
+                  value={editRow.barcode} 
+                  onChange={e => setEditRow({ ...editRow, barcode: e.target.value })}
+                  className={cn(inputCls, "font-mono tracking-widest bg-slate-800 border-slate-700 text-white")} 
+                />
+                <button 
+                  onClick={() => setEditRow({...editRow, barcode: gerarEAN13()})}
+                  className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                 >
-                  <Barcode className="w-4 h-4" aria-hidden="true" />Gerar
+                  Gerar
                 </button>
               </div>
             </Field>
             <Field label="Apresentação">
-              <select value={editRow.apresentacao} onChange={e => setEditRow(r => ({ ...r, apresentacao: e.target.value }))} className={selectCls}>
-                {APRESEN.map(a => <option key={a}>{a}</option>)}
+              <select 
+                value={editRow.apresentacao} 
+                onChange={e => setEditRow({ ...editRow, apresentacao: e.target.value })}
+                className={cn(selectCls, "bg-slate-800 border-slate-700 text-white")}
+              >
+                {APRESEN.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </Field>
-            <Field label="Fator de Conversão">
-              <input type="number" min="1" value={editRow.fator} onChange={e => setEditRow(r => ({ ...r, fator: +e.target.value }))} className={inputCls} />
+            <Field label="Fator Conversão">
+              <input type="number" value={editRow.fator} onChange={e => setEditRow({...editRow, fator: +e.target.value})} className={cn(inputCls, "bg-slate-800 border-slate-700 text-white")} />
             </Field>
-            <Field label="Lastro (Qtde/Camada)">
-              <input type="number" min="1" value={editRow.lastro} onChange={e => setEditRow(r => ({ ...r, lastro: +e.target.value }))} className={inputCls} />
+            <Field label="Peso Bruto">
+              <input type="number" step="0.001" value={editRow.pesoBruto} onChange={e => setEditRow({...editRow, pesoBruto: +e.target.value})} className={cn(inputCls, "bg-slate-800 border-slate-700 text-white")} />
             </Field>
-            <Field label="Camadas">
-              <input type="number" min="1" value={editRow.camada} onChange={e => setEditRow(r => ({ ...r, camada: +e.target.value }))} className={inputCls} />
-            </Field>
-            <Field label="Peso Bruto (kg)">
-              <input type="number" min="0" step="0.001" value={editRow.pesoBruto} onChange={e => setEditRow(r => ({ ...r, pesoBruto: +e.target.value }))} className={inputCls} />
-            </Field>
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 md:col-span-1 flex flex-col justify-center">
+               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Paletização Estimada</p>
+               <p className="text-2xl font-black text-[var(--vp-primary)]">{editRow.lastro * editRow.camada * editRow.fator} <span className="text-xs text-white/40">un / palete</span></p>
+            </div>
           </div>
-          {/* Qtde por Palete (calculado) */}
-          <div className="bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2 flex items-center gap-3 text-[10px] font-bold text-slate-500">
-            <Grid3X3 className="w-3.5 h-3.5 shrink-0" />
-            Palete completo: <strong className="text-secondary text-sm">{editRow.lastro * editRow.camada * editRow.fator}</strong> un · {(editRow.lastro * editRow.camada)} cx/palete · {editRow.camada} camada(s) de {editRow.lastro} caixa(s)
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={cancelEdit} className="px-4 py-2 border-2 border-slate-200 dark:border-slate-700 text-slate-500 rounded-xl text-xs font-black hover:border-slate-400 transition-all">Cancelar</button>
-            <button
-              onClick={saveRow}
-              disabled={!editRow.barcode || editRow.fator < 1 || editRow.lastro < 1 || editRow.camada < 1 || editRow.pesoBruto < 0}
-              className="px-5 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 disabled:opacity-40 transition-all flex items-center gap-1.5 shadow-md"
-            >
-              <Save className="w-3.5 h-3.5" aria-hidden="true" />Salvar Embalagem
-            </button>
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
+            <button onClick={() => setEditRow(null)} className="px-6 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-white transition-all">Cancelar</button>
+            <button onClick={saveRow} className="px-10 py-3 bg-[var(--vp-primary)] text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-105 active:scale-95 transition-all shadow-lg">Confirmar</button>
           </div>
         </div>
       )}
 
-      {/* Grid */}
-      {prod.embalagens.length > 0 ? (
-        <div className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
-                {['Cód. de Barras','Apresentação','Fator','Lastro','Camadas','Peso Bruto','Cx/Palete','Ações'].map(h => (
-                  <th key={h} scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {prod.embalagens.map(emb => (
-                <tr key={emb.id} className={cn('border-t border-slate-100 dark:border-slate-800 hover:bg-secondary/5 transition-all group',
-                  editRow?.id === emb.id && !newRow ? 'bg-secondary/10' : ''
-                )}>
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      <Barcode className="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true" />
-                      <code className="text-xs font-bold text-slate-700 dark:text-slate-300 tracking-widest">{emb.barcode}</code>
-                      <button
-                        onClick={() => copyBarcode(emb.barcode)}
-                        aria-label={copied === emb.barcode ? 'Código copiado!' : `Copiar código de barras ${emb.barcode}`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        {copied === emb.barcode
-                          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" aria-hidden="true" />
-                          : <Copy        className="w-3.5 h-3.5 text-slate-400 hover:text-secondary" aria-hidden="true" />}
-                      </button>
-                    </div>
-                  </td>
-                  <td className="p-3">
-                    <span className="text-[10px] font-black bg-secondary/10 text-secondary px-2.5 py-1 rounded-full">{emb.apresentacao}</span>
-                  </td>
-                  <td className="p-3 text-center text-xs font-black text-slate-600 dark:text-slate-400">{emb.fator}x</td>
-                  <td className="p-3 text-center text-xs font-black text-slate-600 dark:text-slate-400">{emb.lastro}</td>
-                  <td className="p-3 text-center text-xs font-black text-slate-600 dark:text-slate-400">{emb.camada}</td>
-                  <td className="p-3 text-right">
-                    <span className="text-xs font-black text-slate-700 dark:text-slate-300">{emb.pesoBruto.toLocaleString('pt-BR', { minimumFractionDigits:3 })} kg</span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <span className="text-xs font-black text-secondary">{emb.lastro * emb.camada * emb.fator} un</span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => startEdit(emb)}
-                        aria-label={`Editar embalagem ${emb.apresentacao} (${emb.barcode})`}
-                        className="p-1.5 hover:bg-secondary/10 rounded-lg transition-all text-slate-400 hover:text-secondary"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" aria-hidden="true" />
-                      </button>
-                      <button
-                        onClick={() => removeRow(emb.id)}
-                        aria-label={`Excluir embalagem ${emb.apresentacao} (${emb.barcode})`}
-                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-all text-slate-400 hover:text-red-600"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        !editRow && (
-          <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-            <Box className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-400">Nenhuma embalagem cadastrada</p>
-            <p className="text-[10px] text-slate-300 mt-1">Clique em "Nova Embalagem" para adicionar caixas ou paletes.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(prod.embalagens || []).map(emb => (
+          <div key={emb.id} className="p-6 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl group transition-all hover:border-[var(--vp-primary)] shadow-sm">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-[var(--vp-primary)] group-hover:text-black transition-all">
+                <Barcode className="w-5 h-5" />
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => setEditRow(emb)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><Edit3 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => removeRow(emb.id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{emb.apresentacao}</p>
+            <p className="text-lg font-black tracking-tight mb-3">Fator: {emb.fator}x</p>
+            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+               <code className="text-xs font-bold text-slate-500 tracking-widest">{emb.barcode}</code>
+               <button onClick={() => handleCopy(emb.barcode)} className="text-slate-300 hover:text-[var(--vp-primary)]">
+                 {copied === emb.barcode ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+               </button>
+            </div>
           </div>
-        )
-      )}
+        ))}
+      </div>
     </div>
   );
 }
 
 // ─── ABA REGRAS DE NEGÓCIO ────────────────────────────────────────────
 function TabRegras({ prod, onChange }) {
-  const regra = REGRAS_EXP.find(r => r.value === prod.regraExpedicao) || REGRAS_EXP[0];
-
   return (
-    <div className="space-y-5">
-      {/* Regra de Expedição */}
-      <div className="space-y-3">
-        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-          <ArrowUpDown className="w-3.5 h-3.5" />Regra de Expedição
-          <HelpTip text="Define qual lote sairá primeiro no Picking: o mais antigo (FIFO) ou o mais novo (LIFO)." />
-        </label>
-        <div className="space-y-2">
-          {REGRAS_EXP.map(r => (
-            <label
-              key={r.value}
-              className={cn('flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all',
-                r.value === prod.regraExpedicao
-                  ? 'border-secondary/60 bg-secondary/5'
-                  : 'border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
-              )}
-            >
-              {/* Radio nativo oculto — garante acessibilidade por teclado e leitores de tela */}
-              <input
-                type="radio"
-                name="regraExpedicao"
-                value={r.value}
-                checked={prod.regraExpedicao === r.value}
-                onChange={() => onChange('regraExpedicao', r.value)}
-                className="sr-only"
-              />
-              <div
-                aria-hidden="true"
-                className={cn('w-4 h-4 rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all',
-                  r.value === prod.regraExpedicao ? 'border-secondary bg-secondary' : 'border-slate-300 dark:border-slate-600'
-                )}
-              >
-                {r.value === prod.regraExpedicao && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-              </div>
-              <div>
-                <p className={cn('text-sm font-black', r.value === prod.regraExpedicao ? 'text-secondary' : 'text-slate-700 dark:text-slate-300')}>{r.label}</p>
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">{r.desc}</p>
-              </div>
-            </label>
-          ))}
-        </div>
+    <div className="space-y-10 animate-in fade-in slide-in-from-right-2 duration-500">
+      <div className="space-y-6">
+         <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+               <ArrowUpDown className="w-5 h-5 text-indigo-500" />
+            </div>
+            <div>
+               <h3 className="text-lg font-black uppercase tracking-tight">Algoritmo de Picking</h3>
+               <p className="text-xs text-slate-400 font-medium">Define a prioridade de saída do item no armazém.</p>
+            </div>
+         </div>
+         
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {REGRAS_EXP.map(r => (
+               <button 
+                 key={r.value}
+                 onClick={() => onChange('regraExpedicao', r.value)}
+                 className={cn(
+                   "p-6 rounded-2xl border-2 text-left transition-all relative overflow-hidden group",
+                   prod.regraExpedicao === r.value 
+                     ? "border-[var(--vp-primary)] bg-[var(--vp-primary)]/5" 
+                     : "border-slate-100 hover:border-slate-200"
+                 )}
+               >
+                 {prod.regraExpedicao === r.value && (
+                   <CheckCircle2 className="w-5 h-5 text-[var(--vp-primary)] absolute top-4 right-4" />
+                 )}
+                 <p className={cn("text-xs font-black uppercase tracking-[0.1em] mb-2", prod.regraExpedicao === r.value ? "text-slate-900" : "text-slate-400")}>{r.value}</p>
+                 <p className="text-sm font-black mb-1">{r.label}</p>
+                 <p className="text-[10px] text-slate-400 font-medium leading-relaxed">{r.desc}</p>
+               </button>
+            ))}
+         </div>
       </div>
 
-      {/* Locais Preferenciais */}
-      {prod.regraExpedicao === 'LOC' && (
-        <div className="space-y-1">
-          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Locais Preferidos (separados por vírgula)</label>
-          <input value={prod.locaisPreferidos || ''} onChange={e => onChange('locaisPreferidos', e.target.value)}
-            className={inputCls} placeholder="Ex: R1_PP1_CL001_N001" />
-        </div>
-      )}
-
-      {/* Aviso regra VerticalParts */}
-      <div className="bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800/40 rounded-2xl p-4 flex items-start gap-3">
-        <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-xs font-black text-amber-700 dark:text-amber-400">Regra de Negócio VerticalParts</p>
-          <p className="text-[10px] text-amber-600/90 dark:text-amber-500/80 font-medium mt-0.5">
-            Este sistema <strong>não utiliza campos de Data de Validade/Vencimento</strong>. O controle de qualidade é feito exclusivamente através do módulo de <strong>Avarias e Desmembramento de Peças</strong> (Cat. 4 → Controle de Avarias).
-          </p>
-        </div>
+      <div className="p-8 bg-amber-50/50 dark:bg-amber-950/10 border-2 border-amber-100 dark:border-amber-900/40 rounded-3xl flex items-start gap-6">
+         <ShieldAlert className="w-8 h-8 text-amber-500 shrink-0" />
+         <div>
+            <h4 className="text-sm font-black text-amber-800 uppercase tracking-wider mb-2">Protocolo VerticalParts (Qualidade)</h4>
+            <p className="text-xs text-amber-700/80 font-medium leading-relaxed max-w-2xl">
+               Seguindo o padrão de segurança VerticalCD 2025, o catálogo <strong>ignora campos de validade temporal</strong> por serem itens de hardware/elevador. 
+               O controle de integridade é realizado integralmente via formulário de <strong>Avarias, Descrese de Lote e Quarentena Técnica</strong>.
+            </p>
+         </div>
       </div>
     </div>
   );
 }
 
-// ─── BADGE DE DELTA ───────────────────────────────────────────────────
-function DeltaBadge({ erp, wms, real }) {
-  const base = real != null ? real : wms;
-  if (erp == null || base == null) return <span className="text-[9px] text-slate-300 font-bold">—</span>;
-  const delta = erp - base;
-  if (delta === 0) return <span className="flex items-center gap-0.5 text-[10px] font-black text-green-600"><CheckCircle2 className="w-3 h-3" />OK</span>;
-  if (delta > 0) return <span className="flex items-center gap-0.5 text-[10px] font-black text-red-500"><TrendingDown className="w-3 h-3" />+{delta}</span>;
-  return <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-500"><TrendingUp className="w-3 h-3" />{delta}</span>;
-}
-
 // ─── ABA ESTOQUE & DELTA ──────────────────────────────────────────────
 function TabEstoque({ prod, onChange }) {
-  const estoqueErp = prod.estoque_erp ?? null;
-  const estoqueWms = prod.estoque_wms ?? 0;
-  const estoqueReal = prod.estoque_real ?? null;
-  const base = estoqueReal != null ? estoqueReal : estoqueWms;
-  const delta = estoqueErp != null ? estoqueErp - base : null;
-
   const cards = [
-    { label: 'Estoque ERP (Omie)', value: estoqueErp, icon: FileSpreadsheet, color: 'blue', editable: true, field: 'estoque_erp' },
-    { label: 'Estoque WMS', value: estoqueWms, icon: Package, color: 'secondary', editable: false },
-    { label: 'Estoque Real', value: estoqueReal, icon: Eye, color: 'emerald', editable: true, field: 'estoque_real' },
-    { label: 'Estoque Mínimo', value: prod.estoque_minimo, icon: AlertCircle, color: 'amber', editable: true, field: 'estoque_minimo' },
+    { label: 'Saldo ERP (Omie)', value: prod.estoque_erp, icon: FileSpreadsheet, color: 'text-blue-500', field: 'estoque_erp' },
+    { label: 'Saldo WMS', value: prod.estoque_wms || 0, icon: Package, color: 'text-[var(--vp-primary)]', editable: false },
+    { label: 'Inventário Real', value: prod.estoque_real, icon: Eye, color: 'text-green-500', field: 'estoque_real' },
+    { label: 'Gatilho Mínimo', value: prod.estoque_minimo, icon: AlertCircle, color: 'text-red-500', field: 'estoque_minimo' },
   ];
 
+  const delta = prod.estoque_erp != null ? prod.estoque_erp - (prod.estoque_real ?? (prod.estoque_wms || 0)) : null;
+
   return (
-    <div className="space-y-5">
-      {/* Cards de estoque */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {cards.map(c => (
-          <div key={c.label} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl p-4 space-y-2">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <c.icon className="w-3.5 h-3.5" />{c.label}
-            </p>
-            {c.editable ? (
-              <input type="number" min="0" value={c.value ?? ''} onChange={e => onChange(c.field, e.target.value === '' ? null : +e.target.value)}
-                className={inputCls + " text-lg font-black text-center"} placeholder="—" />
+          <div key={c.label} className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-4">
+              <c.icon className={cn("w-4 h-4", c.color)} />
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{c.label}</p>
+            </div>
+            {c.editable !== false ? (
+              <input 
+                type="number" 
+                value={c.value ?? ''} 
+                onChange={e => onChange(c.field, e.target.value === '' ? null : +e.target.value)}
+                className="w-full text-3xl font-black text-center bg-transparent focus:text-[var(--vp-primary)] outline-none transition-colors"
+                placeholder="—"
+              />
             ) : (
-              <p className="text-2xl font-black text-slate-700 dark:text-slate-200 text-center">{c.value ?? '—'}</p>
+              <p className="text-3xl font-black text-center text-slate-800 dark:text-white">{c.value}</p>
             )}
           </div>
         ))}
       </div>
 
-      {/* Delta visual */}
-      <div className={cn('border-2 rounded-2xl p-5 flex items-center gap-4',
-        delta === null ? 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900' :
-        delta === 0 ? 'border-green-300 bg-green-50 dark:bg-green-950/20 dark:border-green-800/50' :
-        delta > 0 ? 'border-red-300 bg-red-50 dark:bg-red-950/20 dark:border-red-800/50' :
-        'border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800/50'
+      <div className={cn(
+        "p-10 rounded-3xl border-2 flex flex-col md:flex-row items-center gap-8 text-center md:text-left shadow-lg",
+        delta === null ? "bg-slate-50 border-slate-100" :
+        delta === 0 ? "bg-green-500/5 border-green-500/20" :
+        delta > 0 ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
       )}>
-        <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center shrink-0',
-          delta === null ? 'bg-slate-200 dark:bg-slate-800' :
-          delta === 0 ? 'bg-green-600' : delta > 0 ? 'bg-red-500' : 'bg-amber-500'
+        <div className={cn(
+          "w-20 h-20 rounded-3xl flex items-center justify-center shrink-0 shadow-xl",
+          delta === null ? "bg-slate-200" :
+          delta === 0 ? "bg-green-500" : delta > 0 ? "bg-red-500" : "bg-amber-500"
         )}>
-          {delta === null ? <Minus className="w-5 h-5 text-slate-400" /> :
-           delta === 0 ? <Check className="w-5 h-5 text-white" /> :
-           delta > 0 ? <TrendingDown className="w-5 h-5 text-white" /> :
-           <TrendingUp className="w-5 h-5 text-white" />}
+           {delta === null ? <Minus className="text-slate-400" /> :
+            delta === 0 ? <Check className="text-white w-8 h-8" /> :
+            delta > 0 ? <TrendingDown className="text-white w-8 h-8" /> : <TrendingUp className="text-white w-8 h-8" />}
         </div>
-        <div>
-          <p className="text-sm font-black text-slate-800 dark:text-white flex items-center">
-            Delta ERP vs {estoqueReal != null ? 'Real' : 'WMS'}: {delta != null ? (delta > 0 ? `+${delta}` : delta) : 'Sem dados'}
-            <HelpTip text="Discrepância entre o saldo do Omie e o saldo físico atual. 0 indica estoque perfeito." />
-          </p>
-          <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-            {delta === null && 'Preencha o Estoque ERP para ver a discrepância.'}
-            {delta === 0 && '✅ Estoque bateu! Sem divergência entre ERP e armazém.'}
-            {delta > 0 && `⚠️ O Omie diz ter ${delta} unidade(s) a MAIS que o ${estoqueReal != null ? 'inventário real' : 'WMS'}. Possível perda, furto ou entrada sem registro.`}
-            {delta < 0 && `⚠️ O Omie diz ter ${Math.abs(delta)} unidade(s) a MENOS que o ${estoqueReal != null ? 'inventário real' : 'WMS'}. Possível entrada não faturada ou erro no ERP.`}
+        <div className="flex-1">
+          <h4 className="text-xl font-black tracking-tight mb-2">
+            Status da Acuracidade: {delta === 0 ? 'Equilibrado' : delta != null ? 'Com Divergência' : 'Aguardando Dados'}
+          </h4>
+          <p className="text-sm font-medium text-slate-500 leading-relaxed">
+            {delta === 0 && 'O estoque físico no armazém reflete exatamente o que consta no ERP Omie.'}
+            {delta > 0 && `Existe uma quebra de ${delta} unidade(s). O sistema Omie apresenta saldo superior ao físico.`}
+            {delta < 0 && `Sobras detectadas (${Math.abs(delta)} un). O armazém possui mais itens do que o registrado no Omie.`}
+            {delta === null && 'Preencha o Saldo ERP para ativar o monitoramento de delta.'}
           </p>
         </div>
+        {delta != null && (
+          <div className="px-8 py-4 bg-slate-900 rounded-2xl text-[var(--vp-primary)] text-3xl font-black shrink-0">
+             {delta > 0 ? `+${delta}` : delta}
+          </div>
+        )}
       </div>
-
-      {/* Alerta estoque mínimo */}
-      {prod.estoque_minimo > 0 && estoqueErp != null && estoqueErp <= prod.estoque_minimo && (
-        <div className="bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800/40 rounded-2xl p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-          <p className="text-xs font-black text-red-700 dark:text-red-400">
-            ⚠️ Estoque abaixo do mínimo! Atual: {estoqueErp} · Mínimo: {prod.estoque_minimo}
-          </p>
-        </div>
-      )}
     </div>
   );
 }
@@ -664,7 +500,7 @@ export default function ProductCatalog() {
   const savedTimeoutRef = useRef(null);
 
   const [produtos, setProdutos] = useState([]);
-  const [loading, setFetching] = useState(true);
+  const [, setFetching] = useState(true);
   const [selectedId, setSelectedId]   = useState(null);
   const [search,     setSearch]       = useState('');
   const [activeTab,  setActiveTab]    = useState(0);
@@ -710,7 +546,7 @@ export default function ProductCatalog() {
     }
   };
 
-  useEffect(() => { fetchProducts(); }, []);
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
   // Sincroniza busca se o parâmetro da URL mudar
   useEffect(() => {
@@ -920,9 +756,9 @@ export default function ProductCatalog() {
             <Package className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">7.4 Cadastro e Segurança</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.4 Catálogo de Produtos</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Peças de elevador · Conjuntos · Embalagens · Regras de expedição</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">7. CADASTRAR — Gestão de Mestre</p>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.5 Catálogo de Produtos</h1>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Hardware de Elevadores · Componentes Críticos · Unidades Logísticas</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
             <div className="relative group">
@@ -989,7 +825,7 @@ export default function ProductCatalog() {
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md font-bold">{p.tipo}</span>
                       {!p.movimentaEstoque && <span className="text-[8px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded-md font-bold">Serviço</span>}
-                      {p.estoque_erp != null && <DeltaBadge erp={p.estoque_erp} wms={p.estoque_wms} real={p.estoque_real} />}
+                      {p.estoque_erp != null && <span className="text-[8px] font-black text-slate-400">ERP: {p.estoque_erp}</span>}
                     </div>
                   </div>
                   {isSel && <ChevronRight className="w-4 h-4 text-secondary shrink-0 mt-2" />}
@@ -1068,6 +904,13 @@ export default function ProductCatalog() {
           )}
         </div>
       </div>
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleImportOmie} 
+        accept=".xlsx, .xls" 
+        className="hidden" 
+      />
     </div>
   );
 }

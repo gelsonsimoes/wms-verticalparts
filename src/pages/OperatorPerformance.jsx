@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   BarChart2,
   Clock,
@@ -22,10 +22,9 @@ import {
   Boxes,
   Activity,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { cn } from '../utils/cn';
 
-function cn(...i) { return twMerge(clsx(i)); }
+
 
 // ─── TIPOS DE ATIVIDADE ──────────────────────────────────────────────
 const TIPOS = ['Todos', 'Alocação', 'Separação de Onda', 'Conferência de Entrada', 'Conferência de Saída', 'Packing'];
@@ -92,24 +91,53 @@ function exportCSV(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-// ─── SORT HOOK ──────────────────────────────────────────────────────
+// ─── HOOK DE ORDENAÇÃO ───────────────────────────────────────────────────────
 function useSort(data) {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
-  const toggle = key => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortDir('asc'); }
-  };
+
+  const toggle = useCallback((k) => {
+    setSortKey(prev => {
+      if (prev === k) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return k; }
+      setSortDir('asc'); return k;
+    });
+  }, []);
+
   const sorted = useMemo(() => {
-    if (!sortKey) return data;
+    if (!sortKey) return [...data];
     return [...data].sort((a, b) => {
-      const av = a[sortKey], bv = b[sortKey];
-      if (typeof av === 'number') return sortDir === 'asc' ? av - bv : bv - av;
-      return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+      const va = a[sortKey], vb = b[sortKey];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), 'pt-BR');
+      return sortDir === 'asc' ? cmp : -cmp;
     });
   }, [data, sortKey, sortDir]);
+
   return { sorted, toggle, sortKey, sortDir };
 }
+
+const SortIcon = ({ sortKey, sortDir, k }) => {
+  if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 opacity-30 ml-1 inline" />;
+  return sortDir === 'asc'
+    ? <TrendingUp className="w-3 h-3 text-secondary ml-1 inline" />
+    : <TrendingDown className="w-3 h-3 text-secondary ml-1 inline" />;
+};
+
+const ThBtn = ({ k, label, sortKey, sortDir, toggle }) => {
+  const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+  return (
+    <th
+      scope="col"
+      aria-sort={sorted_}
+      className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-secondary transition-colors"
+      onClick={() => toggle(k)}
+    >
+      {label}<SortIcon sortKey={sortKey} sortDir={sortDir} k={k} />
+    </th>
+  );
+};
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────
 export default function OperatorPerformance() {
@@ -186,26 +214,7 @@ export default function OperatorPerformance() {
 
   const { sorted, toggle, sortKey, sortDir } = useSort(filtered);
 
-  const SortIcon = ({ k }) => {
-    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 opacity-30 ml-1 inline" />;
-    return sortDir === 'asc'
-      ? <TrendingUp className="w-3 h-3 text-secondary ml-1 inline" />
-      : <TrendingDown className="w-3 h-3 text-secondary ml-1 inline" />;
-  };
 
-  const ThBtn = ({ k, label }) => {
-    const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
-    return (
-      <th
-        scope="col"
-        aria-sort={sorted_}
-        className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:text-secondary transition-colors"
-        onClick={() => toggle(k)}
-      >
-        {label}<SortIcon k={k} />
-      </th>
-    );
-  };
 
   const displayRows = showAll ? sorted : sorted.slice(0, 15);
 
@@ -410,13 +419,13 @@ export default function OperatorPerformance() {
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">#</th>
-                    <ThBtn k="operador"  label="Nome do Usuário" />
-                    <ThBtn k="data"      label="Data" />
-                    <ThBtn k="hIni"      label="Hora Início" />
-                    <ThBtn k="hFim"      label="Hora Fim" />
-                    <ThBtn k="tempo"     label="Tempo Total" />
-                    <ThBtn k="volumes"   label="Qtde Volumes" />
-                    <ThBtn k="itens"     label="Qtde Itens" />
+                    <ThBtn k="operador" label="Nome do Usuário" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="data"     label="Data" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="hIni"     label="Hora Início" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="hFim"     label="Hora Fim" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="tempo"    label="Tempo Total" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="volumes"  label="Qtde Volumes" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
+                    <ThBtn k="itens"    label="Qtde Itens" sortKey={sortKey} sortDir={sortDir} toggle={toggle} />
                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance</th>
                   </tr>

@@ -5,7 +5,6 @@ import {
     List, PackageCheck, Scissors, FileSignature, Zap,
     Check, BarChart3, CalendarDays,
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
 
 // ====== TIPOS E DADOS FICTÍCIOS PARA MONITORAMENTO ======
 const MOCK_NF_DATA = [

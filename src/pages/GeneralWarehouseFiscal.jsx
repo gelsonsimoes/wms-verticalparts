@@ -74,7 +74,7 @@ function StatusBadge({ status }) {
 // ─── MODAL DE VINCULAÇÃO DE RETORNO SIMBÓLICO ──────────────────────
 function VincularModal({ remessa, onClose, onVincular }) {
   const [chaveRetorno, setChaveRetorno] = useState('');
-  const [step, setStep] = useState('input'); // input | confirmar
+
   const [copied, setCopied] = useState(false);
   const inputRef = useRef(null);
   const isValid = chaveRetorno.replace(/\D/g, '').length === 44;
@@ -219,7 +219,7 @@ export default function GeneralWarehouseFiscal() {
     { label: 'Consulta de Retorno',          icon: RotateCcw, count: RETORNOS.length },
   ];
 
-  const handleVincular = (remessaId, chave) => {
+  const handleVincular = (remessaId, _chave) => {
     setRemessas(prev => prev.map(r => r.id === remessaId
       ? { ...r, cobertura: 'Coberta', coberturaQtd: r.totalQtd }
       : r

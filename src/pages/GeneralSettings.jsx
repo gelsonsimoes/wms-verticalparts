@@ -386,7 +386,7 @@ export default function GeneralSettings() {
 
               <div>
                 <h3 className="text-xl font-black tracking-tight uppercase text-primary">WMS Connector</h3>
-                <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-full inline-block">v4.2.0 • Local Engine</p>
+                <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest bg-slate-100 dark:bg-slate-900 px-3 py-1 rounded-full inline-block">v4.3.6 • Local Engine</p>
               </div>
 
               <div className="w-full space-y-3">

@@ -74,7 +74,7 @@ function ModalSupervisor({ divergencia, onApprove, onCancel }) {
       // Placeholder: aceita qualquer preenchimento (demonstração)
       if (!usuario.trim() || senha.length < 1) throw new Error('Credenciais inválidas.');
       onApprove(usuario.trim());
-    } catch (e) {
+    } catch (_e) {
       const t = tentativas + 1;
       setTentativas(t);
       setErro(t >= MAX_ATTEMPTS
@@ -260,7 +260,6 @@ export default function ConferirRecebimento() {
       return arr;
     });
     resetPanel();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lote, validade, isDamaged, damageType]);
 
   const handleConfirmItem = (e) => {

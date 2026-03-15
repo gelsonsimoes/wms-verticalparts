@@ -17,7 +17,8 @@ import {
   ClipboardList,
   AlertTriangle,
   Camera,
-  Search
+  Search,
+  Tag
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -34,11 +35,10 @@ const STATUS_COLORS = {
   'Finalizada': 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400'
 };
 
-import { useApp } from '../context/AppContext';
 
 // ====== SUB-COMPONENTE: TOOLBAR BUTTON ======
 
-const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled = false, badge }) => (
+const ToolbarButton = ({ label, icon: IconComponent, onClick, color = "slate", disabled = false, badge }) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -50,7 +50,7 @@ const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled =
     )}
   >
     <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center transition-colors group-hover:bg-white/10">
-      <Icon className="w-5 h-5" />
+      <IconComponent className="w-5 h-5" />
     </div>
     <span className="text-[9px] font-black uppercase tracking-widest text-center leading-tight whitespace-nowrap">{label}</span>
     {badge && (
@@ -64,7 +64,6 @@ const ToolbarButton = ({ label, icon: Icon, onClick, color = "slate", disabled =
 // ====== COMPONENTE PRINCIPAL ======
 
 export default function ReceivingManager() {
-  const { } = useApp(); // useApp mantido para futura expansão
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [filterPeriod, setFilterPeriod] = useState('1 dia');
   const [selectedOR, setSelectedOR] = useState(null);
@@ -78,8 +77,7 @@ export default function ReceivingManager() {
   ]);
   const [showNFModal, setShowNFModal] = useState(false);
   const [showProductsModal, setShowProductsModal] = useState(false);
-  // Histórico de bips (mantido para futura exibição no modal)
-  // const [scanLog, setScanLog] = useState([]);
+  const [, setScanLog] = useState([]);
   
   // Blind Check State
   const [barcode, setBarcode] = useState('');

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useId, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import React, { useState, useId, useRef } from 'react';
+import { useApp } from '../hooks/useApp';
 import { 
   Warehouse, 
   Plus, 

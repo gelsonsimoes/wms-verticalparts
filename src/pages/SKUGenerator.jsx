@@ -28,7 +28,7 @@ export default function SKUGenerator() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [step, setStep] = useState(1);
+  const [, setStep] = useState(1);
   const [chatHistory, setChatHistory] = useState([]);
 
   // Auto-generate SKU
@@ -108,25 +108,35 @@ export default function SKUGenerator() {
     setChatHistory([]);
   };
 
+  // ===== FUNÇÃO ATUALIZADA CONFORME ORIENTAÇÃO =====
   const generateAIDescription = async () => {
-    if (!additionalDetails) return;
+    // Verificação de segurança: se não houver texto, não dispara
+    if (!additionalDetails.trim()) return; 
+    
     setIsGeneratingAI(true);
     try {
       const response = await fetch('/api_ia.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vpType,
-          category: manualCategory || category,
-          attributes,
-          selectedCompatibility,
-          manualReference,
-          additionalDetails,
-          manualSku,
+          // PASSANDO O CAMPO DE CHAT COMO PRIORIDADE
+          user_instruction: additionalDetails, 
+          
+          // DADOS DE CONTEXTO (SECUNDÁRIOS)
+          context: {
+            vpType,
+            category: manualCategory || category,
+            attributes,
+            sku: manualSku,
+            reference: manualReference,
+            compatibility: selectedCompatibility
+          },
           history: chatHistory
         })
       });
+
       const data = await response.json();
+      
       if (data.description) {
         setGeneratedDescription(data.description);
         setChatHistory(prev => [
@@ -134,11 +144,13 @@ export default function SKUGenerator() {
           { role: 'user', content: additionalDetails },
           { role: 'assistant', content: data.description }
         ]);
-        setAdditionalDetails('');
+        setAdditionalDetails(''); // Limpa o campo após enviar
+      } else if (data.error) {
+        alert("Erro da IA: " + data.error);
       }
     } catch (error) {
-      console.error("Error generating AI description:", error);
-      alert("Falha ao conversar com a IA. Certifique-se que o motor api_ia.php está presente.");
+      console.error("Error:", error);
+      alert("Falha na comunicação com o motor de IA.");
     } finally {
       setIsGeneratingAI(false);
     }
@@ -360,7 +372,7 @@ export default function SKUGenerator() {
       <div className="bg-slate-100 dark:bg-slate-900/50 rounded-2xl p-4 flex items-center justify-between border border-slate-200 mt-20">
          <div className="flex items-center gap-3">
             <Package className="w-4 h-4 text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">WMS VerticalParts v4.3.2 · Engine de Padronização</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">WMS VerticalParts v4.3.23 · Engine de Padronização</span>
          </div>
       </div>
     </div>

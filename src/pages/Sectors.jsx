@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import {
     Layers, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight,
     Filter, CheckCircle2, XCircle, Shield, Users, MapPin, Package,
@@ -77,7 +77,7 @@ function SupervisorModal({ onConfirm, onCancel, message }) {
 }
 
 // ========== LINKING MODAL ==========
-function LinkingModal({ title, icon: Icon, items, columns, headers, onClose, onAdd, onRemove }) {
+function LinkingModal({ title, icon: Icon, items, _columns, _headers, onClose, onAdd, onRemove }) {
     const [newVal, setNewVal] = useState('');
     const inputId = `linking-input-${title.toLowerCase().replace(/\s+/g, '-')}`;
 

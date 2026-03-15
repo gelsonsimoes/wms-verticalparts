@@ -17,7 +17,7 @@ import {
   Scissors,
   RefreshCcw,
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp } from '../hooks/useApp';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 

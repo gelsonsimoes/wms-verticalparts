@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect, useId, useRef } from 'react';
-import { useApp } from '../context/AppContext';
+import React, { useState, useId, useRef } from 'react';
+import { useApp } from '../hooks/useApp';
+import { supabase } from '../services/supabaseClient';
 import { 
   User, 
   Plus, 
@@ -71,16 +72,50 @@ export default function UsersPage() {
     });
   };
 
-  const handleSendInvite = () => {
+  const handleSendInvite = async () => {
     if (!formData.email || !formData.email.includes('@')) {
       showToast('E-mail válido é obrigatório para enviar convite.', 'error');
       return;
     }
-    showToast(`Convite de acesso enviado para ${formData.email}!`, 'success');
+    if (!formData.usuario) {
+      showToast('Defina o Login (username) antes de enviar o convite.', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api_ia.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action:      'invite',
+          email:       formData.email,
+          employee_id: formData.usuario,
+          name:        formData.nomeUsuario,
+          role:        formData.nivel,
+          branch:      formData.entidade,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao enviar convite.');
+      showToast(`Convite enviado para ${formData.email}! Login: ${formData.usuario}`, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   };
 
-  const handleResetPassword = () => {
-    showToast(`Link de redefinição enviado para ${formData.email}`, 'info');
+  const handleResetPassword = async () => {
+    if (!formData.email) {
+      showToast('E-mail é obrigatório para resetar a senha.', 'error');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast(`Link de redefinição enviado para ${formData.email}`, 'info');
+    }
   };
 
   const handleNew = () => {
@@ -260,14 +295,22 @@ export default function UsersPage() {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor={`${fieldId}-cargo`} className="text-[10px] font-black uppercase tracking-widest text-gray-400">Função / Cargo</label>
-                  <input 
+                  <select 
                     id={`${fieldId}-cargo`}
-                    type="text" 
-                    className="w-full bg-white border border-gray-200 rounded-sm py-2 px-3 text-sm focus:border-yellow-500 outline-none transition-all font-bold"
+                    className="w-full h-[38px] bg-white border border-gray-200 rounded-sm px-3 text-sm focus:border-yellow-500 outline-none transition-all font-bold"
                     value={formData.cargo} 
                     onChange={(e) => setFormData({...formData, cargo: e.target.value})}
-                    placeholder="Supervisor, Operador, etc."
-                  />
+                  >
+                    <option value="">Selecione um cargo</option>
+                    <option value="Supervisor de Operações">Supervisor de Operações</option>
+                    <option value="Operador de Armazém">Operador de Armazém</option>
+                    <option value="Almoxarife">Almoxarife</option>
+                    <option value="Estratégias e Processos">Estratégias e Processos</option>
+                    <option value="Operador de Expedição">Operador de Expedição</option>
+                    <option value="Analista Fiscal">Analista Fiscal</option>
+                    <option value="Analista de Inventário">Analista de Inventário</option>
+                    <option value="Operador de Recebimento">Operador de Recebimento</option>
+                  </select>
                 </div>
 
                 <div className="md:col-span-2 space-y-1">

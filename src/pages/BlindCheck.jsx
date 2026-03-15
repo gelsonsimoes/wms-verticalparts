@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useId } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ClipboardCheck, Search, ScanBarcode, CheckCircle2, XCircle, AlertTriangle,
@@ -68,7 +68,7 @@ function validateValidade(dateStr) {
 function ProgressBar({ itens, fase }) {
   const totalItens = itens.length;
   const conferidos = itens.filter(i => i.qtContada > 0).length;
-  const divergentes = itens.filter(i => i.qtContada > 0 && i.qtContada !== i.qtEsperada).length;
+  const _divergentes = itens.filter(i => i.qtContada > 0 && i.qtContada !== i.qtEsperada).length;
   // Durante conferência não revelamos progresso numérico — apenas "item lido" vs "pendente"
   return (
     <div className="flex items-center gap-1.5">
@@ -113,7 +113,7 @@ function ModalSupervisor({ onClose, onOk, titulo = 'Liberar com Divergência', m
     }, 800);
   };
 
-  const triggerShake = () => { setShake(true); setTimeout(() => setShake(false), 500); };
+  const _triggerShake = () => { setShake(true); setTimeout(() => setShake(false), 500); };
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">

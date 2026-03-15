@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
-const APP_VERSION = 'v4.2.1';
+const APP_VERSION = 'v4.3.18';
 
 // Estilo base compartilhado para os inputs (evita repetição)
 const INPUT_BASE =
     'w-full px-4 py-3 rounded-xl text-sm font-bold text-white placeholder-slate-600 outline-none transition-all';
 
-export default function Login({ onLogin }) {
+export default function Login() {
     const [form,         setForm]         = useState({ login: '', senha: '' });
     const [showSenha,    setShowSenha]    = useState(false);
     const [error,        setError]        = useState('');

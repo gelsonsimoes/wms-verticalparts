@@ -41,7 +41,7 @@ export default function FileLayoutMapper() {
     const [fileName, setFileName] = useState("");
     const [templateName, setTemplateName] = useState("");
     const [mappings, setMappings] = useState({});
-    const [detectedColumns, setDetectedColumns] = useState(['Coluna A', 'Coluna B', 'Coluna C', 'Coluna D', 'Coluna E']);
+    const [detectedColumns] = useState(['Coluna A', 'Coluna B', 'Coluna C', 'Coluna D', 'Coluna E']);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
 
     const handleUpload = () => {

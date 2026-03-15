@@ -4,8 +4,8 @@ import {
   Bell, Search, Menu, LogOut, Settings, User, 
   Package, Zap, MapPin, ChevronRight, Loader2 
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
-import { supabase } from '../../services/supabaseClient';
+import { useApp } from '../../hooks/useApp';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function Header({ toggleSidebar, onLogout, session }) {
   const navigate = useNavigate();
