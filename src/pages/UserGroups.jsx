@@ -1,387 +1,571 @@
-import React, { useState, useMemo, useEffect, useId, useRef } from 'react';
-import { useApp } from '../hooks/useApp';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-    Shield, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight,
-    CheckSquare, Square, Smartphone, Monitor, Globe, Warehouse, Activity,
-    Users, X, Save
+  Shield, Plus, Edit2, Trash2, Save, X, ChevronDown, ChevronRight,
+  Users, CheckSquare, Square, Loader2, Lock, Unlock, Search
 } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
-// ========== MODAL DE SELEÇÃO MÚLTIPLA ==========
-function MultiSelectModal({ title, icon: Icon, allOptions, selected, onSave, onClose }) {
-    const [current, setCurrent] = useState([...selected]);
-    const modalId = useId();
-    const closeBtnRef = useRef(null);
+// ── Todas as páginas do WMS organizadas por seção ────────────
+const PAGE_SECTIONS = [
+  {
+    label: 'PRINCIPAL',
+    items: [{ path: '/', label: '1.1 Dashboard Geral' }],
+  },
+  {
+    label: 'OPERAR',
+    items: [
+      { path: '/operacao/cruzar-docas',         label: '2.1 Cruzar Docas' },
+      { path: '/operacao/processar-devolucoes',  label: '2.2 Processar Devoluções' },
+      { path: '/operacao/pesar-cargas',          label: '2.3 Pesar Cargas' },
+      { path: '/operacao/gerenciar-recebimento', label: '2.4 Gerenciar Recebimento' },
+      { path: '/operacao/conferir-recebimento',  label: '2.5 Conferir Recebimento' },
+      { path: '/operacao/gerar-mapa',            label: '2.6 Gerar Mapa de Alocação' },
+      { path: '/operacao/conferencia-cega',      label: '2.7 Conferência Cega' },
+      { path: '/operacao/alocar-estoque',        label: '2.8 Alocar Estoque' },
+      { path: '/operacao/kanban-alocacao',       label: '2.9 Kanban de Alocação' },
+      { path: '/operacao/separar-pedidos',       label: '2.10 Separar Pedidos' },
+      { path: '/operacao/embalar-pedidos',       label: '2.11 Embalar Pedidos' },
+      { path: '/operacao/monitorar-saida',       label: '2.12 Monitorar Saída' },
+      { path: '/operacao/recebimento',           label: '2.13 Recebimento (Check-in)' },
+      { path: '/operacao/estacao-kits',          label: '2.14 Estação de Kits' },
+      { path: '/operacao/conferencia-colmeia',   label: '2.15 Conferência Colmeia' },
+      { path: '/operacao/mapa-visual',           label: '2.16 Mapa Visual de Estoque' },
+      { path: '/operacao/buffer-1',              label: '2.17 Buffer 1' },
+      { path: '/operacao/buffer-2',              label: '2.18 Buffer 2' },
+      { path: '/operacao/ordem-servico',         label: '2.19 Ordem de Serviço' },
+      { path: '/operacao/gestao-seguros',        label: '2.20 Gestão de Seguros' },
+      { path: '/operacao/pesagem-rodoviaria',    label: '2.21 Pesagem Rodoviária' },
+      { path: '/operacao/gerenciamento-pedidos', label: '2.22 Gerenciamento de Pedidos' },
+    ],
+  },
+  {
+    label: 'PLANEJAR',
+    items: [
+      { path: '/planejamento/gerar-ondas',         label: '3.1 Gerar Ondas de Separação' },
+      { path: '/planejamento/monitorar-prazos',    label: '3.2 Monitorar Prazos (SLA)' },
+      { path: '/planejamento/agendar-transportes', label: '3.3 Agendar Transportes' },
+      { path: '/planejamento/monitorar-atividades',label: '3.4 Monitorar Atividades' },
+      { path: '/planejamento/gerenciar-manifestos',label: '3.5 Gerenciar Manifestos' },
+      { path: '/planejamento/expedir-cargas',      label: '3.6 Expedir Cargas' },
+      { path: '/planejamento/gerenciar-portaria',  label: '3.7 Gerenciar Portaria' },
+      { path: '/planejamento/atividades-docas',    label: '3.8 Atividades de Docas' },
+    ],
+  },
+  {
+    label: 'CONTROLAR',
+    items: [
+      { path: '/estoque/auditar-inventario', label: '4.1 Auditar Inventário' },
+      { path: '/estoque/consultar-kardex',   label: '4.2 Consultar Kardex' },
+      { path: '/estoque/analisar-estoque',   label: '4.3 Analisar Estoque' },
+      { path: '/estoque/remanejar',          label: '4.4 Remanejar Produtos' },
+      { path: '/estoque/controlar-lotes',    label: '4.5 Controlar Lotes e Validade' },
+      { path: '/estoque/monitorar-avarias',  label: '4.6 Monitorar Avarias' },
+    ],
+  },
+  {
+    label: 'FISCAL',
+    items: [
+      { path: '/fiscal/gerenciar-nfe',   label: '5.1 Gerenciar NF-e' },
+      { path: '/fiscal/gerenciar-cte',   label: '5.2 Gerenciar CT-e' },
+      { path: '/fiscal/emitir-cobertura',label: '5.3 Emitir Cobertura Fiscal' },
+      { path: '/fiscal/armazem-geral',   label: '5.4 Controlar Armazém Geral' },
+    ],
+  },
+  {
+    label: 'FINANCEIRO',
+    items: [
+      { path: '/financeiro/calcular-diarias', label: '6.1 Calcular Diárias' },
+      { path: '/financeiro/contratos',        label: '6.2 Gerenciar Contratos' },
+    ],
+  },
+  {
+    label: 'CADASTRAR',
+    items: [
+      { path: '/cadastros/empresas',       label: '7.1 Gerenciar Empresas' },
+      { path: '/cadastros/armazens',       label: '7.2 Configurar Armazéns' },
+      { path: '/cadastros/enderecos',      label: '7.3 Cadastrar Endereços' },
+      { path: '/cadastros/clientes',       label: '7.3.1 Catálogo de Clientes' },
+      { path: '/cadastros/produtos',       label: '7.4 Catálogo de Produtos' },
+      { path: '/cadastros/rotas-veiculos', label: '7.5 Cadastrar Rotas e Veículos' },
+      { path: '/cadastros/areas',          label: '7.6 Configurar Áreas' },
+      { path: '/cadastros/setores',        label: '7.7 Configurar Setores' },
+      { path: '/config/gerar-sku',         label: '7.9 Gerar SKU' },
+      { path: '/config/etiquetas',         label: '7.10 Gerenciar Etiquetas' },
+    ],
+  },
+  {
+    label: 'INDICADORES',
+    items: [
+      { path: '/indicadores/financeiro',   label: '8.1 Dashboard Financeiro' },
+      { path: '/indicadores/ocupacao',     label: '8.2 Analisar Ocupação' },
+      { path: '/indicadores/produtividade',label: '8.3 Medir Produtividade' },
+      { path: '/indicadores/auditoria',    label: '8.4 Auditar Logs do Sistema' },
+      { path: '/indicadores/integracao',   label: '8.5 Resultados de Integração' },
+    ],
+  },
+  {
+    label: 'INTEGRAR',
+    items: [
+      { path: '/integrar/alertas',    label: '9.1 Alertas de Integração' },
+      { path: '/integrar/ordens-erp', label: '9.2 Sincronizar Ordens ERP' },
+      { path: '/integrar/omie',       label: '9.3 Conectar Omie ERP' },
+      { path: '/integrar/arquivos',   label: '9.4 Mapear Arquivos (Layouts)' },
+      { path: '/integrar/apis',       label: '9.5 Configurar APIs REST' },
+      { path: '/integrar/ondas',      label: '9.6 Integrar Ondas (Arquivo)' },
+    ],
+  },
+  {
+    label: 'CONFIGURAR',
+    items: [
+      { path: '/config/geral',         label: '10.1 Ajustar Configurações' },
+      { path: '/config/balancas',      label: '10.2 Integrar Balanças (Serial)' },
+      { path: '/config/service-desk',  label: '10.3 Gerenciar Service Desk' },
+      { path: '/config/expurgo',       label: '10.4 Expurgar Dados Antigos' },
+      { path: '/config/certificados',  label: '10.5 Gerenciar Certificados' },
+    ],
+  },
+];
 
-    useEffect(() => {
-        const handleKeyDown = (e) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', handleKeyDown);
-        closeBtnRef.current?.focus();
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+// ── Badges de tipo de grupo ───────────────────────────────────
+const TYPE_BADGE = {
+  padrao:        'bg-slate-100 text-slate-600',
+  personalizado: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+};
 
-    const toggle = (item) => {
-        setCurrent(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-            <div 
-                role="dialog" 
-                aria-modal="true" 
-                aria-labelledby={`${modalId}-title`}
-                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[75vh] flex flex-col" 
-                onClick={e => e.stopPropagation()}
-            >
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center">
-                            <Icon className="w-5 h-5 text-primary" aria-hidden="true" />
-                        </div>
-                        <div>
-                            <h3 id={`${modalId}-title`} className="text-base font-black">{title}</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{current.length} selecionados</p>
-                        </div>
-                    </div>
-                    <button 
-                        ref={closeBtnRef}
-                        onClick={onClose} 
-                        aria-label="Fechar modal"
-                        className="p-2 text-slate-400 hover:text-danger transition-colors"
-                    >
-                        <X className="w-5 h-5" aria-hidden="true" />
-                    </button>
-                </div>
-
-                <div className="flex-1 overflow-auto p-4 space-y-1.5">
-                    {allOptions.map(opt => (
-                        <button 
-                            key={opt} 
-                            role="checkbox"
-                            aria-checked={current.includes(opt)}
-                            onClick={() => toggle(opt)} 
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all focus:ring-2 focus:ring-primary outline-none ${current.includes(opt) ? 'bg-primary/10 border-2 border-primary' : 'bg-slate-50 dark:bg-slate-900 border-2 border-transparent hover:border-slate-200'}`}
-                        >
-                            {current.includes(opt) ? (
-                                <CheckSquare className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-                            ) : (
-                                <Square className="w-4 h-4 text-slate-300 shrink-0" aria-hidden="true" />
-                            )}
-                            <span className="text-xs font-bold uppercase">{opt}</span>
-                        </button>
-                    ))}
-                </div>
-
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 flex gap-3">
-                    <button onClick={onClose} className="flex-1 py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                    <button onClick={() => onSave(current)} className="flex-1 py-3 bg-secondary text-primary font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-2"><Save className="w-3.5 h-3.5" aria-hidden="true" /> Salvar</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ========== OPÇÕES DE MENUS ==========
-const COLETOR_OPTIONS = ['Recebimento', 'Separação', 'Inventário', 'Expedição', 'Transferência', 'Conferência', 'Ressuprimento'];
-const ENTERPRISE_OPTIONS = ['Dashboard', 'Cadastros', 'Relatórios', 'Segurança', 'Configurações', 'Integração', 'Financeiro'];
-const WEB_OPTIONS = ['WMS Web Completo', 'WMS Web Básico', 'WMS Web Consulta', 'WMS Web Relatórios'];
-const DEPOSITO_OPTIONS = ['Entrada', 'Saída', 'Transferência', 'Ajuste', 'Bloqueio', 'Desbloqueio'];
-const ATIVIDADE_OPTIONS = ['Separação da Onda', 'Conferência', 'Expedição', 'Auditoria', 'Recontagem', 'Endereçamento', 'Cross-docking'];
-
-// ========== COMPONENTE PRINCIPAL ==========
 export default function UserGroups() {
-    const { userGroups, userGroupsCrud, users } = useApp();
+  const [groups, setGroups]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [selected, setSelected]       = useState(null);
+  const [isNew, setIsNew]             = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [feedback, setFeedback]       = useState(null); // { type: 'ok'|'err', msg }
+  const [searchTerm, setSearchTerm]   = useState('');
 
-    const [formData, setFormData] = useState({ id: '', grupo: '', ativaExportacoes: false, permitirDownload: false });
-    const [isEditing, setIsEditing] = useState(false);
-    const [selectedId, setSelectedId] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [activeModal, setActiveModal] = useState(null);
-    const itemsPerPage = 6;
+  // Campos do grupo em edição
+  const [editNome, setEditNome]       = useState('');
+  const [editDesc, setEditDesc]       = useState('');
+  const [editPages, setEditPages]     = useState([]);
+  const [expanded, setExpanded]       = useState({});   // { sectionLabel: bool }
 
-    const selectedGroup = userGroups.find(g => g.id === selectedId);
+  // ── Carregar grupos do Supabase ───────────────────────────
+  const loadGroups = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('grupos_acesso')
+      .select('*')
+      .order('created_at');
+    if (!error) setGroups(data || []);
+    setLoading(false);
+  }, []);
 
-    // === Filtro e Paginação ===
-    const filtered = useMemo(() => userGroups.filter(g =>
-        g.grupo.toLowerCase().includes(searchTerm.toLowerCase()) || g.id.toString().includes(searchTerm)
-    ), [userGroups, searchTerm]);
-    const totalPages = Math.ceil(filtered.length / itemsPerPage);
-    const paginated = useMemo(() => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [filtered, currentPage]);
+  useEffect(() => { loadGroups(); }, [loadGroups]);
 
-    // === Handlers ===
-    const handleSelect = (g) => {
-        setSelectedId(g.id);
-        setFormData({ id: g.id, grupo: g.grupo, ativaExportacoes: g.ativaExportacoes, permitirDownload: g.permitirDownload });
-        setIsEditing(true);
-    };
+  // ── Selecionar grupo para editar ──────────────────────────
+  const handleSelect = (group) => {
+    setSelected(group);
+    setIsNew(false);
+    setEditNome(group.nome);
+    setEditDesc(group.descricao || '');
+    setEditPages(group.paginas || []);
+    setExpanded({});
+    setFeedback(null);
+  };
 
-    const handleSave = (e) => {
-        e.preventDefault();
-        if (!formData.grupo.trim()) return;
-        if (isEditing) {
-            userGroupsCrud.update(formData.id, { grupo: formData.grupo, ativaExportacoes: formData.ativaExportacoes, permitirDownload: formData.permitirDownload });
-        } else {
-            userGroupsCrud.add({ grupo: formData.grupo, ativaExportacoes: formData.ativaExportacoes, permitirDownload: formData.permitirDownload, coletor: [], enterprise: [], web: [], operacaoDeposito: [], atividades: [], usuarios: [] });
-        }
-        handleClear();
-    };
+  // ── Modo novo grupo ───────────────────────────────────────
+  const handleNewGroup = () => {
+    setSelected(null);
+    setIsNew(true);
+    setEditNome('');
+    setEditDesc('');
+    setEditPages([]);
+    setExpanded({});
+    setFeedback(null);
+  };
 
-    const handleDelete = () => {
-        if (!selectedId) return;
-        if (window.confirm('Deseja realmente excluir este grupo?')) { userGroupsCrud.remove(selectedId); handleClear(); }
-    };
-
-    const handleClear = () => {
-        setFormData({ id: '', grupo: '', ativaExportacoes: false, permitirDownload: false });
-        setIsEditing(false);
-        setSelectedId(null);
-    };
-
-    const handleSavePermissions = (field, values) => {
-        if (!selectedId) return;
-        userGroupsCrud.update(selectedId, { [field]: values });
-        setActiveModal(null);
-    };
-
-    const handleSaveUsers = (values) => {
-        if (!selectedId) return;
-        userGroupsCrud.update(selectedId, { usuarios: values });
-        setActiveModal(null);
-    };
-
-    // === Botões de Permissão ===
-    const permissionButtons = [
-        { key: 'coletor', label: 'Coletor', icon: Smartphone, options: COLETOR_OPTIONS, color: 'bg-blue-500' },
-        { key: 'enterprise', label: 'Enterprise', icon: Monitor, options: ENTERPRISE_OPTIONS, color: 'bg-purple-500' },
-        { key: 'web', label: 'Web', icon: Globe, options: WEB_OPTIONS, color: 'bg-green-500' },
-        { key: 'operacaoDeposito', label: 'Oper. Depósito', icon: Warehouse, options: DEPOSITO_OPTIONS, color: 'bg-orange-500' },
-        { key: 'atividades', label: 'Atividade', icon: Activity, options: ATIVIDADE_OPTIONS, color: 'bg-red-500' },
-        { key: 'usuarios', label: 'Usuário', icon: Users, options: users.map(u => u.usuario), color: 'bg-secondary' },
-    ];
-
-    return (
-        <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Modais */}
-            {activeModal && selectedGroup && activeModal !== 'usuarios' && (
-                <MultiSelectModal
-                    title={permissionButtons.find(p => p.key === activeModal)?.label}
-                    icon={permissionButtons.find(p => p.key === activeModal)?.icon}
-                    allOptions={permissionButtons.find(p => p.key === activeModal)?.options || []}
-                    selected={selectedGroup[activeModal] || []}
-                    onSave={(vals) => handleSavePermissions(activeModal, vals)}
-                    onClose={() => setActiveModal(null)}
-                />
-            )}
-            {activeModal === 'usuarios' && selectedGroup && (
-                <MultiSelectModal
-                    title="Vincular Usuários"
-                    icon={Users}
-                    allOptions={users.map(u => u.usuario)}
-                    selected={selectedGroup.usuarios || []}
-                    onSave={handleSaveUsers}
-                    onClose={() => setActiveModal(null)}
-                />
-            )}
-
-            {/* Cabeçalho */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight">11.2 Definir Grupos de Acesso — Grupo de Usuário</h1>
-                    <p className="text-sm text-slate-500 font-medium">Configure grupos de acesso e permissões do WMS</p>
-                </div>
-                <div className="bg-secondary/5 px-4 py-2 rounded-xl border border-secondary/10 flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-secondary" aria-hidden="true" />
-                    <span className="text-[10px] font-black text-secondary uppercase tracking-widest">Total: {userGroups.length} grupos</span>
-                </div>
-            </div>
-
-            {/* FORM + DATAGRID */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* FORMULÁRIO */}
-                <div className="lg:col-span-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-9 h-9 bg-secondary rounded-xl flex items-center justify-center"><Shield className="w-4 h-4 text-primary" aria-hidden="true" /></div>
-                            <h2 className="text-base font-black italic">{isEditing ? 'Alterar Grupo' : 'Novo Grupo'}</h2>
-                        </div>
-
-                        <form onSubmit={handleSave} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label htmlFor="id-grupo" className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Id Grupo</label>
-                                <input id="id-grupo" type="text" value={formData.id} disabled placeholder="Auto" className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-4 text-sm font-bold text-slate-400 cursor-not-allowed outline-none" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label htmlFor="nome-grupo" className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Grupo</label>
-                                <input id="nome-grupo" required type="text" value={formData.grupo} onChange={e => setFormData({ ...formData, grupo: e.target.value.toUpperCase() })} placeholder="Ex: ADMINISTRADORES" className="w-full bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-slate-300" />
-                            </div>
-
-                            {/* Checkboxes */}
-                            <div className="space-y-2">
-                                <button 
-                                    type="button" 
-                                    role="checkbox"
-                                    aria-checked={formData.ativaExportacoes}
-                                    onClick={() => setFormData({ ...formData, ativaExportacoes: !formData.ativaExportacoes })} 
-                                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 outline-none focus:ring-2 focus:ring-primary ${formData.ativaExportacoes ? 'bg-primary/10 border-primary' : 'bg-slate-50 dark:bg-slate-900 border-transparent'}`}
-                                >
-                                    {formData.ativaExportacoes ? (
-                                        <CheckSquare className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-                                    ) : (
-                                        <Square className="w-4 h-4 text-slate-300 shrink-0" aria-hidden="true" />
-                                    )}
-                                    <span className="text-[9px] font-black uppercase tracking-widest">Ativa exportações através das abas</span>
-                                </button>
-                                <button 
-                                    type="button" 
-                                    role="checkbox"
-                                    aria-checked={formData.permitirDownload}
-                                    onClick={() => setFormData({ ...formData, permitirDownload: !formData.permitirDownload })} 
-                                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all border-2 outline-none focus:ring-2 focus:ring-primary ${formData.permitirDownload ? 'bg-primary/10 border-primary' : 'bg-slate-50 dark:bg-slate-900 border-transparent'}`}
-                                >
-                                    {formData.permitirDownload ? (
-                                        <CheckSquare className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
-                                    ) : (
-                                        <Square className="w-4 h-4 text-slate-300 shrink-0" aria-hidden="true" />
-                                    )}
-                                    <span className="text-[9px] font-black uppercase tracking-widest">Permitir Download de Arquivos</span>
-                                </button>
-                            </div>
-
-                            {/* Botões de ação */}
-                            <div className="space-y-2 pt-2">
-                                {isEditing ? (
-                                    <>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button type="button" onClick={handleClear} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
-                                            <button type="submit" aria-label="Alterar grupo" className="py-3 bg-warning text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-warning/90 transition-all shadow-lg shadow-warning/20 flex items-center justify-center gap-1.5"><Edit2 className="w-3.5 h-3.5" aria-hidden="true" /> Alterar</button>
-                                        </div>
-                                        <button type="button" onClick={handleDelete} aria-label="Excluir grupo" className="w-full py-2.5 bg-danger/10 text-danger font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-danger hover:text-white transition-all border border-danger/20 flex items-center justify-center gap-1.5"><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Excluir</button>
-                                    </>
-                                ) : (
-                                    <button type="submit" aria-label="Cadastrar novo grupo" className="w-full py-3 bg-secondary text-primary font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-secondary/90 transition-all shadow-lg shadow-black/10 flex items-center justify-center gap-1.5"><Plus className="w-4 h-4" aria-hidden="true" /> Cadastrar</button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                {/* DATAGRID */}
-                <div className="lg:col-span-8">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm flex flex-col">
-                        <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                            <div className="relative max-w-xs">
-                                <label htmlFor="search-groups" className="sr-only">Pesquisar grupos</label>
-                                <input 
-                                    id="search-groups" 
-                                    type="text" 
-                                    placeholder="Procurar grupo..." 
-                                    value={searchTerm} 
-                                    onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
-                                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary transition-all" 
-                                />
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
-                            </div>
-                        </div>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="text-[8px] uppercase font-black tracking-[0.15em] text-slate-400 border-b border-slate-100 dark:border-slate-800">
-                                        <th scope="col" className="px-4 py-4 w-12">ID</th>
-                                        <th scope="col" className="px-4 py-4">Grupo</th>
-                                        <th scope="col" className="px-4 py-4 text-center">Exportações</th>
-                                        <th scope="col" className="px-4 py-4 text-center">Download</th>
-                                        <th scope="col" className="px-4 py-4 text-center">Usuários</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                                    {paginated.length > 0 ? paginated.map(g => (
-                                        <tr key={g.id} onClick={() => handleSelect(g)} className={`cursor-pointer transition-all duration-200 ${selectedId === g.id ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'}`}>
-                                            <td className="px-4 py-3.5 font-mono text-xs font-black text-secondary">#{g.id}</td>
-                                            <td className="px-4 py-3.5 font-black text-xs uppercase tracking-tight">{g.grupo}</td>
-                                            <td className="px-4 py-3.5 text-center">
-                                                {g.ativaExportacoes ? (
-                                                    <CheckSquare className="w-4 h-4 text-success mx-auto" aria-hidden="true" />
-                                                ) : (
-                                                    <Square className="w-4 h-4 text-slate-300 mx-auto" aria-hidden="true" />
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-center">
-                                                {g.permitirDownload ? (
-                                                    <CheckSquare className="w-4 h-4 text-success mx-auto" aria-hidden="true" />
-                                                ) : (
-                                                    <Square className="w-4 h-4 text-slate-300 mx-auto" aria-hidden="true" />
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-center"><span className="inline-flex items-center justify-center w-6 h-6 bg-secondary/10 text-secondary rounded-full text-[10px] font-black">{g.usuarios?.length || 0}</span></td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan="5" className="px-4 py-16 text-center opacity-30"><span className="text-xs font-black uppercase tracking-widest">Nenhum grupo</span></td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Paginação */}
-                        <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{filtered.length} registros</span>
-                            <div className="flex items-center gap-1.5">
-                                <button 
-                                    disabled={currentPage === 1} 
-                                    onClick={() => setCurrentPage(p => p - 1)} 
-                                    aria-label="Página anterior"
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 hover:bg-secondary hover:text-primary transition-all outline-none focus:ring-2 focus:ring-secondary"
-                                >
-                                    <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
-                                </button>
-                                {[...Array(totalPages)].map((_, i) => (
-                                    <button 
-                                        key={i} 
-                                        onClick={() => setCurrentPage(i + 1)} 
-                                        aria-label={`Página ${i + 1}`}
-                                        className={`w-7 h-7 rounded-lg text-[9px] font-black transition-all outline-none focus:ring-2 focus:ring-secondary ${currentPage === i + 1 ? 'bg-secondary text-primary shadow-lg' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-secondary'}`}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                                <button 
-                                    disabled={currentPage >= totalPages} 
-                                    onClick={() => setCurrentPage(p => p + 1)} 
-                                    aria-label="Próxima página"
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 disabled:opacity-30 hover:bg-secondary hover:text-primary transition-all outline-none focus:ring-2 focus:ring-secondary"
-                                >
-                                    <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* PAINEL DE PERMISSÕES (visível ao selecionar grupo) */}
-            {selectedId && (
-                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Permissões e Vinculações do Grupo</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                        {permissionButtons.map(perm => (
-                            <button 
-                                key={perm.key} 
-                                onClick={() => setActiveModal(perm.key)} 
-                                aria-label={`Gerenciar permissões de ${perm.label}`}
-                                className="flex flex-col items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all outline-none focus:ring-2 focus:ring-primary group"
-                            >
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${perm.color} shadow-lg transition-all`}>
-                                    <perm.icon className="w-5 h-5 text-white" aria-hidden="true" />
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-[9px] font-black uppercase tracking-widest">{perm.label}</p>
-                                    <p className="text-base font-black text-secondary mt-1">{(selectedGroup?.[perm.key] || []).length}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
+  // ── Toggle página individual ──────────────────────────────
+  const togglePage = (path) => {
+    setEditPages(prev =>
+      prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]
     );
+  };
+
+  // ── Toggle seção inteira ──────────────────────────────────
+  const toggleSection = (items) => {
+    const paths = items.map(i => i.path);
+    const allIn = paths.every(p => editPages.includes(p));
+    if (allIn) {
+      setEditPages(prev => prev.filter(p => !paths.includes(p)));
+    } else {
+      setEditPages(prev => [...new Set([...prev, ...paths])]);
+    }
+  };
+
+  // ── Salvar (criar ou atualizar) ───────────────────────────
+  const handleSave = async () => {
+    if (!editNome.trim()) {
+      setFeedback({ type: 'err', msg: 'Nome do grupo é obrigatório.' });
+      return;
+    }
+    setSaving(true);
+    setFeedback(null);
+
+    if (isNew) {
+      const { error } = await supabase.from('grupos_acesso').insert({
+        nome:     editNome.trim(),
+        descricao: editDesc.trim() || null,
+        tipo:     'personalizado',
+        paginas:  editPages,
+      });
+      if (error) {
+        setFeedback({ type: 'err', msg: error.message });
+      } else {
+        setFeedback({ type: 'ok', msg: 'Grupo criado com sucesso.' });
+        setIsNew(false);
+        await loadGroups();
+      }
+    } else {
+      const update = {
+        descricao: editDesc.trim() || null,
+        paginas:   editPages,
+      };
+      // Só permite renomear grupos personalizados
+      if (selected.tipo === 'personalizado') update.nome = editNome.trim();
+
+      const { error } = await supabase
+        .from('grupos_acesso')
+        .update(update)
+        .eq('id', selected.id);
+
+      if (error) {
+        setFeedback({ type: 'err', msg: error.message });
+      } else {
+        setFeedback({ type: 'ok', msg: 'Grupo atualizado.' });
+        await loadGroups();
+        // Atualiza selected com dados novos
+        setSelected(prev => ({ ...prev, ...update, nome: update.nome || prev.nome }));
+      }
+    }
+    setSaving(false);
+  };
+
+  // ── Excluir grupo personalizado ───────────────────────────
+  const handleDelete = async () => {
+    if (!selected || selected.tipo === 'padrao') return;
+    if (!window.confirm(`Excluir o grupo "${selected.nome}"? Usuários vinculados perderão o grupo.`)) return;
+    const { error } = await supabase.from('grupos_acesso').delete().eq('id', selected.id);
+    if (error) {
+      setFeedback({ type: 'err', msg: error.message });
+    } else {
+      setSelected(null);
+      setIsNew(false);
+      await loadGroups();
+    }
+  };
+
+  const filteredGroups = groups.filter(g =>
+    g.nome.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const isAdminGroup = selected?.nome === 'Administrador';
+  const canDelete    = selected?.tipo === 'personalizado';
+
+  return (
+    <EnterprisePageBase
+      title="11.2 Definir Grupos de Acesso"
+      breadcrumbItems={[{ label: 'SEGURANÇA', path: '/seguranca/usuarios' }]}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        {/* ── Coluna esquerda: lista de grupos ─────────────── */}
+        <div className="lg:col-span-4 space-y-3">
+          {/* Busca + Novo */}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar grupo..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-sm text-xs font-bold outline-none focus:border-primary transition-all"
+              />
+            </div>
+            <button
+              onClick={handleNewGroup}
+              className="px-4 py-2.5 bg-secondary text-primary font-black text-[10px] uppercase tracking-widest rounded-sm hover:bg-secondary/90 transition-all flex items-center gap-1.5 shadow-sm"
+            >
+              <Plus className="w-3.5 h-3.5" /> Novo
+            </button>
+          </div>
+
+          {/* Lista */}
+          <div className="bg-white border border-slate-200 rounded-sm overflow-hidden shadow-sm">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              </div>
+            ) : filteredGroups.length === 0 ? (
+              <div className="py-12 text-center text-xs font-black uppercase tracking-widest text-slate-300">
+                Nenhum grupo
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-50">
+                {filteredGroups.map(g => {
+                  const isSelected = !isNew && selected?.id === g.id;
+                  return (
+                    <li key={g.id}>
+                      <button
+                        onClick={() => handleSelect(g)}
+                        className={`w-full text-left px-4 py-3.5 transition-all flex items-start gap-3 ${
+                          isSelected
+                            ? 'bg-primary/5 border-l-4 border-l-primary'
+                            : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-sm bg-secondary/10 flex items-center justify-center shrink-0 mt-0.5">
+                          {g.tipo === 'padrao'
+                            ? <Lock className="w-3.5 h-3.5 text-primary" />
+                            : <Unlock className="w-3.5 h-3.5 text-yellow-600" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black uppercase tracking-tight truncate">{g.nome}</p>
+                          <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
+                            {g.nome === 'Administrador'
+                              ? 'Acesso total'
+                              : `${g.paginas?.length ?? 0} página${(g.paginas?.length ?? 0) !== 1 ? 's' : ''}`
+                            }
+                          </p>
+                        </div>
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm shrink-0 ${TYPE_BADGE[g.tipo]}`}>
+                          {g.tipo === 'padrao' ? 'PADRÃO' : 'CUSTOM'}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">
+            {groups.length} grupo{groups.length !== 1 ? 's' : ''} — {groups.filter(g => g.tipo === 'padrao').length} padrão · {groups.filter(g => g.tipo === 'personalizado').length} custom
+          </p>
+        </div>
+
+        {/* ── Coluna direita: editor ────────────────────────── */}
+        <div className="lg:col-span-8">
+          {!selected && !isNew ? (
+            <div className="bg-white border border-slate-200 rounded-sm flex flex-col items-center justify-center py-20 text-slate-300">
+              <Shield className="w-10 h-10 mb-3" />
+              <p className="text-xs font-black uppercase tracking-widest">Selecione um grupo para editar</p>
+              <p className="text-[10px] font-medium mt-1">ou clique em &quot;Novo&quot; para criar</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
+
+              {/* Header do editor */}
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-secondary rounded-sm flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-black uppercase tracking-tight">
+                      {isNew ? 'Novo Grupo Personalizado' : selected?.nome}
+                    </h2>
+                    {!isNew && (
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${TYPE_BADGE[selected?.tipo]}`}>
+                        {selected?.tipo === 'padrao' ? 'GRUPO PADRÃO' : 'GRUPO PERSONALIZADO'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => { setSelected(null); setIsNew(false); }} className="p-1.5 text-slate-400 hover:text-danger transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                {/* Feedback */}
+                {feedback && (
+                  <div className={`px-4 py-3 rounded-sm text-xs font-black uppercase tracking-widest ${
+                    feedback.type === 'ok'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-danger border border-red-200'
+                  }`}>
+                    {feedback.msg}
+                  </div>
+                )}
+
+                {/* Nome e descrição */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                      Nome do Grupo {selected?.tipo === 'padrao' && !isNew && <span className="text-slate-300">(bloqueado)</span>}
+                    </label>
+                    <input
+                      type="text"
+                      value={editNome}
+                      onChange={e => setEditNome(e.target.value)}
+                      disabled={selected?.tipo === 'padrao' && !isNew}
+                      placeholder="Ex: Supervisores"
+                      className="w-full bg-white border-2 border-slate-100 rounded-sm py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-slate-300 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição</label>
+                    <input
+                      type="text"
+                      value={editDesc}
+                      onChange={e => setEditDesc(e.target.value)}
+                      placeholder="Breve descrição do grupo..."
+                      className="w-full bg-white border-2 border-slate-100 rounded-sm py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-slate-300"
+                    />
+                  </div>
+                </div>
+
+                {/* Seletor de páginas */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      {isAdminGroup ? 'Acesso Total (não configurável)' : `Páginas Permitidas — ${editPages.length} selecionadas`}
+                    </span>
+                    {!isAdminGroup && (
+                      <button
+                        onClick={() => {
+                          const all = PAGE_SECTIONS.flatMap(s => s.items.map(i => i.path));
+                          setEditPages(prev => prev.length === all.length ? [] : all);
+                        }}
+                        className="text-[9px] font-black uppercase tracking-widest text-primary hover:underline"
+                      >
+                        {editPages.length === PAGE_SECTIONS.flatMap(s => s.items).length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
+                      </button>
+                    )}
+                  </div>
+
+                  {isAdminGroup ? (
+                    <div className="bg-slate-50 border border-slate-200 rounded-sm px-4 py-3 flex items-center gap-3">
+                      <Lock className="w-4 h-4 text-primary shrink-0" />
+                      <p className="text-xs font-bold text-slate-500">
+                        O grupo <strong>Administrador</strong> tem acesso a todas as páginas do sistema.
+                        Não é possível restringir suas permissões.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-slate-200 rounded-sm overflow-hidden max-h-[420px] overflow-y-auto">
+                      {PAGE_SECTIONS.map(section => {
+                        const paths = section.items.map(i => i.path);
+                        const allIn = paths.every(p => editPages.includes(p));
+                        const someIn = paths.some(p => editPages.includes(p));
+                        const isOpen = !!expanded[section.label];
+
+                        return (
+                          <div key={section.label} className="border-b border-slate-100 last:border-0">
+                            {/* Cabeçalho da seção */}
+                            <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50">
+                              <button
+                                onClick={() => toggleSection(section.items)}
+                                className="flex items-center gap-2 flex-1 text-left"
+                                title={allIn ? 'Desmarcar seção' : 'Marcar seção'}
+                              >
+                                {allIn ? (
+                                  <CheckSquare className="w-4 h-4 text-primary shrink-0" />
+                                ) : someIn ? (
+                                  <div className="w-4 h-4 border-2 border-primary rounded-sm bg-primary/20 shrink-0" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-slate-300 shrink-0" />
+                                )}
+                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">
+                                  {section.label}
+                                </span>
+                                <span className="text-[8px] font-black text-slate-400">
+                                  ({paths.filter(p => editPages.includes(p)).length}/{paths.length})
+                                </span>
+                              </button>
+                              <button
+                                onClick={() => setExpanded(prev => ({ ...prev, [section.label]: !isOpen }))}
+                                className="p-1 text-slate-400 hover:text-primary transition-colors"
+                              >
+                                {isOpen
+                                  ? <ChevronDown className="w-3.5 h-3.5" />
+                                  : <ChevronRight className="w-3.5 h-3.5" />
+                                }
+                              </button>
+                            </div>
+
+                            {/* Itens da seção */}
+                            {isOpen && (
+                              <div className="divide-y divide-slate-50">
+                                {section.items.map(item => (
+                                  <button
+                                    key={item.path}
+                                    onClick={() => togglePage(item.path)}
+                                    className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${
+                                      editPages.includes(item.path)
+                                        ? 'bg-primary/5'
+                                        : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    {editPages.includes(item.path)
+                                      ? <CheckSquare className="w-3.5 h-3.5 text-primary shrink-0" />
+                                      : <Square className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                                    }
+                                    <span className="text-[10px] font-bold text-slate-600">{item.label}</span>
+                                    <span className="text-[9px] text-slate-300 font-mono ml-auto">{item.path}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Botões de ação */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 py-3 bg-secondary text-primary font-black text-[10px] uppercase tracking-widest rounded-sm hover:bg-secondary/90 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {saving
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Save className="w-3.5 h-3.5" />
+                    }
+                    {isNew ? 'Criar Grupo' : 'Salvar Alterações'}
+                  </button>
+
+                  {canDelete && !isNew && (
+                    <button
+                      onClick={handleDelete}
+                      className="px-5 py-3 bg-red-50 text-danger font-black text-[10px] uppercase tracking-widest rounded-sm hover:bg-danger hover:text-white transition-all border border-red-200 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Excluir
+                    </button>
+                  )}
+                </div>
+
+                {/* Info de usuários no grupo */}
+                {!isNew && selected && (
+                  <div className="flex items-center gap-2 pt-1 text-[10px] text-slate-400">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>
+                      {selected.nome === 'Administrador'
+                        ? 'Usuários com role "gestor" pertencem automaticamente a este grupo.'
+                        : `Usuários com este grupo acessam ${selected.paginas?.length ?? 0} página${(selected.paginas?.length ?? 0) !== 1 ? 's' : ''} do WMS.`
+                      }
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </EnterprisePageBase>
+  );
 }

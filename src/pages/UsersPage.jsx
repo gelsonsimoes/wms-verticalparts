@@ -1,4 +1,4 @@
-import React, { useState, useId, useRef, useMemo } from 'react';
+import React, { useState, useId, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
 import { supabase } from '../services/supabaseClient';
 import {
@@ -7,7 +7,6 @@ import {
   Save,
   Trash2,
   FileText,
-  LayoutGrid,
   Shield,
   Building2,
   Printer,
@@ -21,19 +20,18 @@ import {
   UserMinus,
   RefreshCcw,
   Lock,
-  CheckSquare,
-  Square,
   Send,
+  Users,
   ChevronDown,
-  ChevronRight,
 } from 'lucide-react';
 import Breadcrumbs from '../components/ui/Breadcrumbs';
 import ActionPane from '../components/ui/ActionPane';
 import DataGrid from '../components/ui/DataGrid';
 import FastTab from '../components/ui/FastTab';
 
-// ─── Lista de todas as páginas agrupadas por seção ────────────────────────────
-const PAGE_SECTIONS = [
+// ─── Modal de Convite com seleção de Grupo ────────────────────────────────────
+// ─── (placeholder para PAGE_SECTIONS removida — grupos gerenciados em UserGroups.jsx)
+const _REMOVED_PAGE_SECTIONS = [
   {
     section: '2. OPERAR', items: [
       { path: '/operacao/cruzar-docas',           label: '2.1 Cruzar Docas' },
@@ -419,46 +417,43 @@ function InviteModal({ onClose, onSuccess }) {
   );
 }
 
-// Corrige o form submit — atribui data-invite ao form para o botão externo funcionar
-// Solução mais limpa: reescrever o botão para usar onSubmit direto
+// ─── Modal de Convite com seleção de Grupo de Acesso ─────────────────────────
 function InviteModalFixed({ onClose, onSuccess }) {
-  const [form, setForm] = useState({
-    email: '', nome: '', cargo: 'Operador de Armazém',
-  });
-  const [selectedPages, setSelectedPages] = useState([]);
-  const [openSections, setOpenSections] = useState({});
+  const [form, setForm] = useState({ email: '', nome: '', cargo: 'Operador de Armazém' });
+  const [grupos, setGrupos] = useState([]);
+  const [grupoId, setGrupoId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingGrupos, setLoadingGrupos] = useState(true);
   const [error, setError] = useState(null);
   const firstInputRef = useRef(null);
 
-  React.useEffect(() => {
+  // Carrega grupos do Supabase (exceto Administrador — não é atribuível via convite)
+  useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
     firstInputRef.current?.focus();
+
+    supabase
+      .from('grupos_acesso')
+      .select('id, nome, descricao, paginas')
+      .neq('nome', 'Administrador')
+      .order('nome')
+      .then(({ data }) => {
+        setGrupos(data || []);
+        if (data?.length) setGrupoId(data[0].id);
+        setLoadingGrupos(false);
+      });
+
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const togglePage = (path) =>
-    setSelectedPages(prev =>
-      prev.includes(path) ? prev.filter(p => p !== path) : [...prev, path]
-    );
-
-  const toggleSection = (section) => {
-    const paths = PAGE_SECTIONS.find(s => s.section === section)?.items.map(i => i.path) || [];
-    const allSelected = paths.every(p => selectedPages.includes(p));
-    setSelectedPages(prev =>
-      allSelected ? prev.filter(p => !paths.includes(p)) : [...new Set([...prev, ...paths])]
-    );
-  };
-
-  const toggleAll = () =>
-    setSelectedPages(prev => prev.length === ALL_PATHS.length ? [] : [...ALL_PATHS]);
+  const grupoSelecionado = grupos.find(g => g.id === grupoId);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email.includes('@')) { setError('E-mail inválido.'); return; }
-    if (!form.nome.trim()) { setError('Nome é obrigatório.'); return; }
-    if (selectedPages.length === 0) { setError('Selecione ao menos uma página.'); return; }
+    if (!form.nome.trim())         { setError('Nome é obrigatório.'); return; }
+    if (!grupoId)                  { setError('Selecione um grupo de acesso.'); return; }
 
     setLoading(true);
     setError(null);
@@ -467,11 +462,11 @@ function InviteModalFixed({ onClose, onSuccess }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email:              form.email.toLowerCase().trim(),
-          nome:               form.nome.trim(),
-          cargo:              form.cargo,
-          employee_id:        form.email.split('@')[0],
-          paginas_permitidas: selectedPages,
+          email:           form.email.toLowerCase().trim(),
+          nome:            form.nome.trim(),
+          cargo:           form.cargo,
+          employee_id:     form.email.split('@')[0],
+          grupo_acesso_id: grupoId,
         }),
       });
       const data = await res.json();
@@ -491,7 +486,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
     >
       <div
         role="dialog" aria-modal="true" aria-label="Convidar novo usuário"
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col animate-in zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -503,7 +498,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
             <div>
               <h2 className="text-sm font-black uppercase tracking-tight text-gray-800">Convidar Novo Usuário</h2>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                O usuário receberá um e-mail para definir sua própria senha
+                Receberá e-mail para definir sua própria senha
               </p>
             </div>
           </div>
@@ -512,141 +507,105 @@ function InviteModalFixed({ onClose, onSuccess }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto flex flex-col">
-          {/* Dados */}
-          <div className="px-6 py-4 border-b border-gray-100 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2 space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">E-mail Corporativo *</label>
-              <input
-                ref={firstInputRef}
-                type="email" required value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
-                placeholder="colaborador@verticalparts.com.br"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Função / Cargo *</label>
-              <select
-                value={form.cargo}
-                onChange={e => setForm({ ...form, cargo: e.target.value })}
-                className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold"
-              >
-                <option>Operador de Armazém</option>
-                <option>Supervisor de Operações</option>
-                <option>Almoxarife</option>
-                <option>Analista Fiscal</option>
-                <option>Analista de Inventário</option>
-                <option>Operador de Recebimento</option>
-                <option>Operador de Expedição</option>
-                <option>Estratégias e Processos</option>
-                <option>Time de Compras / Vendas</option>
-                <option>Importação</option>
-              </select>
-            </div>
-            <div className="md:col-span-3 space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Nome Completo *</label>
-              <input
-                type="text" required value={form.nome}
-                onChange={e => setForm({ ...form, nome: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
-                placeholder="Ex: Ana Paula Rodrigues"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* E-mail */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">E-mail Corporativo *</label>
+            <input
+              ref={firstInputRef}
+              type="email" required value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
+              placeholder="colaborador@verticalparts.com.br"
+            />
           </div>
 
-          {/* Seletor de páginas */}
-          <div className="px-6 py-4 flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-yellow-500" />
-                Páginas Visíveis para este Usuário
-              </h3>
-              <button type="button" onClick={toggleAll}
-                className="text-[10px] font-black text-yellow-600 hover:text-yellow-700 uppercase tracking-widest"
+          {/* Nome */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Nome Completo *</label>
+            <input
+              type="text" required value={form.nome}
+              onChange={e => setForm({ ...form, nome: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
+              placeholder="Ex: Ana Paula Rodrigues"
+            />
+          </div>
+
+          {/* Cargo */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Função / Cargo</label>
+            <select
+              value={form.cargo}
+              onChange={e => setForm({ ...form, cargo: e.target.value })}
+              className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold"
+            >
+              <option>Operador de Armazém</option>
+              <option>Supervisor de Operações</option>
+              <option>Almoxarife</option>
+              <option>Analista Fiscal</option>
+              <option>Analista de Inventário</option>
+              <option>Operador de Recebimento</option>
+              <option>Operador de Expedição</option>
+              <option>Estratégias e Processos</option>
+              <option>Time de Compras / Vendas</option>
+              <option>Importação</option>
+              <option>Engenheiro de Elevadores</option>
+            </select>
+          </div>
+
+          {/* Grupo de Acesso */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-yellow-500" /> Grupo de Acesso *
+            </label>
+            {loadingGrupos ? (
+              <div className="h-[42px] bg-gray-50 border border-gray-200 rounded-lg flex items-center px-3">
+                <span className="text-xs text-gray-400 font-bold">Carregando grupos...</span>
+              </div>
+            ) : (
+              <select
+                value={grupoId}
+                onChange={e => setGrupoId(e.target.value)}
+                className="w-full h-[42px] border-2 border-yellow-400 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold bg-yellow-50"
               >
-                {selectedPages.length === ALL_PATHS.length ? 'Desmarcar Tudo' : 'Selecionar Tudo'}
-              </button>
-            </div>
+                {grupos.map(g => (
+                  <option key={g.id} value={g.id}>{g.nome}</option>
+                ))}
+              </select>
+            )}
 
-            <div className="space-y-1.5 overflow-y-auto flex-1 max-h-[280px] pr-1">
-              {PAGE_SECTIONS.map(({ section, items }) => {
-                const sectionPaths = items.map(i => i.path);
-                const allSel = sectionPaths.every(p => selectedPages.includes(p));
-                const someSel = !allSel && sectionPaths.some(p => selectedPages.includes(p));
-                const isOpen = openSections[section];
-                const countSel = sectionPaths.filter(p => selectedPages.includes(p)).length;
-
-                return (
-                  <div key={section} className="border border-gray-100 rounded-lg overflow-hidden">
-                    <div className="flex items-center bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <button type="button" onClick={() => toggleSection(section)}
-                        className="p-3 flex-shrink-0" aria-label={`Selecionar seção ${section}`}>
-                        {allSel
-                          ? <CheckSquare className="w-4 h-4 text-yellow-500" />
-                          : someSel
-                            ? <CheckSquare className="w-4 h-4 text-yellow-300" />
-                            : <Square className="w-4 h-4 text-gray-300" />
-                        }
-                      </button>
-                      <button type="button"
-                        onClick={() => setOpenSections(prev => ({ ...prev, [section]: !isOpen }))}
-                        className="flex-1 flex items-center justify-between px-2 py-3 text-left"
-                      >
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-600">{section}</span>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold ${countSel > 0 ? 'text-yellow-600' : 'text-gray-300'}`}>
-                            {countSel}/{items.length}
-                          </span>
-                          {isOpen
-                            ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                            : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                          }
-                        </div>
-                      </button>
-                    </div>
-                    {isOpen && (
-                      <div className="divide-y divide-gray-50">
-                        {items.map(item => (
-                          <label key={item.path}
-                            className="flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-yellow-50 transition-colors">
-                            <input type="checkbox" className="w-4 h-4 accent-yellow-500"
-                              checked={selectedPages.includes(item.path)}
-                              onChange={() => togglePage(item.path)} />
-                            <span className="text-xs font-bold text-gray-600">{item.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="text-[10px] text-gray-400 font-bold mt-2">
-              {selectedPages.length} de {ALL_PATHS.length} páginas selecionadas
-            </p>
+            {/* Preview do grupo selecionado */}
+            {grupoSelecionado && (
+              <div className="bg-gray-50 border border-gray-100 rounded-lg px-4 py-3 flex items-start gap-3">
+                <Users className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-gray-700">{grupoSelecionado.descricao}</p>
+                  <p className="text-[10px] text-gray-400 font-bold mt-0.5 uppercase tracking-widest">
+                    {grupoSelecionado.paginas?.length ?? 0} páginas · Para editar, acesse 11.2 Grupos de Acesso
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (
-            <div className="mx-6 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-xs font-bold">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-600 text-xs font-bold">
               <AlertCircle className="w-4 h-4 shrink-0" />{error}
             </div>
           )}
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-3 sticky bottom-0">
+          <div className="flex items-center justify-between gap-3 pt-2 border-t border-gray-100">
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              <Lock className="w-3.5 h-3.5" />
-              Usuário definirá própria senha no 1º acesso
+              <Lock className="w-3.5 h-3.5" /> Senha definida no 1º acesso
             </div>
             <div className="flex gap-3">
               <button type="button" onClick={onClose}
-                className="px-5 py-2.5 border border-gray-200 rounded-lg text-xs font-black text-gray-500 hover:bg-gray-100 transition-all uppercase tracking-widest">
+                className="px-4 py-2.5 border border-gray-200 rounded-lg text-xs font-black text-gray-500 hover:bg-gray-100 transition-all uppercase tracking-widest">
                 Cancelar
               </button>
-              <button type="submit" disabled={loading}
-                className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-50 flex items-center gap-2">
+              <button type="submit" disabled={loading || loadingGrupos}
+                className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-yellow-500/20 disabled:opacity-50 flex items-center gap-2">
                 {loading
                   ? <><span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />Enviando...</>
                   : <><Send className="w-3.5 h-3.5" />Enviar Convite</>

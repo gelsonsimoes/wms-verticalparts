@@ -99,7 +99,7 @@ app.post('/api/generate-description', async (req, res) => {
 // ── Endpoint: Convidar usuário via Supabase Admin ─────────────
 // Requer SUPABASE_SERVICE_ROLE_KEY no .env do servidor
 app.post('/api/invite-user', async (req, res) => {
-  const { email, employee_id, nome, cargo, paginas_permitidas } = req.body;
+  const { email, employee_id, nome, cargo, grupo_acesso_id } = req.body;
 
   if (!email || !nome) {
     return res.status(400).json({ error: 'email e nome são obrigatórios.' });
@@ -133,17 +133,17 @@ app.post('/api/invite-user', async (req, res) => {
 
     const authUserId = inviteData?.user?.id;
 
-    // 2. Cria/atualiza registro em operadores com UUID do auth + permissões de página
+    // 2. Cria registro em operadores com UUID do auth + grupo de acesso
     if (authUserId) {
       const { error: dbError } = await adminSupabase.from('operadores').upsert({
-        id:                 authUserId,
-        employee_id:        employee_id || email.split('@')[0],
+        id:              authUserId,
+        employee_id:     employee_id || email.split('@')[0],
         nome,
         email,
-        cargo:              cargo || 'Operador',
-        role:               'operador',
-        paginas_permitidas: paginas_permitidas || [],
-        status:             'Ativo',
+        cargo:           cargo || 'Operador',
+        role:            'operador',
+        grupo_acesso_id: grupo_acesso_id || null,
+        status:          'Ativo',
       }, { onConflict: 'id' });
 
       if (dbError) console.error('[invite-user] DB upsert error:', dbError.message);

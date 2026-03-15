@@ -51,26 +51,29 @@ function App() {
         )
       ]);
 
-      // Busca o perfil na tabela 'operadores'
+      // Busca o perfil + grupo de acesso via join
       const { data: profile, error } = await supabase
         .from('operadores')
-        .select('*')
+        .select('*, grupos_acesso(paginas)')
         .eq('id', authUser.id)
         .maybeSingle();
-      
+
       if (error) {
         console.warn("[App] Perfil não encontrado no DB (fallback ativo) ", error);
       }
-      
+
+      const isGestor = profile?.role === 'gestor';
+
       return {
         id:                 authUser.id,
         login:              profile?.employee_id || authUser.email,
         nome:               profile?.nome || authUser.email.split('@')[0],
         role:               profile?.role || 'gestor',
-        nivel:              profile?.role === 'gestor' ? 'Administrador' : 'Operador',
+        nivel:              isGestor ? 'Administrador' : 'Operador',
         email:              authUser.email,
-        // null = sem restrição (admin); array = rotas permitidas
-        paginas_permitidas: profile?.paginas_permitidas ?? null,
+        grupo_acesso_id:    profile?.grupo_acesso_id ?? null,
+        // null = sem restrição (gestor); array de paths = páginas do grupo
+        paginas_permitidas: isGestor ? null : (profile?.grupos_acesso?.paginas ?? []),
       };
     } catch (e) {
       if (e.message === 'DB_TIMEOUT') {
