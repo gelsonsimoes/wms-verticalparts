@@ -225,9 +225,17 @@ export default function Login() {
                 </div>
 
                 {/* Rodapé */}
-                <p className="text-center text-xs text-slate-600 mt-6 font-medium">
-                    VerticalParts WMS · {APP_VERSION} · {new Date().getFullYear()}
-                </p>
+                <div className="text-center mt-6 space-y-2">
+                    <button
+                        onClick={() => { window.location.href = '/'; }}
+                        className="text-xs text-slate-600 hover:text-slate-400 font-bold transition-colors"
+                    >
+                        ← Página Inicial
+                    </button>
+                    <p className="text-xs text-slate-700 font-medium">
+                        VerticalParts WMS · {APP_VERSION} · {new Date().getFullYear()}
+                    </p>
+                </div>
             </div>
         </div>
     );
