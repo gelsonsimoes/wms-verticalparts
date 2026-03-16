@@ -147,7 +147,7 @@ app.post('/api/invite-user', async (req, res) => {
 
     const { error: upsertError } = await supabaseAdmin
       .from('operadores')
-      .upsert(operadorData);
+      .upsert(operadorData, { onConflict: 'email' });
     if (upsertError) throw upsertError;
 
     res.json({ success: true, user_id: userId });

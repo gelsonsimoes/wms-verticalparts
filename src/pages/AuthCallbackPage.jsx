@@ -44,35 +44,30 @@ export default function AuthCallbackPage() {
       }
     });
 
-    // Processa o token da URL (token_hash PKCE ou hash fragment legado)
+    // Processa o token da URL
+    // NOTA: Supabase JS v2 com detectSessionInUrl:true já processa token_hash e
+    // hash fragment automaticamente — NÃO chamamos verifyOtp aqui para evitar
+    // duplo consumo do token (causa "One-time token not found").
     const processToken = async () => {
       const searchParams = new URLSearchParams(window.location.search);
-      const tokenHash = searchParams.get('token_hash');
-      const type = searchParams.get('type') || 'invite';
+      const hashParams   = new URLSearchParams(window.location.hash.substring(1));
 
-      if (tokenHash) {
-        // Formato novo PKCE: ?token_hash=...&type=invite|recovery
-        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
-        if (error && mountedRef.current) setState('error');
+      // Supabase redireciona aqui com ?error=... quando o link é expirado/inválido
+      if (searchParams.get('error') || hashParams.get('error')) {
+        if (mountedRef.current) setState('error');
         return;
       }
 
-      // Formato legado: #access_token=...&refresh_token=...
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken  = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        if (error && mountedRef.current) setState('error');
-        return;
-      }
+      // Aguarda um tick para o detectSessionInUrl processar o token antes de checar
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-      // Verifica se sessão já estava ativa (race condition)
+      // Verifica se sessão já foi estabelecida pelo detectSessionInUrl
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user && mountedRef.current) {
         const eid = await fetchEmployee(session.user.id, session.user.email);
         if (mountedRef.current) { setEmployeeId(eid); setState('set-password'); }
       }
+      // Se nenhuma sessão, aguarda o onAuthStateChange ou o timeout
     };
 
     processToken();
