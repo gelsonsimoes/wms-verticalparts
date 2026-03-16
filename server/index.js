@@ -130,13 +130,13 @@ app.post('/api/invite-user', async (req, res) => {
 
     // 2. Upsert na tabela operadores
     const operadorData = {
-      id:          userId,
+      id:      userId,
+      usuario: employee_id || email.split('@')[0],
       nome,
       email,
-      cargo:       cargo       || 'Operador',
-      employee_id: employee_id || email.split('@')[0],
-      role:        'operador',
-      ativo:       true,
+      cargo:   cargo || 'Operador',
+      nivel:   'Operador',
+      status:  'Ativo',
     };
     if (grupo_acesso_id)    operadorData.grupo_acesso_id    = grupo_acesso_id;
     if (paginas_permitidas) operadorData.paginas_permitidas = paginas_permitidas;

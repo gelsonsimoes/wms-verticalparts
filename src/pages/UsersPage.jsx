@@ -436,7 +436,6 @@ function InviteModalFixed({ onClose, onSuccess }) {
     supabase
       .from('grupos_acesso')
       .select('id, nome, descricao, paginas')
-      .neq('nome', 'Administrador')
       .order('nome')
       .then(({ data }) => {
         setGrupos(data || []);
