@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useApp } from '../hooks/useApp';
 import {
   Truck,
   MapPin,
@@ -316,7 +317,7 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
 
 // ─── SEÇÃO VEÍCULOS ───────────────────────────────────────────────────
 function SecaoVeiculos() {
-  const [veiculos, setVeiculos] = useState(VEICULOS_INIT);
+  const { veiculos, addVeiculo, updateVeiculo, deleteVeiculo } = useApp();
   const [editando, setEditando] = useState(null);
   const [isNew,    setIsNew]    = useState(false);
   const [saved,    setSaved]    = useState(false);
@@ -337,15 +338,18 @@ function SecaoVeiculos() {
 
   const handleSave = () => {
     if (!editando.placa) return;
-    setVeiculos(vs => isNew ? [editando, ...vs] : vs.map(v => v.id === editando.id ? editando : v));
+    if (isNew) { addVeiculo(editando); } else { updateVeiculo(editando.id, editando); }
     setSaved(true);
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
   };
 
-  const handleDelete = (id) => setVeiculos(vs => vs.filter(v => v.id !== id));
+  const handleDelete = (id) => deleteVeiculo(id);
 
-  const toggleDisp = (id) => setVeiculos(vs => vs.map(v => v.id === id ? { ...v, disponivel: !v.disponivel } : v));
+  const toggleDisp = (id) => {
+    const v = veiculos.find(v => v.id === id);
+    if (v) updateVeiculo(id, { disponivel: !v.disponivel });
+  };
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -496,7 +500,7 @@ function SecaoVeiculos() {
 
 // ─── SEÇÃO ROTAS ──────────────────────────────────────────────────────
 function SecaoRotas() {
-  const [rotas,    setRotas]    = useState(ROTAS_INIT);
+  const { rotas, addRota, updateRota, deleteRota } = useApp();
   const [editando, setEditando] = useState(null);
   const [isNew,    setIsNew]    = useState(false);
   const [saved,    setSaved]    = useState(false);
@@ -518,16 +522,16 @@ function SecaoRotas() {
 
   const handleSave = () => {
     if (!editando.codigo) return;
-    setRotas(rs => isNew ? [editando, ...rs] : rs.map(r => r.id === editando.id ? editando : r));
+    if (isNew) { addRota(editando); } else { updateRota(editando.id, editando); }
     setSaved(true);
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => { setSaved(false); setEditando(null); setIsNew(false); }, 1500);
   };
 
-  const handleDelete = (id) => setRotas(rs => rs.filter(r => r.id !== id));
+  const handleDelete = (id) => deleteRota(id);
 
   const handleSaveVinculos = (ids) => {
-    setRotas(rs => rs.map(r => r.id === modalRota.id ? { ...r, clientes: ids } : r));
+    updateRota(modalRota.id, { clientes: ids });
     setModalRota(null);
   };
 

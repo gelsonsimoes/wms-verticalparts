@@ -74,14 +74,54 @@ export function AppProvider({ children, session }) {
             .then(({ data }) => { if (data) setWarehouses(data.map(_normWH)); });
     }, []);
 
-    const [warehouseAreas, setWarehouseAreas] = useState(() => {
-        const saved = localStorage.getItem('vparts_warehouse_areas');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'RECEBIMENTO', endereco: 'R1_PP1_CL001_N001' },
-            { id: 2, name: 'ESTRUTURA PORTA PALETES', endereco: 'R2_PP3_CL005_N002' },
-            { id: 3, name: 'EXPEDIÇÃO', endereco: 'R3_PP1_CL001_N001' }
-        ];
+    // ── Customers (Supabase) ──────────────────────────────────────────────
+    const [customers, setCustomers] = useState([]);
+    useEffect(() => {
+        supabase.from('customers').select('*').order('razao_social')
+            .then(({ data }) => { if (data) setCustomers(data); });
+    }, []);
+
+    // ── Veículos (Supabase) ───────────────────────────────────────────────
+    const [veiculos, setVeiculos] = useState([]);
+    useEffect(() => {
+        supabase.from('veiculos').select('*').order('placa')
+            .then(({ data }) => { if (data) setVeiculos(data); });
+    }, []);
+
+    // ── Rotas (Supabase) ──────────────────────────────────────────────────
+    const [rotas, setRotas] = useState([]);
+    useEffect(() => {
+        supabase.from('rotas').select('*').order('codigo')
+            .then(({ data }) => { if (data) setRotas(data.map(r => ({ ...r, clientes: r.clientes || [] }))); });
+    }, []);
+
+    // ── Lotes (Supabase) ──────────────────────────────────────────────────
+    const _normLote = (l) => ({
+        ...l,
+        qtdUnit: l.qtd_unit ?? l.qtdUnit ?? 0,
     });
+    const _denormLote = (l) => ({
+        lote:       l.lote      || '',
+        local:      l.local     || '',
+        codigo:     l.codigo    || '',
+        descricao:  l.descricao || '',
+        qtd_unit:   l.qtdUnit   ?? l.qtd_unit ?? 0,
+        status:     l.status    || 'Liberado',
+        parent:     l.parent    || null,
+        motivo:     l.motivo    || null,
+        entrada:    l.entrada   || new Date().toISOString(),
+    });
+    const [lotes, setLotes] = useState([]);
+    useEffect(() => {
+        supabase.from('lotes').select('*').order('created_at', { ascending: false })
+            .then(({ data }) => { if (data) setLotes(data.map(_normLote)); });
+    }, []);
+
+    const [warehouseAreas, setWarehouseAreas] = useState([]);
+    useEffect(() => {
+        supabase.from('areas').select('*').order('name')
+            .then(({ data }) => { if (data) setWarehouseAreas(data); });
+    }, []);
 
     // === Warehouse Sub-entities ===
     const [warehouseDocks, setWarehouseDocks] = useState(() => {
@@ -134,14 +174,36 @@ export function AppProvider({ children, session }) {
         ];
     });
 
-    const [sectors, setSectors] = useState(() => {
-        const saved = localStorage.getItem('vparts_sectors');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, setor: 'PEÇAS ELEVADORES', tipoSetor: 'Armazenagem', tipoLocal: 'Porta Palete', codigoIntegracao: 'INT-001', ativo: true, usoExclusivoCaixa: false, depositantes: [{ cnpj: '12.345.678/0001-90', razaoSocial: 'VerticalParts Matriz' }], enderecos: ['R1_PP1_CL001_N001'], produtos: ['VPER-PNT-AL-22D-202X145-CT'], usuarios: ['danilo.supervisor'] },
-            { id: 2, setor: 'EXPEDIÇÃO RÁPIDA', tipoSetor: 'Expedição', tipoLocal: 'Colmeia', codigoIntegracao: 'INT-002', ativo: true, usoExclusivoCaixa: true, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
-            { id: 3, setor: 'MANUTENÇÃO TÉCNICA', tipoSetor: 'Serviço', tipoLocal: 'Bancada', codigoIntegracao: 'INT-003', ativo: false, usoExclusivoCaixa: false, depositantes: [], enderecos: [], produtos: [], usuarios: [] },
-        ];
+    // Normaliza setores DB (snake_case) → app (camelCase)
+    const _normSetor = (s) => ({
+        ...s,
+        tipoSetor:          s.tipo_setor          || s.tipoSetor          || '',
+        tipoLocal:          s.tipo_local          || s.tipoLocal          || '',
+        codigoIntegracao:   s.codigo_integracao   || s.codigoIntegracao   || '',
+        usoExclusivoCaixa:  s.uso_exclusivo_caixa !== false && (s.usoExclusivoCaixa || false),
+        depositantes:       s.depositantes  || [],
+        enderecos:          s.enderecos     || [],
+        produtos:           s.produtos      || [],
+        usuarios:           s.usuarios      || [],
     });
+    const _denormSetor = (s) => ({
+        setor:               s.setor               || '',
+        tipo_setor:          s.tipoSetor           || '',
+        tipo_local:          s.tipoLocal           || '',
+        codigo_integracao:   s.codigoIntegracao    || '',
+        ativo:               s.ativo               !== false,
+        uso_exclusivo_caixa: s.usoExclusivoCaixa   || false,
+        depositantes:        s.depositantes        || [],
+        enderecos:           s.enderecos           || [],
+        produtos:            s.produtos            || [],
+        usuarios:            s.usuarios            || [],
+    });
+
+    const [sectors, setSectors] = useState([]);
+    useEffect(() => {
+        supabase.from('setores').select('*').order('setor')
+            .then(({ data }) => { if (data) setSectors(data.map(_normSetor)); });
+    }, []);
 
     const [userGroups, setUserGroups] = useState(() => {
         const saved = localStorage.getItem('vparts_user_groups');
@@ -248,8 +310,7 @@ export function AppProvider({ children, session }) {
     });
 
     // Persist important data
-    // companies e warehouses persistidos no Supabase — sem localStorage
-    useEffect(() => { localStorage.setItem('vparts_warehouse_areas', JSON.stringify(warehouseAreas)); }, [warehouseAreas]);
+    // companies, warehouses, customers, veiculos, rotas, areas, setores, lotes — persistidos no Supabase
     useEffect(() => { localStorage.setItem('vparts_inventory', JSON.stringify(inventory)); }, [inventory]);
     useEffect(() => { localStorage.setItem('vparts_receipt_history', JSON.stringify(receiptHistory)); }, [receiptHistory]);
     useEffect(() => { localStorage.setItem('vparts_wh_docks', JSON.stringify(warehouseDocks)); }, [warehouseDocks]);
@@ -259,7 +320,7 @@ export function AppProvider({ children, session }) {
     useEffect(() => { localStorage.setItem('vparts_wh_buffers', JSON.stringify(warehouseBuffers)); }, [warehouseBuffers]);
     useEffect(() => { localStorage.setItem('vparts_wh_servicos', JSON.stringify(warehouseServicos)); }, [warehouseServicos]);
     useEffect(() => { localStorage.setItem('vparts_wh_packing', JSON.stringify(warehousePacking)); }, [warehousePacking]);
-    useEffect(() => { localStorage.setItem('vparts_sectors', JSON.stringify(sectors)); }, [sectors]);
+    // sectors → Supabase
     useEffect(() => { localStorage.setItem('vparts_user_groups', JSON.stringify(userGroups)); }, [userGroups]);
     useEffect(() => { localStorage.setItem('vparts_users', JSON.stringify(users)); }, [users]);
     useEffect(() => { localStorage.setItem('vparts_serial_devices', JSON.stringify(serialDevices)); }, [serialDevices]);
@@ -319,9 +380,120 @@ export function AppProvider({ children, session }) {
         });
     };
 
-    const addWarehouseArea = (area) => setWarehouseAreas([...warehouseAreas, { ...area, id: warehouseAreas.length > 0 ? Math.max(...warehouseAreas.map(a => a.id)) + 1 : 1 }]);
-    const updateWarehouseArea = (id, updatedArea) => setWarehouseAreas(warehouseAreas.map(a => a.id === id ? { ...a, ...updatedArea } : a));
-    const deleteWarehouseArea = (id) => setWarehouseAreas(warehouseAreas.filter(a => a.id !== id));
+    // ── Customers CRUD (Supabase) ─────────────────────────────────────────
+    const addCustomer = (customer) => {
+        const newC = { ...customer, id: crypto.randomUUID() };
+        setCustomers(prev => [...prev, newC]);
+        supabase.from('customers').insert(newC).then(({ error }) => {
+            if (error) { console.error('[AppContext] addCustomer:', error.message); setCustomers(prev => prev.filter(c => c.id !== newC.id)); }
+        });
+    };
+    const updateCustomer = (id, data) => {
+        setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+        supabase.from('customers').update(data).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateCustomer:', error.message);
+        });
+    };
+    const deleteCustomer = (id) => {
+        setCustomers(prev => prev.filter(c => c.id !== id));
+        supabase.from('customers').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteCustomer:', error.message);
+        });
+    };
+
+    // ── Veículos CRUD (Supabase) ──────────────────────────────────────────
+    const addVeiculo = (veiculo) => {
+        const newV = { ...veiculo, id: crypto.randomUUID() };
+        setVeiculos(prev => [...prev, newV]);
+        supabase.from('veiculos').insert(newV).then(({ error }) => {
+            if (error) { console.error('[AppContext] addVeiculo:', error.message); setVeiculos(prev => prev.filter(v => v.id !== newV.id)); }
+        });
+    };
+    const updateVeiculo = (id, data) => {
+        setVeiculos(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
+        supabase.from('veiculos').update(data).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateVeiculo:', error.message);
+        });
+    };
+    const deleteVeiculo = (id) => {
+        setVeiculos(prev => prev.filter(v => v.id !== id));
+        supabase.from('veiculos').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteVeiculo:', error.message);
+        });
+    };
+
+    // ── Rotas CRUD (Supabase) ─────────────────────────────────────────────
+    const addRota = (rota) => {
+        const newR = { ...rota, id: crypto.randomUUID(), clientes: rota.clientes || [] };
+        setRotas(prev => [...prev, newR]);
+        supabase.from('rotas').insert(newR).then(({ error }) => {
+            if (error) { console.error('[AppContext] addRota:', error.message); setRotas(prev => prev.filter(r => r.id !== newR.id)); }
+        });
+    };
+    const updateRota = (id, data) => {
+        setRotas(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
+        supabase.from('rotas').update(data).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateRota:', error.message);
+        });
+    };
+    const deleteRota = (id) => {
+        setRotas(prev => prev.filter(r => r.id !== id));
+        supabase.from('rotas').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteRota:', error.message);
+        });
+    };
+
+    // ── Lotes CRUD (Supabase) ─────────────────────────────────────────────
+    const addLote = (lote) => {
+        const id = crypto.randomUUID();
+        const dbData = { id, ..._denormLote(lote) };
+        const appData = _normLote(dbData);
+        setLotes(prev => [appData, ...prev]);
+        supabase.from('lotes').insert(dbData).then(({ error }) => {
+            if (error) { console.error('[AppContext] addLote:', error.message); setLotes(prev => prev.filter(l => l.id !== id)); }
+        });
+    };
+    const updateLote = (id, data) => {
+        setLotes(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
+        const dbData = {};
+        if (data.status    !== undefined) dbData.status   = data.status;
+        if (data.motivo    !== undefined) dbData.motivo   = data.motivo;
+        if (data.local     !== undefined) dbData.local    = data.local;
+        if (data.qtdUnit   !== undefined) dbData.qtd_unit = data.qtdUnit;
+        if (data.qtd_unit  !== undefined) dbData.qtd_unit = data.qtd_unit;
+        if (Object.keys(dbData).length > 0) {
+            supabase.from('lotes').update(dbData).eq('id', id).then(({ error }) => {
+                if (error) console.error('[AppContext] updateLote:', error.message);
+            });
+        }
+    };
+    const deleteLote = (id) => {
+        setLotes(prev => prev.filter(l => l.id !== id));
+        supabase.from('lotes').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteLote:', error.message);
+        });
+    };
+
+    // ── Warehouse Areas CRUD (Supabase) ───────────────────────────────────
+    const addWarehouseArea = (area) => {
+        const newA = { ...area, id: crypto.randomUUID() };
+        setWarehouseAreas(prev => [...prev, newA]);
+        supabase.from('areas').insert(newA).then(({ error }) => {
+            if (error) { console.error('[AppContext] addWarehouseArea:', error.message); setWarehouseAreas(prev => prev.filter(a => a.id !== newA.id)); }
+        });
+    };
+    const updateWarehouseArea = (id, updatedArea) => {
+        setWarehouseAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedArea } : a));
+        supabase.from('areas').update(updatedArea).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateWarehouseArea:', error.message);
+        });
+    };
+    const deleteWarehouseArea = (id) => {
+        setWarehouseAreas(prev => prev.filter(a => a.id !== id));
+        supabase.from('areas').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteWarehouseArea:', error.message);
+        });
+    };
 
     // Generic sub-entity CRUD factory
     const makeSubCrud = (setter) => ({
@@ -338,7 +510,32 @@ export function AppProvider({ children, session }) {
     const buffersCrud = makeSubCrud(setWarehouseBuffers);
     const servicosCrud = makeSubCrud(setWarehouseServicos);
     const packingCrud = makeSubCrud(setWarehousePacking);
-    const sectorsCrud = makeSubCrud(setSectors);
+    const sectorsCrud = {
+        add: (item) => {
+            const id = crypto.randomUUID();
+            const dbData = { id, ..._denormSetor(item) };
+            const appData = _normSetor(dbData);
+            setSectors(prev => [...prev, appData]);
+            supabase.from('setores').insert(dbData).then(({ error }) => {
+                if (error) { console.error('[AppContext] sectorsCrud.add:', error.message); setSectors(prev => prev.filter(s => s.id !== id)); }
+            });
+        },
+        update: (id, data) => {
+            setSectors(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+            supabase.from('setores').update(_denormSetor(data)).eq('id', id).then(({ error }) => {
+                if (error) console.error('[AppContext] sectorsCrud.update:', error.message);
+            });
+        },
+        remove: (id) => {
+            setSectors(prev => prev.filter(s => s.id !== id));
+            supabase.from('setores').delete().eq('id', id).then(({ error }) => {
+                if (error) console.error('[AppContext] sectorsCrud.remove:', error.message);
+            });
+        },
+        bulkUpdate: (ids, data) => {
+            setSectors(prev => prev.map(s => ids.includes(s.id) ? { ...s, ...data } : s));
+        },
+    };
     const userGroupsCrud = makeSubCrud(setUserGroups);
     const usersCrud = makeSubCrud(setUsers);
     const serialDevicesCrud = makeSubCrud(setSerialDevices);
@@ -398,6 +595,10 @@ export function AppProvider({ children, session }) {
         <AppContext.Provider value={{
             companies, addCompany, updateCompany, deleteCompany,
             warehouses, addWarehouse, updateWarehouse, deleteWarehouse,
+            customers, addCustomer, updateCustomer, deleteCustomer,
+            veiculos, addVeiculo, updateVeiculo, deleteVeiculo,
+            rotas, addRota, updateRota, deleteRota,
+            lotes, addLote, updateLote, deleteLote,
             warehouseAreas, addWarehouseArea, updateWarehouseArea, deleteWarehouseArea,
             orders, updateOrderStatus,
             inventory, setInventory, addToInventory,

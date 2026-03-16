@@ -1,31 +1,29 @@
-import React, { useState, useMemo, useId } from 'react';
+import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
 import {
   Users,
   Search,
   Plus,
   Save,
   Trash2,
-  ChevronRight,
   Info,
   MapPin,
   Mail,
   Phone,
   Globe,
-  Link,
   CreditCard,
   Building2,
   CheckCircle2,
   AlertCircle,
   FileText,
-  Upload,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
-// ─── COMPONENTE DE AJUDA (TOOLTIP) ────────────────────────────
 const HelpTip = ({ text, position = 'top' }) => (
   <div className="group relative inline-block ml-1.5 focus:outline-none shrink-0" tabIndex="0">
     <Info className="w-3 h-3 text-slate-400 hover:text-secondary cursor-help transition-colors" />
@@ -36,15 +34,14 @@ const HelpTip = ({ text, position = 'top' }) => (
       {text}
       <div className={cn(
         "absolute left-1/2 -translate-x-1/2 border-4",
-        position === 'top' 
-          ? "top-full border-t-slate-900 border-x-transparent border-b-transparent" 
+        position === 'top'
+          ? "top-full border-t-slate-900 border-x-transparent border-b-transparent"
           : "bottom-full border-b-slate-900 border-x-transparent border-t-transparent"
       )} />
     </div>
   </div>
 );
 
-// ─── INPUT HELPER ─────────────────────────────────────────────────────
 function Field({ label, children, className }) {
   const id = useId();
   return (
@@ -57,32 +54,102 @@ function Field({ label, children, className }) {
 
 const inputCls = "w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-sm font-medium text-slate-800 dark:text-slate-200 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
-export default function CustomerCatalog() {
-  const [customers] = useState([
-    { id: 1, razao_social: 'VerticalParts Manutenção LTDA', nome_fantasia: 'VP Manutenção', cnpj: '12.345.678/0001-99', email: 'contato@vp.com.br', telefone: '(11) 98888-7777', cidade: 'São Paulo', uf: 'SP', status: 'Ativo' },
-    { id: 2, razao_social: 'Condomínio Edifício Horizon', nome_fantasia: 'Ed. Horizon', cnpj: '98.765.432/0001-00', email: 'adm@horizon.com.br', telefone: '(11) 3333-2222', cidade: 'Barueri', uf: 'SP', status: 'Ativo' },
-  ]);
-  const [selectedId, setSelectedId] = useState(1);
-  const [search, setSearch] = useState('');
-  const [saved, setSaved] = useState(false);
+const emptyForm = () => ({
+  razao_social: '', nome_fantasia: '', cnpj: '', inscricao_estadual: '',
+  email: '', telefone: '', website: '', cep: '', logradouro: '', bairro: '',
+  cidade: '', uf: '', status: 'Ativo',
+});
 
-  const selected = useMemo(() => customers.find(c => c.id === selectedId), [customers, selectedId]);
+export default function CustomerCatalog() {
+  const { customers, addCustomer, updateCustomer, deleteCustomer } = useApp();
+
+  const [selectedId, setSelectedId] = useState(null);
+  const [isNew, setIsNew] = useState(false);
+  const [formData, setFormData] = useState(emptyForm());
+  const [search, setSearch] = useState('');
+
+  // Toast
+  const [toast, setToast] = useState(null);
+  const toastRef = useRef(null);
+  const showToast = (message, type = 'success') => {
+    if (toastRef.current) clearTimeout(toastRef.current);
+    setToast({ message, type });
+    toastRef.current = setTimeout(() => setToast(null), 3000);
+  };
 
   const filtered = useMemo(() =>
     customers.filter(c =>
-      c.razao_social.toLowerCase().includes(search.toLowerCase()) ||
-      c.cnpj.includes(search)
+      (c.razao_social || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.cnpj || '').includes(search)
     ), [customers, search]);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const selected = useMemo(() =>
+    customers.find(c => c.id === selectedId) || null,
+    [customers, selectedId]);
+
+  // Sync form when selection changes
+  useEffect(() => {
+    if (selected) {
+      setFormData({
+        razao_social:      selected.razao_social      || '',
+        nome_fantasia:     selected.nome_fantasia      || '',
+        cnpj:              selected.cnpj               || '',
+        inscricao_estadual:selected.inscricao_estadual || '',
+        email:             selected.email              || '',
+        telefone:          selected.telefone           || '',
+        website:           selected.website            || '',
+        cep:               selected.cep                || '',
+        logradouro:        selected.logradouro         || '',
+        bairro:            selected.bairro             || '',
+        cidade:            selected.cidade             || '',
+        uf:                selected.uf                 || '',
+        status:            selected.status             || 'Ativo',
+      });
+    }
+  }, [selected]);
+
+  const set = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }));
+
+  const handleNew = () => {
+    setIsNew(true);
+    setSelectedId(null);
+    setFormData(emptyForm());
   };
+
+  const handleSelect = (c) => {
+    setIsNew(false);
+    setSelectedId(c.id);
+  };
+
+  const handleSave = () => {
+    if (!formData.razao_social.trim()) { showToast('Razão Social é obrigatória.', 'error'); return; }
+    if (isNew) {
+      addCustomer(formData);
+      setIsNew(false);
+      showToast('Cliente cadastrado com sucesso!');
+    } else if (selectedId) {
+      updateCustomer(selectedId, formData);
+      showToast('Alterações salvas com sucesso!');
+    }
+  };
+
+  const handleDelete = () => {
+    if (!selectedId) return;
+    const nome = selected?.razao_social || 'este cliente';
+    if (window.confirm(`Deseja realmente excluir "${nome}"?`)) {
+      deleteCustomer(selectedId);
+      setSelectedId(null);
+      setFormData(emptyForm());
+      showToast('Cliente excluído.', 'info');
+    }
+  };
+
+  const showDetail = isNew || !!selectedId;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in duration-700">
-      
-      {/* ══ HEADER ══ */}
+
+      {/* HEADER */}
       <div className="bg-white dark:bg-slate-900 border-b-2 border-slate-100 dark:border-slate-800 px-6 py-5 relative overflow-hidden shrink-0">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-secondary via-amber-500 to-secondary" />
         <div className="flex items-center gap-4">
@@ -95,26 +162,24 @@ export default function CustomerCatalog() {
             <p className="text-xs text-slate-400 font-medium mt-0.5">Destinos de Peças · Condomínios · Técnicos · Fornecedores</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            
-            {/* 🔗 MENSÃO À API DO OMIE */}
             <div className="relative group">
               <button disabled className="flex items-center gap-1.5 px-4 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-400 rounded-2xl text-xs font-black cursor-not-allowed opacity-60">
                 <RefreshCw className="w-4 h-4" />Sincronizar Omie
               </button>
               <HelpTip text="A Integração via API Omie será conectada aqui. No futuro, os clientes serão importados automaticamente." position="bottom" />
             </div>
-
-            <button className="flex items-center gap-1.5 px-4 py-2.5 bg-secondary text-primary rounded-2xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
+            <button onClick={handleNew}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-secondary text-primary rounded-2xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
               <Plus className="w-4 h-4" />Novo Cliente
             </button>
           </div>
         </div>
       </div>
 
-      {/* ══ LAYOUT MASTER-DETAIL ══ */}
+      {/* MASTER-DETAIL */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* MASTER — Lista lateral */}
+        {/* MASTER */}
         <div className="w-80 shrink-0 bg-white dark:bg-slate-900 border-r-2 border-slate-100 dark:border-slate-800 flex flex-col">
           <div className="p-3 border-b border-slate-100 dark:border-slate-800">
             <div className="relative">
@@ -126,22 +191,36 @@ export default function CustomerCatalog() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {isNew && (
+              <div className="w-full text-left px-4 py-4 border-b border-slate-100 bg-secondary/10 border-l-4 border-l-secondary flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-secondary text-primary">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black font-mono text-secondary">NOVO CLIENTE</p>
+                  <p className="text-xs font-bold text-slate-600 leading-snug mt-0.5">Preencha o formulário ao lado</p>
+                </div>
+              </div>
+            )}
+            {filtered.length === 0 && !isNew && (
+              <p className="text-center text-[11px] text-slate-400 py-8 font-medium">Nenhum cliente cadastrado.</p>
+            )}
             {filtered.map(c => (
-              <button key={c.id} onClick={() => setSelectedId(c.id)}
+              <button key={c.id} onClick={() => handleSelect(c)}
                 className={cn('w-full text-left px-4 py-4 border-b border-slate-100 dark:border-slate-800 transition-all flex items-start gap-3',
-                  selectedId === c.id ? 'bg-secondary/10 border-l-4 border-l-secondary' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border-l-4 border-l-transparent'
+                  selectedId === c.id && !isNew ? 'bg-secondary/10 border-l-4 border-l-secondary' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border-l-4 border-l-transparent'
                 )}>
                 <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5',
-                  selectedId === c.id ? 'bg-secondary text-primary' : 'bg-slate-100 dark:bg-slate-800'
+                  selectedId === c.id && !isNew ? 'bg-secondary text-primary' : 'bg-slate-100 dark:bg-slate-800'
                 )}>
                   <Building2 className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={cn('text-[10px] font-black font-mono truncate', selectedId === c.id ? 'text-secondary' : 'text-slate-500')}>{c.cnpj}</p>
-                  <p className={cn('text-xs font-bold truncate leading-snug mt-0.5', selectedId === c.id ? 'text-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400')}>{c.nome_fantasia || c.razao_social}</p>
+                  <p className={cn('text-[10px] font-black font-mono truncate', selectedId === c.id && !isNew ? 'text-secondary' : 'text-slate-500')}>{c.cnpj || '—'}</p>
+                  <p className={cn('text-xs font-bold truncate leading-snug mt-0.5', selectedId === c.id && !isNew ? 'text-slate-800 dark:text-white' : 'text-slate-600 dark:text-slate-400')}>{c.nome_fantasia || c.razao_social}</p>
                   <div className="flex items-center gap-1.5 mt-1">
-                    <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md font-bold">{c.cidade} - {c.uf}</span>
-                    <span className="text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md font-bold">{c.status}</span>
+                    {c.cidade && <span className="text-[8px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md font-bold">{c.cidade}{c.uf ? ` - ${c.uf}` : ''}</span>}
+                    <span className={cn('text-[8px] px-1.5 py-0.5 rounded-md font-bold', c.status !== 'Inativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>{c.status || 'Ativo'}</span>
                   </div>
                 </div>
               </button>
@@ -151,9 +230,9 @@ export default function CustomerCatalog() {
 
         {/* DETAIL */}
         <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-6">
-          {selected ? (
+          {showDetail ? (
             <div className="max-w-4xl mx-auto space-y-6">
-              
+
               {/* Toolbar Ações */}
               <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-4">
@@ -161,46 +240,62 @@ export default function CustomerCatalog() {
                     <Building2 className="w-6 h-6 text-slate-400" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">{selected.razao_social}</h2>
-                    <p className="text-xs text-slate-500 font-bold">{selected.cnpj} · <span className="text-secondary">{selected.nome_fantasia}</span></p>
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                      {isNew ? 'Novo Cliente' : (formData.razao_social || '—')}
+                    </h2>
+                    <p className="text-xs text-slate-500 font-bold">
+                      {isNew ? 'Preencha os dados e clique em Salvar' : `${formData.cnpj || '—'} · ${formData.nome_fantasia || '—'}`}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                  <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2.5 bg-secondary text-primary rounded-xl text-sm font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
-                    <Save className="w-4 h-4" />{saved ? 'Salvo!' : 'Salvar Alterações'}
+                  {!isNew && (
+                    <button onClick={handleDelete}
+                      className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      title="Excluir cliente">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button onClick={handleSave}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-secondary text-primary rounded-xl text-sm font-black hover:brightness-105 active:scale-95 transition-all shadow-md">
+                    <Save className="w-4 h-4" />Salvar
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* ── Dados Cadastrais ── */}
+
+                {/* Dados Cadastrais */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 space-y-5">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <FileText className="w-4 h-4" />Informações de Registro
                   </p>
                   <div className="grid grid-cols-1 gap-4">
                     <Field label="Razão Social">
-                      <input defaultValue={selected.razao_social} className={inputCls} />
+                      <input value={formData.razao_social} onChange={set('razao_social')} className={inputCls} placeholder="Razão Social completa" />
                     </Field>
                     <Field label="Nome Fantasia">
-                      <input defaultValue={selected.nome_fantasia} className={inputCls} />
+                      <input value={formData.nome_fantasia} onChange={set('nome_fantasia')} className={inputCls} placeholder="Nome comercial" />
                     </Field>
                     <div className="grid grid-cols-2 gap-4">
                       <Field label={<span className="flex items-center">CNPJ / CPF <HelpTip text="Dado mestre do Omie. Usado para validação de Notas Fiscais." /></span>}>
-                        <input defaultValue={selected.cnpj} className={inputCls} />
+                        <input value={formData.cnpj} onChange={set('cnpj')} className={inputCls} placeholder="00.000.000/0001-00" />
                       </Field>
                       <Field label="Inscrição Estadual">
-                        <input placeholder="Isento" className={inputCls} />
+                        <input value={formData.inscricao_estadual} onChange={set('inscricao_estadual')} className={inputCls} placeholder="Isento" />
                       </Field>
                     </div>
+                    <Field label="Status">
+                      <select value={formData.status} onChange={set('status')} className={inputCls}>
+                        <option value="Ativo">Ativo</option>
+                        <option value="Inativo">Inativo</option>
+                        <option value="Bloqueado">Bloqueado</option>
+                      </select>
+                    </Field>
                   </div>
                 </div>
 
-                {/* ── Contatos ── */}
+                {/* Contatos */}
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 space-y-5">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <Phone className="w-4 h-4" />Contato & Faturamento
@@ -209,56 +304,56 @@ export default function CustomerCatalog() {
                     <Field label="E-mail Principal">
                       <div className="relative">
                         <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input defaultValue={selected.email} className={inputCls + " pl-10"} />
+                        <input value={formData.email} onChange={set('email')} className={inputCls + " pl-10"} placeholder="contato@empresa.com.br" />
                       </div>
                     </Field>
                     <div className="grid grid-cols-2 gap-4">
                       <Field label="Telefone">
                         <div className="relative">
                           <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                          <input defaultValue={selected.telefone} className={inputCls + " pl-10"} />
+                          <input value={formData.telefone} onChange={set('telefone')} className={inputCls + " pl-10"} placeholder="(11) 99999-9999" />
                         </div>
                       </Field>
                       <Field label="Website">
                         <div className="relative">
                           <Globe className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                          <input placeholder="www.exemplo.com" className={inputCls + " pl-10"} />
+                          <input value={formData.website} onChange={set('website')} className={inputCls + " pl-10"} placeholder="www.exemplo.com" />
                         </div>
                       </Field>
                     </div>
                   </div>
                 </div>
 
-                {/* ── Endereço ── */}
+                {/* Endereço */}
                 <div className="col-span-1 md:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl border-2 border-slate-100 dark:border-slate-800 space-y-5">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <MapPin className="w-4 h-4" />Endereço de Entrega / Obra
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Field label="CEP" className="md:col-span-1">
-                      <input placeholder="00000-000" className={inputCls} />
+                      <input value={formData.cep} onChange={set('cep')} placeholder="00000-000" className={inputCls} />
                     </Field>
                     <Field label="Logradouro" className="md:col-span-2">
-                      <input placeholder="Rua, Avenida, etc." className={inputCls} />
+                      <input value={formData.logradouro} onChange={set('logradouro')} placeholder="Rua, Avenida, etc." className={inputCls} />
                     </Field>
                     <Field label="Bairro">
-                      <input className={inputCls} />
+                      <input value={formData.bairro} onChange={set('bairro')} className={inputCls} />
                     </Field>
                     <Field label="Cidade">
-                      <input defaultValue={selected.cidade} className={inputCls} />
+                      <input value={formData.cidade} onChange={set('cidade')} className={inputCls} />
                     </Field>
                     <Field label="UF">
-                      <input defaultValue={selected.uf} className={inputCls} />
+                      <input value={formData.uf} onChange={set('uf')} maxLength={2} className={inputCls} placeholder="SP" />
                     </Field>
                   </div>
                 </div>
 
-                {/* 🔗 BANNER DA API (Placeholder) */}
+                {/* Omie placeholder */}
                 <div className="col-span-1 md:col-span-2 bg-secondary/5 border-2 border-dashed border-secondary/30 rounded-3xl p-8 text-center space-y-3">
                   <RefreshCw className="w-8 h-8 text-secondary mx-auto animate-pulse" />
                   <h3 className="text-sm font-black text-secondary uppercase tracking-tight">Espaço Reservado para Integração Omie</h3>
                   <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
-                    A API de Clientes (Consultar, Listar e Upsert) será conectada neste módulo. 
+                    A API de Clientes (Consultar, Listar e Upsert) será conectada neste módulo.
                     Isso permitirá que os dados de faturamento e obra venham diretamente do ERP sem necessidade de redigitação.
                   </p>
                   <div className="flex justify-center gap-2 mt-4">
@@ -273,13 +368,32 @@ export default function CustomerCatalog() {
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
                 <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="font-bold text-slate-400">Selecione um cliente para ver os detalhes</p>
+                <p className="font-bold text-slate-400">Selecione um cliente ou clique em Novo Cliente</p>
               </div>
             </div>
           )}
         </div>
-
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300" role="status">
+          <div className={cn(
+            'flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 text-white',
+            toast.type === 'success' ? 'bg-green-500 border-green-700' :
+            toast.type === 'error'   ? 'bg-red-500 border-red-700' :
+            'bg-blue-600 border-blue-800'
+          )}>
+            {toast.type === 'success'
+              ? <CheckCircle2 className="w-5 h-5" />
+              : <AlertCircle className="w-5 h-5" />}
+            <p className="text-sm font-bold">{toast.message}</p>
+            <button onClick={() => setToast(null)} className="ml-4 p-1 hover:bg-black/10 rounded-full transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

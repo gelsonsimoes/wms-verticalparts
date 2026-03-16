@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useApp } from '../hooks/useApp';
 import {
   Layers,
   Lock,
@@ -485,7 +486,7 @@ function HistoricoDrawer({ lote, onClose }) {
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────
 export default function LotManager() {
-  const [lotes,        setLotes]        = useState(INITIAL_LOTES);
+  const { lotes, addLote, updateLote } = useApp();
   const [selectedId,   setSelectedId]   = useState(null);
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [filterSearch, setFilterSearch] = useState('');
@@ -504,33 +505,29 @@ export default function LotManager() {
   const kpiFilhos = lotes.filter(l => l.parent).length;
 
   const handleBloqueio = (id, motivo) => {
-    setLotes(prev => prev.map(l => l.id === id
-      ? { ...l, status: l.status === 'Bloqueado' ? 'Liberado' : 'Bloqueado', motivo: motivo || null }
-      : l
-    ));
+    const lote = lotes.find(l => l.id === id);
+    if (!lote) return;
+    updateLote(id, {
+      status: lote.status === 'Bloqueado' ? 'Liberado' : 'Bloqueado',
+      motivo: motivo || null,
+    });
     setSelectedId(null);
   };
 
   const handleDividir = (paiId, novaQtd, novoLocal, filhoLote) => {
-    setLotes(prev => {
-      const pai = prev.find(l => l.id === paiId);
-      const filho = {
-        // ID único via crypto.randomUUID() — sem risco de colisão
-        id:        crypto.randomUUID(),
-        lote:      filhoLote,
-        local:     novoLocal,
-        codigo:    pai.codigo,
-        descricao: pai.descricao,
-        qtdUnit:   novaQtd,
-        status:    'Liberado',
-        parent:    pai.lote,
-        motivo:    null,
-        entrada:   new Date().toLocaleDateString('pt-BR'),
-      };
-      return [
-        ...prev.map(l => l.id === paiId ? { ...l, qtdUnit: l.qtdUnit - novaQtd } : l),
-        filho,
-      ];
+    const pai = lotes.find(l => l.id === paiId);
+    if (!pai) return;
+    updateLote(paiId, { qtdUnit: pai.qtdUnit - novaQtd });
+    addLote({
+      lote:      filhoLote,
+      local:     novoLocal,
+      codigo:    pai.codigo,
+      descricao: pai.descricao,
+      qtdUnit:   novaQtd,
+      status:    'Liberado',
+      parent:    pai.lote,
+      motivo:    null,
+      entrada:   new Date().toISOString(),
     });
     setSelectedId(null);
   };
