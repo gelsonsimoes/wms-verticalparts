@@ -60,10 +60,10 @@ export default function Warehouses() {
   const handleNew = () => {
     setSelectedWarehouse({ id: 'NOVO' });
     setFormData({
-      id: 'AUTO',
-      codigoInterno: 'VPARMZ',
-      nome: 'CD CENTRAL GUARULHOS',
-      entidade: 'VerticalParts Matriz',
+      id: '',
+      codigoInterno: '',
+      nome: '',
+      entidade: '',
       tipo: 'Distribuição',
       ativo: true
     });
