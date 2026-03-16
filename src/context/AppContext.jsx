@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { supabase } from '../services/supabaseClient';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AppContext = createContext();
@@ -47,19 +48,31 @@ export function AppProvider({ children, session }) {
         paginas_permitidas: null,
     });
 
-    const [companies, setCompanies] = useState(() => {
-        const saved = localStorage.getItem('vparts_companies');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, name: 'VerticalParts Matriz', cnpj: '12.345.678/0001-90', address: 'Rua Armandina Braga de Almeida, 383, Guarulhos-SP, 07141-003', omieKey: 'XXXX-XXXX', status: 'Ativo' }
-        ];
+    const [companies, setCompanies] = useState([]);
+    useEffect(() => {
+        supabase.from('companies').select('*').order('name')
+            .then(({ data }) => { if (data) setCompanies(data); });
+    }, []);
+
+    // Normaliza colunas DB (snake_case) → formato do app (camelCase)
+    const _normWH = (w) => ({
+        ...w,
+        codigoInterno: w.codigo_interno || w.codigoInterno || '',
+        ativo: w.is_active !== false,
+    });
+    const _denormWH = (w) => ({
+        codigo_interno: w.codigoInterno || '',
+        nome:           w.nome || '',
+        entidade:       w.entidade || null,
+        tipo:           w.tipo || 'Distribuição',
+        is_active:      w.ativo !== false,
     });
 
-    const [warehouses, setWarehouses] = useState(() => {
-        const saved = localStorage.getItem('vparts_warehouses');
-        return saved ? JSON.parse(saved) : [
-            { id: 1, codigoInterno: 'VPARMZ', nome: 'CD Central Guarulhos', entidade: 'VerticalParts Matriz', ativo: true, addresses: 1240, occupation: 78, tipo: 'Distribuição' }
-        ];
-    });
+    const [warehouses, setWarehouses] = useState([]);
+    useEffect(() => {
+        supabase.from('warehouses').select('*').order('nome')
+            .then(({ data }) => { if (data) setWarehouses(data.map(_normWH)); });
+    }, []);
 
     const [warehouseAreas, setWarehouseAreas] = useState(() => {
         const saved = localStorage.getItem('vparts_warehouse_areas');
@@ -235,8 +248,7 @@ export function AppProvider({ children, session }) {
     });
 
     // Persist important data
-    useEffect(() => { localStorage.setItem('vparts_companies', JSON.stringify(companies)); }, [companies]);
-    useEffect(() => { localStorage.setItem('vparts_warehouses', JSON.stringify(warehouses)); }, [warehouses]);
+    // companies e warehouses persistidos no Supabase — sem localStorage
     useEffect(() => { localStorage.setItem('vparts_warehouse_areas', JSON.stringify(warehouseAreas)); }, [warehouseAreas]);
     useEffect(() => { localStorage.setItem('vparts_inventory', JSON.stringify(inventory)); }, [inventory]);
     useEffect(() => { localStorage.setItem('vparts_receipt_history', JSON.stringify(receiptHistory)); }, [receiptHistory]);
@@ -257,10 +269,55 @@ export function AppProvider({ children, session }) {
     // === CRUD Helpers ===
     const nextId = (arr) => arr.length > 0 ? Math.max(...arr.map(a => a.id)) + 1 : 1;
 
-    const addCompany = (company) => setCompanies([...companies, { ...company, id: Date.now() }]);
-    const addWarehouse = (wh) => setWarehouses(prev => [...prev, { ...wh, id: nextId(prev) }]);
-    const updateWarehouse = (id, data) => setWarehouses(prev => prev.map(w => w.id === id ? { ...w, ...data } : w));
-    const deleteWarehouse = (id) => setWarehouses(prev => prev.filter(w => w.id !== id));
+    // ── Companies CRUD (Supabase) ──────────────────────────────────────────────
+    const addCompany = (company) => {
+        const newCompany = { ...company, id: crypto.randomUUID() };
+        setCompanies(prev => [...prev, newCompany]);
+        supabase.from('companies').insert(newCompany).then(({ error }) => {
+            if (error) {
+                console.error('[AppContext] addCompany:', error.message);
+                setCompanies(prev => prev.filter(c => c.id !== newCompany.id));
+            }
+        });
+    };
+    const updateCompany = (id, data) => {
+        setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+        supabase.from('companies').update(data).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateCompany:', error.message);
+        });
+    };
+    const deleteCompany = (id) => {
+        setCompanies(prev => prev.filter(c => c.id !== id));
+        supabase.from('companies').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteCompany:', error.message);
+        });
+    };
+
+    // ── Warehouses CRUD (Supabase) ────────────────────────────────────────────
+    const addWarehouse = (wh) => {
+        const id = crypto.randomUUID();
+        const dbData = { id, ..._denormWH(wh) };
+        const appData = _normWH(dbData);
+        setWarehouses(prev => [...prev, appData]);
+        supabase.from('warehouses').insert(dbData).then(({ error }) => {
+            if (error) {
+                console.error('[AppContext] addWarehouse:', error.message);
+                setWarehouses(prev => prev.filter(w => w.id !== id));
+            }
+        });
+    };
+    const updateWarehouse = (id, data) => {
+        setWarehouses(prev => prev.map(w => w.id === id ? { ...w, ...data } : w));
+        supabase.from('warehouses').update(_denormWH(data)).eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] updateWarehouse:', error.message);
+        });
+    };
+    const deleteWarehouse = (id) => {
+        setWarehouses(prev => prev.filter(w => w.id !== id));
+        supabase.from('warehouses').delete().eq('id', id).then(({ error }) => {
+            if (error) console.error('[AppContext] deleteWarehouse:', error.message);
+        });
+    };
 
     const addWarehouseArea = (area) => setWarehouseAreas([...warehouseAreas, { ...area, id: warehouseAreas.length > 0 ? Math.max(...warehouseAreas.map(a => a.id)) + 1 : 1 }]);
     const updateWarehouseArea = (id, updatedArea) => setWarehouseAreas(warehouseAreas.map(a => a.id === id ? { ...a, ...updatedArea } : a));
@@ -339,7 +396,7 @@ export function AppProvider({ children, session }) {
 
     return (
         <AppContext.Provider value={{
-            companies, addCompany,
+            companies, addCompany, updateCompany, deleteCompany,
             warehouses, addWarehouse, updateWarehouse, deleteWarehouse,
             warehouseAreas, addWarehouseArea, updateWarehouseArea, deleteWarehouseArea,
             orders, updateOrderStatus,
