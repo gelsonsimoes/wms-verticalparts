@@ -724,8 +724,8 @@ export default function ProductCatalog() {
   };
 
   const handleDelete = async () => {
-    if (!selectedId || produtos.length <= 1) return;
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+    if (!selectedId) return;
+    if (!confirm(`Excluir o produto "${selected?.descricao || selected?.codigo}"? Esta ação não pode ser desfeita.`)) return;
 
     try {
       const { error } = await supabase
@@ -757,7 +757,7 @@ export default function ProductCatalog() {
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">7. CADASTRAR — Gestão de Mestre</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.5 Catálogo de Produtos</h1>
+            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">7.5 Cadastro de Produtos</h1>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Hardware de Elevadores · Componentes Críticos · Unidades Logísticas</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -857,7 +857,7 @@ export default function ProductCatalog() {
                       <CheckCircle2 className="w-4 h-4" />Salvo!
                     </div>
                   )}
-                  <button onClick={handleDelete} disabled={produtos.length <= 1}
+                  <button onClick={handleDelete} disabled={!selectedId || isNew}
                     className="flex items-center gap-1.5 px-3 py-2 border-2 border-red-200 dark:border-red-900/40 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl text-xs font-black transition-all disabled:opacity-30">
                     <Trash2 className="w-3.5 h-3.5" />Excluir
                   </button>
