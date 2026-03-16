@@ -13,7 +13,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import * as XLSX from 'xlsx';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import { supabase } from '../services/supabaseClient';
 
@@ -1217,6 +1217,148 @@ const TABS = [
   { label:'Descrição IA',    Icon: Bot       },
 ];
 
+// ─── QR CODE MODAL ────────────────────────────────────────────────────────────
+
+const QR_BASE_URL = 'https://wmsverticalparts.com.br/cadastros/produtos';
+
+function QRModal({ prod, onClose }) {
+  const qrUrl = `${QR_BASE_URL}?sku=${encodeURIComponent(prod.sku)}`;
+
+  function downloadPNG() {
+    const canvas = document.getElementById('qr-canvas-dl');
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `QR_${prod.sku}.png`;
+    a.click();
+  }
+
+  function downloadSVG() {
+    const svg = document.getElementById('qr-modal-svg');
+    if (!svg) return;
+    const svgStr = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `QR_${prod.sku}.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function printLabel() {
+    const canvas = document.getElementById('qr-canvas-dl');
+    const imgSrc = canvas ? canvas.toDataURL('image/png') : null;
+    const win = window.open('', '_blank', 'width=420,height=560');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Etiqueta QR — ${prod.sku}</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{background:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Courier New',monospace;}
+        .card{text-align:center;padding:20px 24px;border:2px solid #1e293b;border-radius:3px;display:inline-block;min-width:220px;}
+        .brand{font-size:10px;font-weight:900;letter-spacing:.2em;color:#92400e;margin-bottom:8px;text-transform:uppercase;}
+        .qr{display:block;margin:0 auto;width:180px;height:180px;}
+        .sku{font-size:13px;font-weight:900;color:#1e293b;margin-top:8px;letter-spacing:.05em;word-break:break-all;}
+        .desc{font-size:9px;color:#475569;margin-top:3px;max-width:200px;line-height:1.3;}
+        .ant{font-size:9px;color:#b45309;font-weight:700;margin-top:2px;}
+        .url{font-size:7px;color:#94a3b8;margin-top:6px;word-break:break-all;}
+        @media print{@page{margin:5mm;size:60mm 80mm;}body{min-height:auto;}}
+      </style>
+    </head><body>
+      <div class="card">
+        <div class="brand">VerticalParts WMS</div>
+        ${imgSrc
+          ? `<img src="${imgSrc}" class="qr" alt="QR"/>`
+          : `<div style="width:180px;height:180px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:10px;color:#94a3b8;">QR</div>`}
+        <div class="sku">${prod.sku}</div>
+        ${prod.descricao ? `<div class="desc">${prod.descricao}</div>` : ''}
+        ${prod.codigo_antigo ? `<div class="ant">Ant: ${prod.codigo_antigo}</div>` : ''}
+        <div class="url">${qrUrl}</div>
+      </div>
+      <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}</script>
+    </body></html>`);
+    win.document.close();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      onClick={onClose}>
+      <div
+        className="bg-white dark:bg-slate-900 rounded-sm border border-slate-200 dark:border-slate-700 shadow-2xl w-80 animate-in fade-in zoom-in-95 duration-200"
+        onClick={e => e.stopPropagation()}>
+
+        {/* ── header ── */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">QR Code do Produto</p>
+            <p className="text-sm font-black text-slate-900 dark:text-white mt-0.5">{prod.sku}</p>
+          </div>
+          <button onClick={onClose}
+            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* ── QR SVG — display ── */}
+        <div className="flex justify-center py-5 px-5">
+          <div className="p-4 bg-white border-2 border-slate-200 rounded-sm shadow-inner">
+            <QRCodeSVG
+              id="qr-modal-svg"
+              value={qrUrl}
+              size={212}
+              level="H"
+              includeMargin={false}
+            />
+          </div>
+        </div>
+
+        {/* QR Canvas oculto — PNG download em alta resolução */}
+        <div className="hidden" aria-hidden>
+          <QRCodeCanvas
+            id="qr-canvas-dl"
+            value={qrUrl}
+            size={512}
+            level="H"
+            includeMargin
+          />
+        </div>
+
+        {/* ── info produto ── */}
+        <div className="mx-5 mb-4 bg-slate-50 dark:bg-slate-800 rounded-sm p-3">
+          {prod.descricao && <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{prod.descricao}</p>}
+          {prod.codigo_antigo && (
+            <p className="text-[10px] text-amber-600 font-bold mt-0.5">Cód. Antigo: {prod.codigo_antigo}</p>
+          )}
+          <p className="text-[9px] text-slate-400 mt-1 break-all leading-relaxed">{qrUrl}</p>
+        </div>
+
+        {/* ── ações ── */}
+        <div className="px-5 pb-5 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={downloadPNG}
+              className="flex items-center justify-center gap-1.5 py-2.5 bg-yellow-400 hover:bg-yellow-300 text-slate-900 rounded-sm text-[11px] font-black transition">
+              <Download className="w-3.5 h-3.5" />PNG · 512px
+            </button>
+            <button onClick={downloadSVG}
+              className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-900 hover:bg-slate-700 text-white rounded-sm text-[11px] font-black transition">
+              <Download className="w-3.5 h-3.5" />SVG · Vetorial
+            </button>
+          </div>
+          <button onClick={printLabel}
+            className="w-full flex items-center justify-center gap-1.5 py-2.5 border border-slate-300 dark:border-slate-600 hover:border-yellow-400 text-slate-700 dark:text-slate-300 rounded-sm text-[11px] font-black transition">
+            <Printer className="w-3.5 h-3.5" />Imprimir Etiqueta
+          </button>
+          <p className="text-[9px] text-slate-400 text-center">
+            PNG para impressoras · SVG para site comercial e Adobe Illustrator
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function ProductCatalog() {
@@ -1233,6 +1375,7 @@ export default function ProductCatalog() {
   const [isNew,        setIsNew       ] = useState(false);
   const [saving,       setSaving      ] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
+  const [showQRModal,  setShowQRModal ] = useState(false);
 
   // ── fetch ──
   async function fetchProducts() {
@@ -1593,23 +1736,22 @@ export default function ProductCatalog() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* QR Code compacto */}
+                  {/* QR Code compacto — clica para abrir modal */}
                   {selected.sku && (
-                    <div className="flex flex-col items-center gap-0.5 group relative">
-                      <div id="qr-svg-product" className="w-12 h-12 p-0.5 bg-white border border-slate-200 rounded-sm cursor-pointer hover:border-yellow-400 transition"
-                        title="QR Code do produto — clique para imprimir">
-                        <QRCodeSVG
-                          value={`${window.location.origin}/cadastros/produtos?sku=${selected.sku}`}
-                          size={44}
-                          level="M"
-                          includeMargin={false}
-                        />
-                      </div>
-                      <button onClick={()=>printQR(selected)}
-                        className="flex items-center gap-1 text-[9px] font-black text-slate-400 hover:text-yellow-600 transition">
-                        <Printer className="w-2.5 h-2.5" />impr.
-                      </button>
-                    </div>
+                    <button
+                      onClick={()=>setShowQRModal(true)}
+                      title="Expandir QR Code — baixar PNG/SVG ou imprimir etiqueta"
+                      className="flex flex-col items-center gap-0.5 group p-1 border border-slate-200 dark:border-slate-700 hover:border-yellow-400 rounded-sm transition bg-white dark:bg-slate-900">
+                      <QRCodeSVG
+                        value={`${QR_BASE_URL}?sku=${encodeURIComponent(selected.sku)}`}
+                        size={40}
+                        level="M"
+                        includeMargin={false}
+                      />
+                      <span className="flex items-center gap-0.5 text-[9px] font-black text-slate-400 group-hover:text-yellow-600 transition">
+                        <QrCode className="w-2.5 h-2.5" />ver
+                      </span>
+                    </button>
                   )}
                   <button onClick={handleDelete} title="Excluir produto"
                     className="p-2 text-slate-400 hover:text-red-500 border border-slate-200 dark:border-slate-700 hover:border-red-300 rounded-sm transition">
@@ -1655,6 +1797,10 @@ export default function ProductCatalog() {
           )}
         </div>
       </div>
+      {/* ── QR MODAL ── */}
+      {showQRModal && selected?.sku && (
+        <QRModal prod={selected} onClose={()=>setShowQRModal(false)} />
+      )}
     </EnterprisePageBase>
   );
 }
