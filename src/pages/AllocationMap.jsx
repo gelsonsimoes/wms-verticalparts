@@ -562,14 +562,14 @@ export default function AllocationMap() {
       {/* ═══ BARRA DE FILTROS ═══ */}
       <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-3 flex flex-wrap gap-3 items-center shrink-0">
         <div className="relative">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Ordem, Produto ou Depositante..."
             aria-label="Filtrar registros"
-            className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all w-56"
+            className="pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all w-56"
           />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
         </div>
 
         {/* Botões de filtro — cores corretas sem split hack */}

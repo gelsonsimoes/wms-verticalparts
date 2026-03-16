@@ -254,14 +254,14 @@ export default function CollaboratorReport() {
 
           {/* Busca livre */}
           <div className="relative min-w-[200px] flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
               placeholder="Buscar colaborador, ação..."
-              className="w-full pl-9 pr-4 py-2.5 text-xs font-medium rounded-xl border-2 border-slate-200 focus:border-violet-400 outline-none transition-all bg-slate-50"
+              className="w-full pr-9 pl-4 py-2.5 text-xs font-medium rounded-xl border-2 border-slate-200 focus:border-violet-400 outline-none transition-all bg-slate-50"
             />
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             {search && (
               <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500">
                 <X className="w-3 h-3" />
