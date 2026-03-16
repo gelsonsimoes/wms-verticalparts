@@ -8,10 +8,12 @@ import {
   TrendingUp, TrendingDown, Minus, Building2,
   Image, Barcode, Link2, Wrench, FileText,
   MapPin, ArrowUpDown, Hash, Cable, Eye, EyeOff,
+  Printer, QrCode,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import * as XLSX from 'xlsx';
+import { QRCodeSVG } from 'qrcode.react';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import { supabase } from '../services/supabaseClient';
 
@@ -44,7 +46,7 @@ const VP_PREFIXES = [
   { code: 'VPBT',    desc: 'BST — Peças e Equipamentos (Representada)',     group: 'Parceiros' },
 ];
 
-const PREFIXES_WITH_NATUREZA = new Set(['VPEL', 'VPER', 'VPMP', 'VPIN']);
+const PREFIXES_WITH_NATUREZA = new Set(['VPEL', 'VPER', 'VPMP', 'VPIN', 'VPMO', 'VPBT']);
 
 const NATUREZAS = [
   { code: 'eletrico', label: 'Elétrico',              Icon: Zap      },
@@ -317,7 +319,7 @@ function Inp({ value, onChange, placeholder='', type='text', id, readOnly }) {
 
 // ─── TAB 0 — IDENTIFICAÇÃO + SKU BUILDER ─────────────────────────────────────
 
-function TabIdentificacao({ prod, onChange }) {
+function TabIdentificacao({ prod, onChange, onGoToIA }) {
   const at = prod.atributos_tecnicos || {};
   const [showBuilder, setShowBuilder] = useState(!prod.sku);
   const [copied, setCopied] = useState(false);
@@ -574,6 +576,34 @@ function TabIdentificacao({ prod, onChange }) {
       {/* ── DIMENSÕES & PESO ── */}
       <div>
         <p className={cn(labelCls,'mb-3')}>Dimensões Físicas & Peso</p>
+        {/* Ø Externo / Interno — exibido quando natureza é roldana ou rolamento */}
+        {(prod.natureza === 'roldana') && (
+          <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-sm">
+            <div className="col-span-3">
+              <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-2">
+                ⬤ Diâmetros (preenchidos pelo Construtor de SKU)
+              </p>
+            </div>
+            <Field label="Ø Externo (mm)">
+              <Inp type="number"
+                value={prod.atributos_tecnicos?.de||''}
+                onChange={v=>onChange('atributos_tecnicos',{...prod.atributos_tecnicos, de:v})}
+                placeholder="50" />
+            </Field>
+            <Field label="Ø Interno (mm)">
+              <Inp type="number"
+                value={prod.atributos_tecnicos?.di||''}
+                onChange={v=>onChange('atributos_tecnicos',{...prod.atributos_tecnicos, di:v})}
+                placeholder="20" />
+            </Field>
+            <Field label="Largura (mm)">
+              <Inp type="number"
+                value={prod.atributos_tecnicos?.larg||''}
+                onChange={v=>onChange('atributos_tecnicos',{...prod.atributos_tecnicos, larg:v})}
+                placeholder="15" />
+            </Field>
+          </div>
+        )}
         <div className="grid grid-cols-5 gap-3">
           {[
             {key:'altura',       label:'Altura (cm)'},
@@ -603,11 +633,22 @@ function TabIdentificacao({ prod, onChange }) {
       </div>
 
       {/* ── OBSERVAÇÕES ── */}
-      <Field label="Observações">
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <p className={labelCls}>Observações</p>
+          <button
+            onClick={()=>onGoToIA?.()}
+            title="Ir para aba de geração de descrição técnica com IA"
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 hover:bg-yellow-400 text-white hover:text-slate-900 rounded-sm text-[10px] font-black transition group">
+            <Bot className="w-3 h-3 group-hover:animate-pulse" />
+            Gerar Descrição com IA
+          </button>
+        </div>
         <textarea value={prod.observacao||''} onChange={e=>onChange('observacao',e.target.value)}
           rows={2} placeholder="Observações internas, referências, notas de manutenção..."
           className={inputCls} />
-      </Field>
+        <p className="text-[9px] text-slate-400 mt-0.5">Use o botão acima para gerar a ficha técnica completa com IA (Claude Haiku) na aba "Descrição IA".</p>
+      </div>
 
       {/* ── MOVIMENTA ESTOQUE ── */}
       <label className="flex items-center gap-3 cursor-pointer">
@@ -1367,6 +1408,38 @@ export default function ProductCatalog() {
     e.target.value='';
   }
 
+  // ── QR print ──
+  function printQR(prod) {
+    if (!prod?.sku) return;
+    const qrUrl = `${window.location.origin}/cadastros/produtos?sku=${prod.sku}`;
+    const win = window.open('', '_blank', 'width=400,height=520');
+    if (!win) return;
+    const svgEl = document.getElementById('qr-svg-product');
+    const svgSrc = svgEl ? new XMLSerializer().serializeToString(svgEl) : '';
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>QR — ${prod.sku}</title>
+      <style>
+        body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:monospace;}
+        .card{text-align:center;padding:24px;border:2px solid #1e293b;border-radius:4px;display:inline-block;}
+        .brand{font-size:11px;font-weight:900;letter-spacing:.15em;color:#78350f;margin-bottom:4px;text-transform:uppercase;}
+        .sku{font-size:14px;font-weight:900;color:#1e293b;margin-top:6px;letter-spacing:.05em;}
+        .desc{font-size:10px;color:#64748b;margin-top:4px;max-width:200px;word-break:break-word;}
+        svg{display:block;margin:0 auto;}
+        @media print{body{margin:0;}@page{margin:8mm;}}
+      </style>
+    </head><body>
+      <div class="card">
+        <div class="brand">VerticalParts WMS</div>
+        ${svgSrc}
+        <div class="sku">${prod.sku}</div>
+        ${prod.descricao?`<div class="desc">${prod.descricao}</div>`:''}
+        ${prod.codigo_antigo?`<div class="desc" style="color:#b45309">Ant: ${prod.codigo_antigo}</div>`:''}
+      </div>
+      <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}</script>
+    </body></html>`);
+    win.document.close();
+  }
+
   // ── filtered list ──
   const filtered = useMemo(()=>{
     const q = search.toLowerCase();
@@ -1520,6 +1593,24 @@ export default function ProductCatalog() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* QR Code compacto */}
+                  {selected.sku && (
+                    <div className="flex flex-col items-center gap-0.5 group relative">
+                      <div id="qr-svg-product" className="w-12 h-12 p-0.5 bg-white border border-slate-200 rounded-sm cursor-pointer hover:border-yellow-400 transition"
+                        title="QR Code do produto — clique para imprimir">
+                        <QRCodeSVG
+                          value={`${window.location.origin}/cadastros/produtos?sku=${selected.sku}`}
+                          size={44}
+                          level="M"
+                          includeMargin={false}
+                        />
+                      </div>
+                      <button onClick={()=>printQR(selected)}
+                        className="flex items-center gap-1 text-[9px] font-black text-slate-400 hover:text-yellow-600 transition">
+                        <Printer className="w-2.5 h-2.5" />impr.
+                      </button>
+                    </div>
+                  )}
                   <button onClick={handleDelete} title="Excluir produto"
                     className="p-2 text-slate-400 hover:text-red-500 border border-slate-200 dark:border-slate-700 hover:border-red-300 rounded-sm transition">
                     <Trash2 className="w-4 h-4" />
@@ -1553,7 +1644,7 @@ export default function ProductCatalog() {
 
               {/* content */}
               <div className="flex-1 overflow-y-auto p-5">
-                {activeTab===0 && <TabIdentificacao  prod={selected} onChange={fieldChange} />}
+                {activeTab===0 && <TabIdentificacao  prod={selected} onChange={fieldChange} onGoToIA={()=>setActiveTab(5)} />}
                 {activeTab===1 && <TabCompatibilidade prod={selected} onChange={fieldChange} />}
                 {activeTab===2 && <TabFotos          prod={selected} onChange={fieldChange} />}
                 {activeTab===3 && <TabEmbalagens     prod={selected} onChange={fieldChange} />}
