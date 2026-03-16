@@ -101,12 +101,11 @@ const PAGE_SECTIONS = [
       { path: '/cadastros/armazens',       label: '7.2 Configurar Armazéns' },
       { path: '/cadastros/clientes',       label: '7.3 Catálogo de Clientes' },
       { path: '/cadastros/enderecos',      label: '7.4 Cadastrar Endereços' },
-      { path: '/cadastros/produtos',       label: '7.5 Catálogo de Produtos' },
+      { path: '/cadastros/produtos',       label: '7.5 Cadastro de Produtos' },
       { path: '/cadastros/rotas-veiculos', label: '7.6 Cadastrar Rotas e Veículos' },
       { path: '/cadastros/areas',          label: '7.7 Configurar Áreas' },
       { path: '/cadastros/setores',        label: '7.8 Configurar Setores' },
-      { path: '/config/gerar-sku',         label: '7.9 Gerar SKU' },
-      { path: '/config/etiquetas',         label: '7.10 Gerenciar Etiquetas' },
+      { path: '/config/etiquetas',         label: '7.9 Gerenciar Etiquetas' },
     ]
   },
   {
