@@ -635,15 +635,15 @@ export default function LotManager() {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 px-5 py-4 flex flex-wrap items-center gap-3 shadow-sm">
         <Filter className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3" aria-hidden="true" />
           <label htmlFor="filter-search" className="sr-only">Buscar lote, código ou descrição</label>
           <input
             id="filter-search"
             value={filterSearch}
             onChange={e => setFilterSearch(e.target.value)}
             placeholder="Lote, código ou descrição..."
-            className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-64"
+            className="pr-9 pl-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-64"
           />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3" aria-hidden="true" />
         </div>
         <div className="flex gap-1.5" role="group" aria-label="Filtrar por status">
           {['Todos', 'Liberado', 'Bloqueado'].map(s => (

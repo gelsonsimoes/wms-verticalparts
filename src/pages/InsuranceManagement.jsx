@@ -117,7 +117,6 @@ export default function InsuranceManagement() {
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Histórico de Apólices Ativas</h3>
               <div className="relative w-48">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" aria-hidden="true" />
                 {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: filtro de busca */}
                 <input
                   type="text"
@@ -125,8 +124,9 @@ export default function InsuranceManagement() {
                   value={filterQuery}
                   onChange={e => setFilterQuery(e.target.value)}
                   aria-label="Buscar apólice por número"
-                  className="w-full bg-slate-50 dark:bg-slate-850 border-none rounded-lg py-1.5 pl-8 pr-3 text-[10px] font-bold outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-850 border-none rounded-lg py-1.5 pr-8 pl-3 text-[10px] font-bold outline-none focus:ring-1 focus:ring-primary/30 transition-all"
                 />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" aria-hidden="true" />
               </div>
             </div>
             <div className="overflow-x-auto">

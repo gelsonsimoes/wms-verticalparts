@@ -273,15 +273,15 @@ function KardexProduto() {
 
         {/* Busca */}
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3" aria-hidden="true" />
           <label htmlFor="search-produto" className="sr-only">Buscar por produto ou código</label>
           <input
             id="search-produto"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Produto ou código..."
-            className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-52"
+            className="pr-9 pl-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-52"
           />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3" aria-hidden="true" />
         </div>
 
         {/* Situação */}
@@ -531,15 +531,15 @@ function KardexEndereco() {
         <Filter className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
 
         <div className="relative flex items-center">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3" aria-hidden="true" />
           <label htmlFor="search-endereco" className="sr-only">Buscar por endereço, código ou região</label>
           <input
             id="search-endereco"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Endereço, código ou região..."
-            className="pl-9 pr-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-56"
+            className="pr-9 pl-4 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all w-56"
           />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3" aria-hidden="true" />
         </div>
 
         {/* Período */}

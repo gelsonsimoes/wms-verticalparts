@@ -350,8 +350,8 @@ export default function SerialDevices() {
                     <div className="flex-1" />
                     <div className="relative min-w-[200px]">
                         <label htmlFor={`${fieldId}-search`} className="sr-only">Procurar dispositivo</label>
-                        <input id={`${fieldId}-search`} type="text" placeholder="Procurar dispositivo..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary transition-all" />
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                        <input id={`${fieldId}-search`} type="text" placeholder="Procurar dispositivo..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full pr-9 pl-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold outline-none focus:border-primary transition-all" />
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
                     </div>
                 </div>
             </div>

@@ -108,17 +108,17 @@ export default function OrderManagement() {
         <FastTab title="Carteira de Pedidos Ativos" defaultOpen={true}>
           <div className="mb-4 flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
               {/* Label sr-only associa o campo sem texto visível */}
               <label htmlFor="search-order" className="sr-only">Buscar pedidos por ordem, cliente ou status</label>
-              <input 
+              <input
                 id="search-order"
-                type="text" 
-                placeholder="Filtrar por Ordem, Cliente ou Status..." 
-                className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
+                type="text"
+                placeholder="Filtrar por Ordem, Cliente ou Status..."
+                className="w-full pr-10 pl-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
             </div>
             <button
               className="btn-secondary px-4 flex items-center gap-2"

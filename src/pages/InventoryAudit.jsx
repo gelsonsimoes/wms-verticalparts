@@ -103,15 +103,15 @@ export default function InventoryAudit() {
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Lista de Contagem — Amostragem de Hoje</h3>
                     <div className="flex gap-2">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" aria-hidden="true" />
                             <input
                                 type="text"
                                 placeholder="Filtrar..."
                                 value={filterQuery}
                                 onChange={e => setFilterQuery(e.target.value)}
                                 aria-label="Filtrar itens de inventário por produto ou SKU"
-                                className="pl-8 pr-4 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] outline-none focus:ring-1 focus:ring-primary/30"
+                                className="pr-8 pl-4 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] outline-none focus:ring-1 focus:ring-primary/30"
                             />
+                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" aria-hidden="true" />
                         </div>
                         <button
                             aria-label="Abrir opções de filtro"

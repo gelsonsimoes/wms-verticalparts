@@ -281,14 +281,14 @@ export default function UserGroups() {
           {/* Busca + Novo */}
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
               <input
                 type="text"
                 placeholder="Buscar grupo..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-sm text-xs font-bold outline-none focus:border-primary transition-all"
+                className="w-full pr-9 pl-4 py-2.5 bg-white border border-slate-200 rounded-sm text-xs font-bold outline-none focus:border-primary transition-all"
               />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             </div>
             <button
               onClick={handleNewGroup}
