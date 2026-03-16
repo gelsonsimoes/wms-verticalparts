@@ -21,7 +21,7 @@ const MOCK_DATA = [
   { id: '1005', sku: 'VPER-LUM-LED-VRD-24V', desc: 'Luminária em LED Verde 24V', qty: 15, status: 'Ativo' }
 ];
 
-export default function EnterprisePageBase({ title, breadcrumbItems = [], actions, children }) {
+export default function EnterprisePageBase({ title, breadcrumbItems = [], actions, actionGroups: actionGroupsProp, children }) {
   const [registroId] = useState('VP-AUTO-001');
   const [depositante, setDepositante] = useState('VerticalParts Matriz');
   const [tipoOperacao, setTipoOperacao] = useState('Entrada Normal');
@@ -33,7 +33,8 @@ export default function EnterprisePageBase({ title, breadcrumbItems = [], action
     { label: title, active: true }
   ];
 
-  const actionGroups = [
+  // Permite que cada página passe seus próprios grupos com onClick reais
+  const actionGroups = actionGroupsProp || [
     [
       { label: 'Novo', primary: true, icon: <LayoutGrid className="w-3.5 h-3.5" /> },
       { label: 'Duplicar', icon: <FileText className="w-3.5 h-3.5" /> }

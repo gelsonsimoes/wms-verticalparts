@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, Minus, Building2,
   Image, Barcode, Link2, Wrench, FileText,
   MapPin, ArrowUpDown, Hash, Cable, Eye, EyeOff,
-  Printer, QrCode,
+  Printer, QrCode, LayoutGrid, FileDown,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -1422,11 +1422,11 @@ export default function ProductCatalog() {
     setSelectedId(null); setIsNew(true); setActiveTab(0);
   }
 
-  // ── save ──
+  // ── save ── (retorna true/false para uso em handleSaveAndClose)
   async function handleSave() {
-    if (!selected) return;
-    if (!selected.sku?.trim())       { alert('SKU é obrigatório'); return; }
-    if (!selected.descricao?.trim()) { alert('Descrição é obrigatória'); return; }
+    if (!selected) return false;
+    if (!selected.sku?.trim())       { alert('SKU é obrigatório'); return false; }
+    if (!selected.descricao?.trim()) { alert('Descrição é obrigatória'); return false; }
     setSaving(true);
     try {
       // Para novos produtos: gera UUID no frontend (garante id não-nulo mesmo sem default no banco)
@@ -1487,9 +1487,151 @@ export default function ProductCatalog() {
       setSaved(true);
       savedRef.current && clearTimeout(savedRef.current);
       savedRef.current = setTimeout(()=>setSaved(false), 2500);
+      return true;
     } catch(e) {
       alert('Erro ao salvar: ' + (e.message||JSON.stringify(e)));
+      return false;
     } finally { setSaving(false); }
+  }
+
+  // ── save and close ──
+  async function handleSaveAndClose() {
+    const ok = await handleSave();
+    if (ok) { setSelectedId(null); setIsNew(false); setActiveTab(0); }
+  }
+
+  // ── duplicate ──
+  function handleDuplicate() {
+    if (!selected || isNew) return;
+    const copy = {
+      ...selected,
+      id: '__new__',
+      sku: selected.sku + '-COPIA',
+      descricao: (selected.descricao || '') + ' (Cópia)',
+      codigo_antigo: '',
+      codigo_integracao: '',
+      enderecos_estoque: [],
+      curva_abc: null,
+      estoque_erp: null,
+    };
+    setProdutos(prev => [copy, ...prev.filter(p => p.id !== '__new__')]);
+    setIsNew(true); setSelectedId(null); setActiveTab(0);
+  }
+
+  // ── relatórios — exporta lista filtrada como XLSX ──
+  function handleRelatorios() {
+    const rows = filtered.map(p => ({
+      SKU:                  p.sku || '',
+      'Código Antigo':      p.codigo_antigo || '',
+      Descrição:            p.descricao || '',
+      'Part Number':        p.part_number || '',
+      NCM:                  p.ncm || '',
+      Tipo:                 p.tipo || '',
+      Família:              p.familia || '',
+      Marca:                p.marca || '',
+      Unidade:              p.unidade || '',
+      'Prefixo VP':         p.prefixo_vp || '',
+      Natureza:             p.natureza || '',
+      'Curva ABC':          p.curva_abc || '',
+      'Estoque ERP':        p.estoque_erp ?? '',
+      'Estoque Mín.':       p.estoque_minimo ?? '',
+      'Preço Custo (R$)':   p.preco_custo ?? '',
+      'Preço Venda (R$)':   p.preco_venda ?? '',
+      EAN:                  p.ean || '',
+      'Peso Líq. (kg)':     p.peso_liquido ?? '',
+      'Peso Bruto (kg)':    p.peso_bruto ?? '',
+      'Altura (cm)':        p.altura ?? '',
+      'Largura (cm)':       p.largura ?? '',
+      'Prof. (cm)':         p.profundidade ?? '',
+      Compatibilidade:      (p.compatibilidade || []).join(', '),
+      Ativo:                p.ativo ? 'Sim' : 'Não',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
+    XLSX.writeFile(wb, `catalogo_produtos_${new Date().toISOString().slice(0,10)}.xlsx`);
+  }
+
+  // ── exportar ficha técnica como PDF (janela de impressão) ──
+  function handleExportarFicha() {
+    if (!selected || isNew) return;
+    const compat = (selected.compatibilidade || [])
+      .map(cc => { const m = MARCAS_COMPAT.find(x => x.abrev === cc); return m ? `${m.nome} (${cc})` : cc; })
+      .join(' · ') || 'Multimarcas';
+    const attrs = selected.atributos_tecnicos || {};
+    const attrRows = Object.entries(attrs)
+      .filter(([,v]) => v)
+      .map(([k,v]) => `<tr><td class="lbl">${k.replace(/_/g,' ').toUpperCase()}</td><td class="val">${v}</td></tr>`)
+      .join('');
+    const dims = [
+      selected.altura       ? `Altura: ${selected.altura}cm`       : '',
+      selected.largura      ? `Largura: ${selected.largura}cm`      : '',
+      selected.profundidade ? `Prof.: ${selected.profundidade}cm`   : '',
+      selected.peso_liquido ? `Peso Líq.: ${selected.peso_liquido}kg` : '',
+      selected.peso_bruto   ? `Peso Bruto: ${selected.peso_bruto}kg`  : '',
+    ].filter(Boolean).join('  ·  ');
+    const win = window.open('', '_blank', 'width=860,height=1100');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head>
+      <title>Ficha Técnica — ${selected.sku}</title>
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:'Segoe UI',Arial,sans-serif;color:#1e293b;font-size:12px;}
+        .hdr{background:#1e293b;color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:flex-start;}
+        .brand{font-size:10px;font-weight:900;letter-spacing:.2em;color:#fbbf24;margin-bottom:4px;text-transform:uppercase;}
+        .sku{font-size:22px;font-weight:900;letter-spacing:.04em;}
+        .desc{font-size:12px;color:#94a3b8;margin-top:3px;}
+        .badge{font-size:11px;font-weight:900;color:#fbbf24;background:rgba(251,191,36,.15);padding:4px 10px;border:1px solid rgba(251,191,36,.3);border-radius:2px;display:inline-block;}
+        .sec{padding:12px 28px;border-bottom:1px solid #e2e8f0;}
+        .sec-title{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#64748b;margin-bottom:8px;}
+        table{width:100%;border-collapse:collapse;}
+        .lbl{font-weight:700;padding:4px 10px;background:#f8fafc;border:1px solid #e2e8f0;width:30%;font-size:10px;text-transform:uppercase;letter-spacing:.05em;}
+        .val{padding:4px 10px;border:1px solid #e2e8f0;font-size:11px;}
+        .id-row td{padding:3px 10px 3px 0;font-size:11px;width:auto;}
+        .id-row strong{font-weight:700;}
+        .desc-box{font-size:11px;line-height:1.75;color:#334155;white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:2px;}
+        .ftr{padding:8px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;}
+        .ftr span{font-size:9px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+        @media print{@page{margin:10mm;size:A4;}}
+      </style>
+    </head><body>
+      <div class="hdr">
+        <div>
+          <div class="brand">VerticalParts WMS — Ficha Técnica</div>
+          <div class="sku">${selected.sku}</div>
+          <div class="desc">${selected.descricao || ''}</div>
+        </div>
+        <div style="text-align:right">
+          ${selected.curva_abc ? `<div class="badge">CURVA ${selected.curva_abc}</div>` : ''}
+          ${selected.prefixo_vp ? `<div style="font-size:11px;color:#94a3b8;margin-top:6px">${selected.prefixo_vp}</div>` : ''}
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">Identificação</div>
+        <table><tr class="id-row">
+          ${selected.codigo_antigo ? `<td><strong>Cód. Antigo:</strong> ${selected.codigo_antigo}</td>` : ''}
+          ${selected.part_number   ? `<td><strong>Part Number:</strong> ${selected.part_number}</td>`   : ''}
+          ${selected.ncm           ? `<td><strong>NCM:</strong> ${selected.ncm}</td>`                   : ''}
+          ${selected.ean           ? `<td><strong>EAN:</strong> ${selected.ean}</td>`                   : ''}
+          ${selected.unidade       ? `<td><strong>Unid.:</strong> ${selected.unidade}</td>`             : ''}
+          ${selected.marca         ? `<td><strong>Marca:</strong> ${selected.marca}</td>`               : ''}
+        </tr></table>
+      </div>
+      ${attrRows ? `<div class="sec"><div class="sec-title">Atributos Técnicos</div><table>${attrRows}</table></div>` : ''}
+      ${dims ? `<div class="sec"><div class="sec-title">Dimensões & Peso</div><p style="font-size:11px">${dims}</p></div>` : ''}
+      <div class="sec">
+        <div class="sec-title">Compatibilidade com Marcas</div>
+        <p style="font-size:11px;line-height:1.6">${compat}</p>
+      </div>
+      ${selected.descricao_detalhada ? `<div class="sec"><div class="sec-title">Descrição Técnica Detalhada</div><div class="desc-box">${selected.descricao_detalhada}</div></div>` : ''}
+      ${selected.observacao ? `<div class="sec"><div class="sec-title">Observações</div><p style="font-size:11px">${selected.observacao}</p></div>` : ''}
+      <div class="ftr">
+        <span>VerticalParts WMS · Ficha gerada em ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}</span>
+        <span>${selected.sku}</span>
+      </div>
+      <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}</script>
+    </body></html>`);
+    win.document.close();
   }
 
   // ── delete ──
@@ -1599,12 +1741,45 @@ export default function ProductCatalog() {
     );
   }, [produtos, search]);
 
+  // ─── ACTION GROUPS — barra superior ─────────────────────────────────────────
+
+  const productActionGroups = [
+    [
+      { label: 'Novo',      primary: true, icon: <Plus className="w-3.5 h-3.5"/>,
+        onClick: handleNew },
+      { label: 'Duplicar',  icon: <Copy className="w-3.5 h-3.5"/>,
+        onClick: handleDuplicate,
+        disabled: !selected || isNew,
+        tooltip: selected && !isNew ? 'Duplicar produto selecionado' : 'Selecione um produto para duplicar' },
+    ],
+    [
+      { label: 'Salvar',          icon: <Save className="w-3.5 h-3.5"/>,
+        onClick: handleSave,
+        disabled: saving || !selected,
+        tooltip: 'Salvar produto atual (Ctrl+S)' },
+      { label: 'Salvar e Fechar', icon: <CheckCircle2 className="w-3.5 h-3.5"/>,
+        onClick: handleSaveAndClose,
+        disabled: saving || !selected,
+        tooltip: 'Salvar e voltar para a lista' },
+    ],
+    [
+      { label: 'Relatórios',  icon: <FileSpreadsheet className="w-3.5 h-3.5"/>,
+        onClick: handleRelatorios,
+        tooltip: `Exportar ${filtered.length} produto(s) filtrado(s) como planilha XLSX` },
+      { label: 'Exportar PDF', icon: <FileDown className="w-3.5 h-3.5"/>,
+        onClick: handleExportarFicha,
+        disabled: !selected || isNew,
+        tooltip: 'Imprimir ficha técnica completa do produto selecionado' },
+    ],
+  ];
+
   // ─── RENDER ──────────────────────────────────────────────────────────────────
 
   return (
     <EnterprisePageBase
       title="7.4 Catálogo de Produtos"
       breadcrumbItems={[{ label:'CADASTRAR', path:'/cadastros' }]}
+      actionGroups={productActionGroups}
     >
       <div className="flex bg-white dark:bg-slate-950 rounded-sm border border-slate-200 dark:border-slate-800 overflow-hidden"
         style={{ height:'calc(100vh - 130px)' }}>
