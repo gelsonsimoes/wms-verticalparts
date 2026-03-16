@@ -5,6 +5,7 @@ import Header from './components/layout/Header';
 import { AppProvider } from './context/AppContext';
 import ChatAssistant from './components/chat/ChatAssistant';
 import Login from './pages/Login';
+import WelcomePage from './pages/WelcomePage';
 import NotFound from './pages/NotFound';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import { supabase } from './services/supabaseClient';
@@ -190,9 +191,12 @@ function App() {
     return <FallbackLoader />;
   }
 
-  // Tela de login
+  // Não autenticado: login em /login, página pública em qualquer outra rota
   if (!session) {
-    return <Login onLogin={handleLogin} />;
+    if (currentPath === '/login') {
+      return <Login onLogin={handleLogin} />;
+    }
+    return <WelcomePage />;
   }
 
   return (

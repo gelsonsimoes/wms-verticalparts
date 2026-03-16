@@ -25,13 +25,13 @@ export default function AuthCallbackPage() {
     const fetchEmployee = async (userId, email) => {
       const { data: profile } = await supabase
         .from('operadores')
-        .select('employee_id')
+        .select('usuario')
         .eq('id', userId)
         .maybeSingle();
-      return profile?.employee_id || email?.split('@')[0] || '';
+      return profile?.usuario || email?.split('@')[0] || '';
     };
 
-    // Listener para detectar SIGNED_IN / PASSWORD_RECOVERY via detectSessionInUrl
+    // Listener para detectar SIGNED_IN / PASSWORD_RECOVERY
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mountedRef.current) return;
       if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
@@ -44,23 +44,45 @@ export default function AuthCallbackPage() {
       }
     });
 
-    // Verifica se sessão já foi estabelecida antes do listener (race condition)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!mountedRef.current) return;
-      if (session?.user && state === 'loading') {
-        const eid = await fetchEmployee(session.user.id, session.user.email);
-        if (!mountedRef.current) return;
-        setEmployeeId(eid);
-        setState('set-password');
-      }
-    });
+    // Processa o token da URL (token_hash PKCE ou hash fragment legado)
+    const processToken = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tokenHash = searchParams.get('token_hash');
+      const type = searchParams.get('type') || 'invite';
 
-    // Timeout de segurança: link inválido ou expirado
+      if (tokenHash) {
+        // Formato novo PKCE: ?token_hash=...&type=invite|recovery
+        const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+        if (error && mountedRef.current) setState('error');
+        return;
+      }
+
+      // Formato legado: #access_token=...&refresh_token=...
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken  = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (error && mountedRef.current) setState('error');
+        return;
+      }
+
+      // Verifica se sessão já estava ativa (race condition)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && mountedRef.current) {
+        const eid = await fetchEmployee(session.user.id, session.user.email);
+        if (mountedRef.current) { setEmployeeId(eid); setState('set-password'); }
+      }
+    };
+
+    processToken();
+
+    // Timeout de segurança: nenhum token encontrado ou já expirado
     const timeout = setTimeout(() => {
       if (mountedRef.current) {
         setState(s => s === 'loading' ? 'error' : s);
       }
-    }, 12000);
+    }, 15000);
 
     return () => {
       mountedRef.current = false;

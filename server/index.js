@@ -120,9 +120,13 @@ app.post('/api/invite-user', async (req, res) => {
     });
 
     // 1. Convite via Supabase Auth
+    const appUrl = process.env.VITE_APP_URL || 'https://wmsverticalparts.com.br';
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
-      { data: { must_change_password: true, nome, cargo } }
+      {
+        data:       { must_change_password: true, nome, cargo },
+        redirectTo: `${appUrl}/auth/callback`,
+      }
     );
     if (inviteError) throw inviteError;
 
