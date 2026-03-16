@@ -149,7 +149,8 @@ function App() {
           console.log('[App] onAuthStateChange: buscando perfil para', supabaseSession.user.id);
           // Usuário convidado que ainda não trocou a senha → forçar UpdatePassword
           if (supabaseSession.user.user_metadata?.must_change_password) {
-            if (window.location.pathname !== '/auth/update-password') {
+            const cp = window.location.pathname;
+            if (cp !== '/auth/update-password' && cp !== '/auth/callback' && cp !== '/auth/reset-password') {
               window.location.href = '/auth/update-password';
             }
             return;
