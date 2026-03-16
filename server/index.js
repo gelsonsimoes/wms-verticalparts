@@ -56,31 +56,37 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.post('/api/generate-description', async (req, res) => {
-  const { vpType, category, attributes, selectedCompatibility, manualReference, additionalDetails } = req.body;
+  const { vpType, category, attributes, selectedCompatibility, manualReference, additionalDetails, sku, descricao } = req.body;
 
   try {
-    const prompt = `Você é um Engenheiro Sênior da VerticalParts, especialista em documentação técnica.
-    Sua tarefa é transformar dados de um produto em uma descrição técnica de ALTA QUALIDADE, rica e profissional.
+    // selectedCompatibility pode chegar como string (já formatada pelo frontend) ou array
+    const compatStr = Array.isArray(selectedCompatibility)
+      ? selectedCompatibility.join(', ')
+      : (selectedCompatibility || 'Multimarcas');
 
-    DADOS TÉCNICOS:
-    - Identificador: ${vpType}
-    - Categoria: ${category}
-    - Atributos: ${JSON.stringify(attributes)}
-    - Compatibilidade: ${selectedCompatibility?.join(', ') || 'Multimarcas'}
-    - Referência: ${manualReference || 'N/A'}
+    const prompt = `Você é um Engenheiro Sênior da VerticalParts, especialista em documentação técnica de elevadores, escadas rolantes e esteiras.
+Sua tarefa é transformar dados de um produto em uma FICHA TÉCNICA DE ALTA QUALIDADE, rica e profissional, pronta para uso em catálogo de vendas e Nota Fiscal.
 
-    TEXTO DO OPERADOR (PRIORIDADE MÁXIMA):
-    "${additionalDetails || '(Nenhum detalhe adicional fornecido)'}"
+DADOS DO PRODUTO:
+- SKU: ${sku || vpType || 'N/A'}
+- Descrição curta: ${descricao || 'N/A'}
+- Prefixo VP: ${vpType || 'N/A'}
+- Natureza/Categoria: ${category || 'N/A'}
+- Atributos técnicos: ${JSON.stringify(attributes || {})}
+- Compatibilidade com marcas: ${compatStr}
+- Referência/Marca: ${manualReference || 'N/A'}
 
-    REGRAS DE OURO:
-    1. PRIORIDADE: Use o "TEXTO DO OPERADOR" como base para a descrição narrativa.
-    2. TÍTULO: Em negrito, contendo a categoria e marca principal.
-    3. ESTRUTURA:
-       - Breve introdução comercial/técnica (3-4 linhas).
-       - Seção **FUNÇÃO NO SISTEMA**: Explique para que serve.
-       - Seção **ESPECIFICAÇÕES TÉCNICAS**: Lista com os atributos fornecidos.
-       - Seção **OBSERVAÇÃO TÉCNICA**: Alertas de instalação ou compatibilidade.
-    4. TOM: Use linguagem de engenharia (ex: use "interface", "acoplamento", "balaustrada", "cabina", "manobra").`;
+OBSERVAÇÕES DO OPERADOR (PRIORIDADE MÁXIMA — incorpore todo este conteúdo):
+"${additionalDetails || '(Nenhuma observação fornecida)'}"
+
+INSTRUÇÕES DE FORMATAÇÃO:
+1. Comece com um parágrafo de introdução comercial/técnica (3-4 linhas) descrevendo o produto e sua aplicação.
+2. Seção **FUNÇÃO NO SISTEMA**: onde e como este componente é instalado/utilizado.
+3. Seção **ESPECIFICAÇÕES TÉCNICAS**: lista detalhada com todos os atributos fornecidos (dimensões, materiais, tensões, etc.).
+4. Seção **COMPATIBILIDADE**: marcas e modelos compatíveis.
+5. Seção **OBSERVAÇÃO TÉCNICA**: alertas importantes de instalação, armazenamento ou manutenção.
+Use linguagem de engenharia: "interface", "acoplamento", "balaustrada", "cabina", "manobra", "vão livre", "carga nominal", "ciclos de operação".
+Responda em Português Brasileiro. Seja preciso e profissional. Não use bullet points genéricos — use linguagem técnica de catálogo industrial.`;
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
