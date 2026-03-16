@@ -1,3 +1,4 @@
+// VerticalParts WMS Backend — v4.3.27
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
