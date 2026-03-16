@@ -212,9 +212,9 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Disponíveis ({disponiveis.length})</p>
             </div>
             <div className="relative mb-2 shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input value={searchDisp} onChange={e => setSearchDisp(e.target.value)} placeholder="Buscar..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
+                className="w-full pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
             </div>
             <div
               onDragOver={e => { e.preventDefault(); setDragOver('disp'); }}
@@ -275,9 +275,9 @@ function ModalVincularClientes({ rota, onClose, onSave }) {
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vinculados ({vinculados.length})</p>
             </div>
             <div className="relative mb-2 shrink-0">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input value={searchVinc} onChange={e => setSearchVinc(e.target.value)} placeholder="Buscar..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
+                className="w-full pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none focus:border-secondary transition-all" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
             </div>
             <div
               onDragOver={e => { e.preventDefault(); setDragOver('vinc'); }}
@@ -352,9 +352,9 @@ function SecaoVeiculos() {
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Placa ou Modelo..."
-            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all" />
+            className="w-full pr-9 pl-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all" />
+          <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
         </div>
         <button onClick={startNew}
           className="flex items-center gap-1.5 px-4 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md shrink-0">
@@ -539,9 +539,9 @@ function SecaoRotas() {
         {/* Toolbar */}
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Código ou Descrição da Rota..."
-              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all" />
+              className="w-full pr-9 pl-3 py-2 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 focus:border-secondary rounded-xl text-xs font-medium outline-none transition-all" />
+            <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
           </div>
           <button onClick={startNew}
             className="flex items-center gap-1.5 px-4 py-2 bg-secondary text-primary rounded-xl text-xs font-black hover:brightness-105 active:scale-95 transition-all shadow-md shrink-0">

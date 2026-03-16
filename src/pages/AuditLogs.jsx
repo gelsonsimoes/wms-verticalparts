@@ -244,15 +244,15 @@ export default function AuditLogs() {
 
             {/* Busca controlada */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
               <input
                 type="text"
                 value={secSearch}
                 onChange={e => setSecSearch(e.target.value)}
                 placeholder="Pesquisar por usuário, operação ou descrição..."
                 aria-label="Buscar logs de segurança"
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-300 w-72 transition-all"
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pr-10 pl-4 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-300 w-72 transition-all"
               />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
               {secSearch && (
                 <button onClick={() => setSecSearch('')} aria-label="Limpar busca"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">

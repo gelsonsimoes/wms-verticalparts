@@ -270,9 +270,9 @@ export default function OperatorPerformance() {
               <User className="w-3 h-3" aria-hidden="true" />Usuário / Operador
             </label>
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input id="busca-operador" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome..."
-                className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-violet-500 transition-all" />
+                className="w-full pr-8 pl-3 py-2 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-violet-500 transition-all" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               {busca && (
                 <button
                   onClick={() => setBusca('')}

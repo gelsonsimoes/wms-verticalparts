@@ -138,17 +138,17 @@ export default function InventoryManagement() {
         <FastTab title="Visão Geral do Estoque Disponível" defaultOpen={true}>
           <div className="mb-4 flex gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
               {/* label sr-only: visível apenas para leitores de tela */}
               <label htmlFor="search-inventory" className="sr-only">Buscar produto por SKU, Localização ou Descrição</label>
               <input
                 id="search-inventory"
                 type="text"
                 placeholder="Buscar por SKU, Localização ou Descrição..."
-                className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
+                className="w-full pr-10 pl-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
             </div>
             <button
               onClick={() => setShowAdvancedFilters(prev => !prev)}

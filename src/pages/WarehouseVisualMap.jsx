@@ -91,14 +91,14 @@ const WarehouseVisualMap = () => {
                 <div className="flex items-center gap-3">
                     {loading && <Loader2 className="w-4 h-4 text-[#ffcd00] animate-spin" />}
                     <div className="relative group">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#ffcd00]" size={16} />
-                        <input 
+                        <input
                             type="text"
                             placeholder="Buscar SKU ou Endereço (ex: R1_PP1)..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-black border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#ffcd00] w-64 transition-all"
+                            className="bg-black border border-white/10 rounded-lg pr-10 pl-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#ffcd00] w-64 transition-all"
                         />
+                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#ffcd00]" size={16} />
                     </div>
                     <button className="flex items-center gap-2 px-4 py-2 bg-[#ffcd00] text-black rounded-lg font-black text-xs hover:bg-[#ffe066] transition-all shadow-lg active:scale-95">
                         <Monitor size={14} />
