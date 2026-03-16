@@ -1429,7 +1429,10 @@ export default function ProductCatalog() {
     if (!selected.descricao?.trim()) { alert('Descrição é obrigatória'); return; }
     setSaving(true);
     try {
+      // Para novos produtos: gera UUID no frontend (garante id não-nulo mesmo sem default no banco)
+      const newId = isNew ? crypto.randomUUID() : undefined;
       const payload = {
+        ...(newId ? { id: newId } : {}),
         sku:                selected.sku.trim().toUpperCase(),
         codigo_antigo:      selected.codigo_antigo      || null,
         codigo_integracao:  selected.codigo_integracao  || null,
