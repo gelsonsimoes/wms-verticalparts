@@ -63,7 +63,9 @@ function App() {
         console.warn("[App] Perfil não encontrado no DB (fallback ativo) ", error);
       }
 
-      const isGestor = profile?.role === 'gestor';
+      // Se perfil não existe no DB (linha deletada / novo usuário sem cadastro)
+      // → trata como gestor com acesso total, sem travar o menu
+      const isGestor = !profile || profile.role === 'gestor';
 
       return {
         id:                 authUser.id,
@@ -73,8 +75,8 @@ function App() {
         nivel:              isGestor ? 'Administrador' : 'Operador',
         email:              authUser.email,
         grupo_acesso_id:    profile?.grupo_acesso_id ?? null,
-        // null = sem restrição (gestor); array de paths = páginas do grupo
-        paginas_permitidas: isGestor ? null : (profile?.grupos_acesso?.paginas ?? []),
+        // null = sem restrição (gestor/sem perfil); array de paths = páginas do grupo
+        paginas_permitidas: isGestor ? null : (profile?.grupos_acesso?.paginas ?? null),
       };
     } catch (e) {
       if (e.message === 'DB_TIMEOUT') {
