@@ -1,0 +1,63 @@
+name: Deploy → Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout do código
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Configurar Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Instalar dependências
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Criar arquivo .env com variáveis de produção
+      - name: Create .env.production
+        run: |
+          cat > .env.production << 'EOF'
+          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_PROJECT_ID=clakkpyzinuheubkhdep
+          VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
+          VITE_API_URL=https://wms-verticalparts-production.up.railway.app
+          VITE_API_TIMEOUT=30000
+          VITE_ENABLE_REALTIME=true
+          VITE_ENABLE_SYNC=true
+          VITE_SYNC_INTERVAL=5000
+          VITE_DEBUG=false
+          VITE_ENVIRONMENT=production
+          EOF
+
+      # 5. Build do Vite
+      - name: Build
+        run: npm run build
+
+      # 6. Deploy via FTP para Hostinger
+      - name: Deploy to Hostinger via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.wmsverticalparts.com.br
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: /domains/wmsverticalparts.com.br/public_html/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
