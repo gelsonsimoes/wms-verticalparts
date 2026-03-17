@@ -39,6 +39,8 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { logActivity } from '../services/activityLogger';
+import { useApp } from '../hooks/useApp';
 import { cn } from '../utils/cn';
 import Tooltip from '../components/ui/Tooltip';
 import { 
@@ -497,6 +499,8 @@ const OMIE_COL = {
 // ─── COMPONENTE ROOT ─────────────────────────────────────────────────
 export default function ProductCatalog() {
   const [searchParams] = useSearchParams();
+  const { currentUser } = useApp();
+  const _logUser = () => currentUser?.nome || currentUser?.usuario || 'OPERADOR';
   const savedTimeoutRef = useRef(null);
 
   const [produtos, setProdutos] = useState([]);
@@ -629,13 +633,21 @@ export default function ProductCatalog() {
 
       setSaved(true);
       setIsNew(false);
+      logActivity({
+        userName: _logUser(),
+        action: isNew ? 'CRIOU' : 'ATUALIZOU',
+        entity: 'produto',
+        entityId: payload.sku,
+        entityName: payload.sku,
+        description: `Produto "${payload.sku} — ${payload.descricao}" ${isNew ? 'cadastrado' : 'atualizado'}.`,
+        details: { descricao: payload.descricao, tipo: payload.tipo, familia: payload.familia },
+      });
       await fetchProducts(); // Recarrega a lista do banco
-      
+
       if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current);
       savedTimeoutRef.current = setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error('[ProductCatalog] Save error:', err);
-      // Mostra o erro detalhado para o usuário ajudar a identificar colunas faltando
       alert(`Erro ao salvar: ${err.message || 'Erro desconhecido'}`);
     }
   };
@@ -734,6 +746,16 @@ export default function ProductCatalog() {
         .eq('sku', selected.sku);
 
       if (error) throw error;
+
+      logActivity({
+        userName: _logUser(),
+        action: 'EXCLUIU',
+        entity: 'produto',
+        entityId: selected.sku,
+        entityName: selected.sku,
+        description: `Produto "${selected.sku} — ${selected.descricao}" excluído permanentemente.`,
+        level: 'WARNING',
+      });
 
       const remaining = produtos.filter(p => p.id !== selectedId);
       setProdutos(remaining);

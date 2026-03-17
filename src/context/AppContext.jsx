@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { logActivity } from '../services/activityLogger';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const AppContext = createContext();
@@ -331,26 +332,30 @@ export function AppProvider({ children, session }) {
     const nextId = (arr) => arr.length > 0 ? Math.max(...arr.map(a => a.id)) + 1 : 1;
 
     // ── Companies CRUD (Supabase) ──────────────────────────────────────────────
+    const _logUser = () => currentUser?.nome || currentUser?.usuario || 'SISTEMA';
+
     const addCompany = (company) => {
         const newCompany = { ...company, id: crypto.randomUUID() };
         setCompanies(prev => [...prev, newCompany]);
         supabase.from('companies').insert(newCompany).then(({ error }) => {
-            if (error) {
-                console.error('[AppContext] addCompany:', error.message);
-                setCompanies(prev => prev.filter(c => c.id !== newCompany.id));
-            }
+            if (error) { console.error('[AppContext] addCompany:', error.message); setCompanies(prev => prev.filter(c => c.id !== newCompany.id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'empresa', entityId: newCompany.id, entityName: newCompany.name, description: `Empresa "${newCompany.name}" cadastrada.` });
         });
     };
     const updateCompany = (id, data) => {
+        const prev_name = companies.find(c => c.id === id)?.name;
         setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
         supabase.from('companies').update(data).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateCompany:', error.message);
+            if (error) { console.error('[AppContext] updateCompany:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'empresa', entityId: id, entityName: prev_name, description: `Empresa "${prev_name}" atualizada.` });
         });
     };
     const deleteCompany = (id) => {
+        const name = companies.find(c => c.id === id)?.name;
         setCompanies(prev => prev.filter(c => c.id !== id));
         supabase.from('companies').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteCompany:', error.message);
+            if (error) { console.error('[AppContext] deleteCompany:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'empresa', entityId: id, entityName: name, description: `Empresa "${name}" excluída.`, level: 'WARNING' });
         });
     };
 
@@ -361,22 +366,24 @@ export function AppProvider({ children, session }) {
         const appData = _normWH(dbData);
         setWarehouses(prev => [...prev, appData]);
         supabase.from('warehouses').insert(dbData).then(({ error }) => {
-            if (error) {
-                console.error('[AppContext] addWarehouse:', error.message);
-                setWarehouses(prev => prev.filter(w => w.id !== id));
-            }
+            if (error) { console.error('[AppContext] addWarehouse:', error.message); setWarehouses(prev => prev.filter(w => w.id !== id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'armazém', entityId: id, entityName: wh.nome, description: `Armazém "${wh.nome}" cadastrado.` });
         });
     };
     const updateWarehouse = (id, data) => {
+        const nome = warehouses.find(w => w.id === id)?.nome;
         setWarehouses(prev => prev.map(w => w.id === id ? { ...w, ...data } : w));
         supabase.from('warehouses').update(_denormWH(data)).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateWarehouse:', error.message);
+            if (error) { console.error('[AppContext] updateWarehouse:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'armazém', entityId: id, entityName: nome, description: `Armazém "${nome}" atualizado.` });
         });
     };
     const deleteWarehouse = (id) => {
+        const nome = warehouses.find(w => w.id === id)?.nome;
         setWarehouses(prev => prev.filter(w => w.id !== id));
         supabase.from('warehouses').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteWarehouse:', error.message);
+            if (error) { console.error('[AppContext] deleteWarehouse:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'armazém', entityId: id, entityName: nome, description: `Armazém "${nome}" excluído.`, level: 'WARNING' });
         });
     };
 
@@ -385,19 +392,24 @@ export function AppProvider({ children, session }) {
         const newC = { ...customer, id: crypto.randomUUID() };
         setCustomers(prev => [...prev, newC]);
         supabase.from('customers').insert(newC).then(({ error }) => {
-            if (error) { console.error('[AppContext] addCustomer:', error.message); setCustomers(prev => prev.filter(c => c.id !== newC.id)); }
+            if (error) { console.error('[AppContext] addCustomer:', error.message); setCustomers(prev => prev.filter(c => c.id !== newC.id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'cliente', entityId: newC.id, entityName: newC.razao_social, description: `Cliente "${newC.razao_social}" cadastrado.` });
         });
     };
     const updateCustomer = (id, data) => {
+        const nome = customers.find(c => c.id === id)?.razao_social;
         setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
         supabase.from('customers').update(data).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateCustomer:', error.message);
+            if (error) { console.error('[AppContext] updateCustomer:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'cliente', entityId: id, entityName: nome, description: `Cliente "${nome}" atualizado.` });
         });
     };
     const deleteCustomer = (id) => {
+        const nome = customers.find(c => c.id === id)?.razao_social;
         setCustomers(prev => prev.filter(c => c.id !== id));
         supabase.from('customers').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteCustomer:', error.message);
+            if (error) { console.error('[AppContext] deleteCustomer:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'cliente', entityId: id, entityName: nome, description: `Cliente "${nome}" excluído.`, level: 'WARNING' });
         });
     };
 
@@ -406,19 +418,24 @@ export function AppProvider({ children, session }) {
         const newV = { ...veiculo, id: crypto.randomUUID() };
         setVeiculos(prev => [...prev, newV]);
         supabase.from('veiculos').insert(newV).then(({ error }) => {
-            if (error) { console.error('[AppContext] addVeiculo:', error.message); setVeiculos(prev => prev.filter(v => v.id !== newV.id)); }
+            if (error) { console.error('[AppContext] addVeiculo:', error.message); setVeiculos(prev => prev.filter(v => v.id !== newV.id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'veículo', entityId: newV.id, entityName: newV.placa, description: `Veículo "${newV.placa} — ${newV.modelo || ''}" cadastrado.` });
         });
     };
     const updateVeiculo = (id, data) => {
+        const placa = veiculos.find(v => v.id === id)?.placa;
         setVeiculos(prev => prev.map(v => v.id === id ? { ...v, ...data } : v));
         supabase.from('veiculos').update(data).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateVeiculo:', error.message);
+            if (error) { console.error('[AppContext] updateVeiculo:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'veículo', entityId: id, entityName: placa, description: `Veículo "${placa}" atualizado.` });
         });
     };
     const deleteVeiculo = (id) => {
+        const placa = veiculos.find(v => v.id === id)?.placa;
         setVeiculos(prev => prev.filter(v => v.id !== id));
         supabase.from('veiculos').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteVeiculo:', error.message);
+            if (error) { console.error('[AppContext] deleteVeiculo:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'veículo', entityId: id, entityName: placa, description: `Veículo "${placa}" excluído.`, level: 'WARNING' });
         });
     };
 
@@ -427,19 +444,24 @@ export function AppProvider({ children, session }) {
         const newR = { ...rota, id: crypto.randomUUID(), clientes: rota.clientes || [] };
         setRotas(prev => [...prev, newR]);
         supabase.from('rotas').insert(newR).then(({ error }) => {
-            if (error) { console.error('[AppContext] addRota:', error.message); setRotas(prev => prev.filter(r => r.id !== newR.id)); }
+            if (error) { console.error('[AppContext] addRota:', error.message); setRotas(prev => prev.filter(r => r.id !== newR.id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'rota', entityId: newR.id, entityName: newR.codigo, description: `Rota "${newR.codigo} — ${newR.descricao || ''}" cadastrada.` });
         });
     };
     const updateRota = (id, data) => {
+        const codigo = rotas.find(r => r.id === id)?.codigo;
         setRotas(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
         supabase.from('rotas').update(data).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateRota:', error.message);
+            if (error) { console.error('[AppContext] updateRota:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'rota', entityId: id, entityName: codigo, description: `Rota "${codigo}" atualizada.` });
         });
     };
     const deleteRota = (id) => {
+        const codigo = rotas.find(r => r.id === id)?.codigo;
         setRotas(prev => prev.filter(r => r.id !== id));
         supabase.from('rotas').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteRota:', error.message);
+            if (error) { console.error('[AppContext] deleteRota:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'rota', entityId: id, entityName: codigo, description: `Rota "${codigo}" excluída.`, level: 'WARNING' });
         });
     };
 
@@ -450,10 +472,12 @@ export function AppProvider({ children, session }) {
         const appData = _normLote(dbData);
         setLotes(prev => [appData, ...prev]);
         supabase.from('lotes').insert(dbData).then(({ error }) => {
-            if (error) { console.error('[AppContext] addLote:', error.message); setLotes(prev => prev.filter(l => l.id !== id)); }
+            if (error) { console.error('[AppContext] addLote:', error.message); setLotes(prev => prev.filter(l => l.id !== id)); return; }
+            logActivity({ userName: _logUser(), action: lote.parent ? 'DIVIDIU' : 'CRIOU', entity: 'lote', entityId: id, entityName: lote.lote, description: lote.parent ? `Lote "${lote.lote}" criado por fracionamento de "${lote.parent}".` : `Lote "${lote.lote}" cadastrado.` });
         });
     };
     const updateLote = (id, data) => {
+        const loteAtual = lotes.find(l => l.id === id);
         setLotes(prev => prev.map(l => l.id === id ? { ...l, ...data } : l));
         const dbData = {};
         if (data.status    !== undefined) dbData.status   = data.status;
@@ -463,14 +487,22 @@ export function AppProvider({ children, session }) {
         if (data.qtd_unit  !== undefined) dbData.qtd_unit = data.qtd_unit;
         if (Object.keys(dbData).length > 0) {
             supabase.from('lotes').update(dbData).eq('id', id).then(({ error }) => {
-                if (error) console.error('[AppContext] updateLote:', error.message);
+                if (error) { console.error('[AppContext] updateLote:', error.message); return; }
+                if (data.status) {
+                    const acao = data.status === 'Bloqueado' ? 'BLOQUEOU' : 'DESBLOQUEOU';
+                    logActivity({ userName: _logUser(), action: acao, entity: 'lote', entityId: id, entityName: loteAtual?.lote, description: `Lote "${loteAtual?.lote}" ${data.status === 'Bloqueado' ? 'bloqueado' : 'desbloqueado'}. Motivo: ${data.motivo || '—'}`, level: data.status === 'Bloqueado' ? 'WARNING' : 'INFO' });
+                } else {
+                    logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'lote', entityId: id, entityName: loteAtual?.lote, description: `Lote "${loteAtual?.lote}" atualizado.` });
+                }
             });
         }
     };
     const deleteLote = (id) => {
+        const nome = lotes.find(l => l.id === id)?.lote;
         setLotes(prev => prev.filter(l => l.id !== id));
         supabase.from('lotes').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteLote:', error.message);
+            if (error) { console.error('[AppContext] deleteLote:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'lote', entityId: id, entityName: nome, description: `Lote "${nome}" excluído.`, level: 'WARNING' });
         });
     };
 
@@ -479,19 +511,24 @@ export function AppProvider({ children, session }) {
         const newA = { ...area, id: crypto.randomUUID() };
         setWarehouseAreas(prev => [...prev, newA]);
         supabase.from('areas').insert(newA).then(({ error }) => {
-            if (error) { console.error('[AppContext] addWarehouseArea:', error.message); setWarehouseAreas(prev => prev.filter(a => a.id !== newA.id)); }
+            if (error) { console.error('[AppContext] addWarehouseArea:', error.message); setWarehouseAreas(prev => prev.filter(a => a.id !== newA.id)); return; }
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'área', entityId: newA.id, entityName: newA.name, description: `Área "${newA.name}" cadastrada.` });
         });
     };
     const updateWarehouseArea = (id, updatedArea) => {
+        const nome = warehouseAreas.find(a => a.id === id)?.name;
         setWarehouseAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedArea } : a));
         supabase.from('areas').update(updatedArea).eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] updateWarehouseArea:', error.message);
+            if (error) { console.error('[AppContext] updateWarehouseArea:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'área', entityId: id, entityName: nome, description: `Área "${nome}" atualizada.` });
         });
     };
     const deleteWarehouseArea = (id) => {
+        const nome = warehouseAreas.find(a => a.id === id)?.name;
         setWarehouseAreas(prev => prev.filter(a => a.id !== id));
         supabase.from('areas').delete().eq('id', id).then(({ error }) => {
-            if (error) console.error('[AppContext] deleteWarehouseArea:', error.message);
+            if (error) { console.error('[AppContext] deleteWarehouseArea:', error.message); return; }
+            logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'área', entityId: id, entityName: nome, description: `Área "${nome}" excluída.`, level: 'WARNING' });
         });
     };
 
@@ -517,19 +554,24 @@ export function AppProvider({ children, session }) {
             const appData = _normSetor(dbData);
             setSectors(prev => [...prev, appData]);
             supabase.from('setores').insert(dbData).then(({ error }) => {
-                if (error) { console.error('[AppContext] sectorsCrud.add:', error.message); setSectors(prev => prev.filter(s => s.id !== id)); }
+                if (error) { console.error('[AppContext] sectorsCrud.add:', error.message); setSectors(prev => prev.filter(s => s.id !== id)); return; }
+                logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'setor', entityId: id, entityName: item.setor, description: `Setor "${item.setor}" cadastrado.` });
             });
         },
         update: (id, data) => {
+            const nome = sectors.find(s => s.id === id)?.setor;
             setSectors(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
             supabase.from('setores').update(_denormSetor(data)).eq('id', id).then(({ error }) => {
-                if (error) console.error('[AppContext] sectorsCrud.update:', error.message);
+                if (error) { console.error('[AppContext] sectorsCrud.update:', error.message); return; }
+                logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'setor', entityId: id, entityName: nome, description: `Setor "${nome}" atualizado.` });
             });
         },
         remove: (id) => {
+            const nome = sectors.find(s => s.id === id)?.setor;
             setSectors(prev => prev.filter(s => s.id !== id));
             supabase.from('setores').delete().eq('id', id).then(({ error }) => {
-                if (error) console.error('[AppContext] sectorsCrud.remove:', error.message);
+                if (error) { console.error('[AppContext] sectorsCrud.remove:', error.message); return; }
+                logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'setor', entityId: id, entityName: nome, description: `Setor "${nome}" excluído.`, level: 'WARNING' });
             });
         },
         bulkUpdate: (ids, data) => {
