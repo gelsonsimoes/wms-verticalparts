@@ -128,19 +128,20 @@ export default function Header({ toggleSidebar, onLogout, session }) {
       {/* Center Section: Search Bar */}
       <div className="hidden md:flex items-center flex-1 max-w-md mx-8 relative">
         <div className="w-full relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--vp-text-label)]" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearching(true)}
             placeholder="Buscar pedido, produto, carga..."
-            className="w-full pl-10 pr-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm bg-[var(--vp-bg-main)] focus:border-[var(--vp-primary)] focus:outline-none transition-colors shadow-inner font-bold"
+            className="w-full pl-4 pr-10 py-2 border border-[var(--vp-border)] rounded-sm text-sm bg-[var(--vp-bg-main)] focus:border-[var(--vp-primary)] focus:outline-none transition-colors shadow-inner font-bold"
           />
-          {loading && (
+          {loading ? (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-500"></div>
             </div>
+          ) : (
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--vp-text-label)] pointer-events-none" />
           )}
         </div>
 
