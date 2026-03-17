@@ -1203,11 +1203,12 @@ function TabDescricaoIA({ prod, onChange }) {
 
 // ─── TAB 6 — PRODUTOS (tabela completa com filtros) ──────────────────────────
 
-function TabProdutos({ produtos, onSelect }) {
+function TabProdutos({ produtos, onSelect, onDelete }) {
   const [busca,      setBusca     ] = useState('');
   const [filtFamilia,setFiltFamilia] = useState('');
   const [filtTipo,   setFiltTipo  ] = useState('');
   const [filtAtivo,  setFiltAtivo ] = useState('');
+  const [checkedIds, setCheckedIds ] = useState(new Set());
 
   const base = useMemo(() => produtos.filter(p => p.id !== '__new__'), [produtos]);
 
@@ -1265,8 +1266,31 @@ function TabProdutos({ produtos, onSelect }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black text-slate-500">{filtrados.length} de {base.length} produto(s)</span>
+      {/* ── BARRA DE CONTAGEM + AÇÕES MASSA ── */}
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          title="Selecionar todos os filtrados"
+          checked={filtrados.length > 0 && filtrados.every(p => checkedIds.has(p.id))}
+          ref={el => {
+            if (el) el.indeterminate = checkedIds.size > 0 && !filtrados.every(p => checkedIds.has(p.id));
+          }}
+          onChange={e => setCheckedIds(e.target.checked ? new Set(filtrados.map(p=>p.id)) : new Set())}
+          className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer shrink-0"
+        />
+        <span className="text-[10px] font-black text-slate-500 flex-1">
+          {checkedIds.size > 0
+            ? `${checkedIds.size} selecionado${checkedIds.size>1?'s':''} de ${base.length}`
+            : `${filtrados.length} de ${base.length} produto(s)`}
+        </span>
+        {checkedIds.size > 0 && (
+          <button
+            onClick={() => { if (onDelete) onDelete([...checkedIds], () => setCheckedIds(new Set())); }}
+            className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white rounded-sm px-3 py-1 text-[10px] font-black transition">
+            <Trash2 className="w-3 h-3" />
+            Excluir {checkedIds.size} produto{checkedIds.size>1?'s':''}
+          </button>
+        )}
         {(busca||filtFamilia||filtTipo||filtAtivo) &&
           <button onClick={()=>{setBusca('');setFiltFamilia('');setFiltTipo('');setFiltAtivo('');}}
             className="text-[10px] font-black text-yellow-600 hover:text-yellow-500 transition">
@@ -1277,9 +1301,21 @@ function TabProdutos({ produtos, onSelect }) {
       {/* ── TABELA COMPLETA ── */}
       <div className="overflow-auto rounded-sm border border-slate-200 dark:border-slate-700"
         style={{maxHeight:'calc(100vh - 310px)'}}>
-        <table className="text-[11px] border-collapse" style={{minWidth:'2400px'}}>
+        <table className="text-[11px] border-collapse" style={{minWidth:'2440px'}}>
           <thead className="sticky top-0 bg-slate-900 text-white z-10">
             <tr>
+              {/* Coluna checkbox */}
+              <th className="px-3 py-2 w-8 sticky top-0 border-r border-slate-700">
+                <input
+                  type="checkbox"
+                  checked={filtrados.length > 0 && filtrados.every(p => checkedIds.has(p.id))}
+                  ref={el => {
+                    if (el) el.indeterminate = checkedIds.size > 0 && !filtrados.every(p => checkedIds.has(p.id));
+                  }}
+                  onChange={e => setCheckedIds(e.target.checked ? new Set(filtrados.map(p=>p.id)) : new Set())}
+                  className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer"
+                />
+              </th>
               {[
                 'SKU','Descrição','Família','Tipo','Tipo Físico',
                 'NCM','Unid.','Marca / Fabricante',
@@ -1300,19 +1336,36 @@ function TabProdutos({ produtos, onSelect }) {
               const tipoFisicoLabel = at.tipo_fisico
                 ? (TIPOS_FISICOS.find(t=>t.code===at.tipo_fisico)?.label || at.tipo_fisico)
                 : '—';
+              const isChecked = checkedIds.has(p.id);
               const rowCls = cn(
-                'cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors',
-                i%2===0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50 dark:bg-slate-900',
-                'hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
+                'border-b border-slate-100 dark:border-slate-800 transition-colors',
+                isChecked
+                  ? 'bg-red-50 dark:bg-red-900/15'
+                  : i%2===0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50 dark:bg-slate-900'
               );
               const td  = 'px-3 py-1.5 text-slate-600 dark:text-slate-300 whitespace-nowrap';
               const tdb = 'px-3 py-1.5 font-black text-slate-800 dark:text-white whitespace-nowrap';
               const tdn = 'px-3 py-1.5 text-slate-400 dark:text-slate-500 whitespace-nowrap text-center';
               const val = (v) => v ?? '—';
               return (
-                <tr key={p.id} onClick={()=>onSelect(p.id)} className={rowCls}>
-                  <td className={tdb}>{p.sku}</td>
-                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300 max-w-[280px] truncate">{p.descricao||'—'}</td>
+                <tr key={p.id} className={rowCls}>
+                  {/* Checkbox — não abre o produto */}
+                  <td className="px-3 py-1.5 text-center border-r border-slate-100 dark:border-slate-800"
+                    onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={e => setCheckedIds(prev => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(p.id) : next.delete(p.id);
+                        return next;
+                      })}
+                      className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer"
+                    />
+                  </td>
+                  {/* Colunas de dados — clique abre o produto */}
+                  <td className={cn(tdb,'cursor-pointer hover:text-yellow-600')} onClick={()=>onSelect(p.id)}>{p.sku}</td>
+                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300 max-w-[280px] truncate cursor-pointer hover:text-yellow-600" onClick={()=>onSelect(p.id)}>{p.descricao||'—'}</td>
                   <td className={td}>{p.familia||'—'}</td>
                   <td className={td}>{p.tipo||'—'}</td>
                   <td className={td}>{tipoFisicoLabel}</td>
@@ -1341,7 +1394,7 @@ function TabProdutos({ produtos, onSelect }) {
               );
             })}
             {filtrados.length === 0 && (
-              <tr><td colSpan={21} className="px-3 py-10 text-center text-slate-400 text-xs font-bold">
+              <tr><td colSpan={22} className="px-3 py-10 text-center text-slate-400 text-xs font-bold">
                 {base.length === 0 ? 'Nenhum produto cadastrado ainda.' : 'Nenhum produto corresponde aos filtros.'}
               </td></tr>
             )}
@@ -1349,7 +1402,7 @@ function TabProdutos({ produtos, onSelect }) {
         </table>
       </div>
       <p className="text-[10px] text-slate-400 font-bold text-center">
-        Clique em qualquer linha para abrir o produto no formulário de cadastro
+        Clique no SKU ou descrição para abrir o produto · Use os checkboxes para selecionar e excluir em massa
       </p>
     </div>
   );
@@ -1549,7 +1602,6 @@ export default function ProductCatalog() {
   const [saving,       setSaving      ] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const [showQRModal,  setShowQRModal ] = useState(false);
-  const [selectedIds,  setSelectedIds ] = useState(new Set());
 
   // ── fetch ──
   async function fetchProducts() {
@@ -1846,12 +1898,11 @@ export default function ProductCatalog() {
     setSelectedId(null);
   }
 
-  // ── bulk delete ──
-  async function handleBulkDelete() {
-    if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
+  // ── exclusão em massa (chamada pela TabProdutos) ──
+  async function handleBulkDelete(ids, onDone) {
+    if (!ids?.length) return;
+    const count = ids.length;
     if (!window.confirm(`Excluir ${count} produto${count>1?'s':''}? Esta ação não pode ser desfeita.`)) return;
-    const ids = [...selectedIds];
     const { error } = await supabase.from('produtos').delete().in('id', ids);
     if (error) { alert('Erro ao excluir: ' + error.message); return; }
     logActivity({
@@ -1864,7 +1915,7 @@ export default function ProductCatalog() {
       level: 'WARNING',
     });
     if (ids.includes(selectedId)) { setSelectedId(null); setIsNew(false); }
-    setSelectedIds(new Set());
+    onDone?.();
     await fetchProducts();
   }
 
@@ -2045,35 +2096,8 @@ export default function ProductCatalog() {
             </div>
           )}
 
-          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <input
-              type="checkbox"
-              title="Selecionar todos"
-              checked={filtered.length > 0 && filtered.filter(p=>p.id!=='__new__').every(p => selectedIds.has(p.id))}
-              ref={el => {
-                if (el) {
-                  const real = filtered.filter(p=>p.id!=='__new__');
-                  el.indeterminate = selectedIds.size > 0 && !real.every(p => selectedIds.has(p.id));
-                }
-              }}
-              onChange={e => {
-                const real = filtered.filter(p=>p.id!=='__new__');
-                setSelectedIds(e.target.checked ? new Set(real.map(p=>p.id)) : new Set());
-              }}
-              className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer shrink-0"
-            />
-            <p className="text-[10px] text-slate-500 font-bold flex-1">
-              {selectedIds.size > 0
-                ? `${selectedIds.size} selecionado${selectedIds.size>1?'s':''}`
-                : `${filtered.length} produto${filtered.length!==1?'s':''}`}
-            </p>
-            {selectedIds.size > 0 && (
-              <button onClick={handleBulkDelete}
-                className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white rounded-sm px-2 py-0.5 text-[10px] font-black transition">
-                <Trash2 className="w-3 h-3" />
-                Excluir
-              </button>
-            )}
+          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
+            <p className="text-[10px] text-slate-500 font-bold">{filtered.length} produto{filtered.length!==1?'s':''}</p>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -2089,63 +2113,39 @@ export default function ProductCatalog() {
             ) : (
               filtered.map(p => {
                 const isSel = isNew ? p.id==='__new__' : p.id===selectedId;
-                const isChecked = selectedIds.has(p.id);
                 return (
-                  <div key={p.id}
+                  <button key={p.id}
+                    onClick={()=>{ setSelectedId(p.id); setIsNew(false); setActiveTab(0); }}
                     className={cn(
-                      'flex items-stretch border-b border-slate-100 dark:border-slate-800 transition',
-                      isSel && 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-l-yellow-400',
-                      isChecked && !isSel && 'bg-red-50 dark:bg-red-900/10'
+                      'w-full text-left px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 transition',
+                      isSel && 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-l-yellow-400'
                     )}>
-                    {/* Checkbox — não abre produto */}
-                    {p.id !== '__new__' && (
-                      <div className="flex items-center justify-center px-2 shrink-0"
-                        onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={e => {
-                            setSelectedIds(prev => {
-                              const next = new Set(prev);
-                              e.target.checked ? next.add(p.id) : next.delete(p.id);
-                              return next;
-                            });
-                          }}
-                          className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer"
-                        />
-                      </div>
-                    )}
-                    {/* Clique na linha — abre produto */}
-                    <button
-                      onClick={()=>{ setSelectedId(p.id); setIsNew(false); setActiveTab(0); }}
-                      className="flex-1 text-left py-2.5 pr-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className={cn('text-[11px] font-black truncate',
-                          isSel?'text-yellow-700 dark:text-yellow-400':'text-slate-800 dark:text-slate-200')}>
-                          {p.sku || <span className="text-slate-400 italic">Novo produto</span>}
-                        </p>
-                        {p.prefixo_vp && (
-                          <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded-sm shrink-0">
-                            {p.prefixo_vp}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{p.descricao}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {p.codigo_antigo && (
-                          <p className="text-[9px] text-amber-600 font-bold">Ant: {p.codigo_antigo}</p>
-                        )}
-                        {p.curva_abc && (
-                          <span className={cn('text-[9px] font-black px-1 py-0.5 rounded-sm border ml-auto',
-                            p.curva_abc==='A'?'bg-emerald-100 text-emerald-700 border-emerald-300':
-                            p.curva_abc==='B'?'bg-amber-100 text-amber-700 border-amber-300':
-                                             'bg-slate-100 text-slate-600 border-slate-300')}>
-                            {p.curva_abc}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <p className={cn('text-[11px] font-black truncate',
+                        isSel?'text-yellow-700 dark:text-yellow-400':'text-slate-800 dark:text-slate-200')}>
+                        {p.sku || <span className="text-slate-400 italic">Novo produto</span>}
+                      </p>
+                      {p.prefixo_vp && (
+                        <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded-sm shrink-0">
+                          {p.prefixo_vp}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{p.descricao}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {p.codigo_antigo && (
+                        <p className="text-[9px] text-amber-600 font-bold">Ant: {p.codigo_antigo}</p>
+                      )}
+                      {p.curva_abc && (
+                        <span className={cn('text-[9px] font-black px-1 py-0.5 rounded-sm border ml-auto',
+                          p.curva_abc==='A'?'bg-emerald-100 text-emerald-700 border-emerald-300':
+                          p.curva_abc==='B'?'bg-amber-100 text-amber-700 border-amber-300':
+                                           'bg-slate-100 text-slate-600 border-slate-300')}>
+                          {p.curva_abc}
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 );
               })
             )}
@@ -2244,7 +2244,7 @@ export default function ProductCatalog() {
                 {activeTab===3 && <TabFotos           prod={selected} onChange={fieldChange} />}
                 {activeTab===4 && <TabEmbalagens      prod={selected} onChange={fieldChange} />}
                 {activeTab===5 && <TabEstoqueRegras   prod={selected} onChange={fieldChange} />}
-                {activeTab===6 && <TabProdutos produtos={produtos} onSelect={(id) => { setSelectedId(id); setIsNew(false); setActiveTab(0); }} />}
+                {activeTab===6 && <TabProdutos produtos={produtos} onSelect={(id) => { setSelectedId(id); setIsNew(false); setActiveTab(0); }} onDelete={handleBulkDelete} />}
               </div>
             </>
           )}
