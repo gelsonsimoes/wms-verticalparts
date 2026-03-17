@@ -617,14 +617,8 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
         </div>
       </div>
 
-      {/* ── PREÇOS & LOGÍSTICA ── */}
+      {/* ── LOGÍSTICA ── */}
       <div className="grid grid-cols-3 gap-4">
-        <Field label="Preço de Custo (R$)">
-          <Inp type="number" value={prod.preco_custo||''} onChange={v=>onChange('preco_custo',v)} placeholder="0.00" />
-        </Field>
-        <Field label="Preço de Venda (R$)">
-          <Inp type="number" value={prod.preco_venda||''} onChange={v=>onChange('preco_venda',v)} placeholder="0.00" />
-        </Field>
         <Field label="Dias Cross-docking">
           <Inp type="number" value={prod.dias_crossdocking||''} onChange={v=>onChange('dias_crossdocking',v)} placeholder="0" />
         </Field>
