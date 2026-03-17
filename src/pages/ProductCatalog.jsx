@@ -1201,73 +1201,156 @@ function TabDescricaoIA({ prod, onChange }) {
   );
 }
 
-// ─── TAB 6 — PRODUTOS ────────────────────────────────────────────────────────
+// ─── TAB 6 — PRODUTOS (tabela completa com filtros) ──────────────────────────
 
 function TabProdutos({ produtos, onSelect }) {
-  const [busca, setBusca] = useState('');
+  const [busca,      setBusca     ] = useState('');
+  const [filtFamilia,setFiltFamilia] = useState('');
+  const [filtTipo,   setFiltTipo  ] = useState('');
+  const [filtAtivo,  setFiltAtivo ] = useState('');
+
+  const base = useMemo(() => produtos.filter(p => p.id !== '__new__'), [produtos]);
+
+  const familias = useMemo(() => [...new Set(base.map(p=>p.familia).filter(Boolean))].sort(), [base]);
+  const tipos    = useMemo(() => [...new Set(base.map(p=>p.tipo).filter(Boolean))].sort(),    [base]);
+
   const filtrados = useMemo(() => {
-    if (!busca) return produtos.filter(p => p.id !== '__new__');
-    const q = busca.toLowerCase();
-    return produtos.filter(p => p.id !== '__new__' && (
-      (p.sku||'').toLowerCase().includes(q) ||
-      (p.descricao||'').toLowerCase().includes(q) ||
-      (p.familia||'').toLowerCase().includes(q) ||
-      (p.tipo||'').toLowerCase().includes(q)
-    ));
-  }, [produtos, busca]);
+    return base.filter(p => {
+      const q = busca.toLowerCase();
+      if (busca && !(
+        (p.sku||'').toLowerCase().includes(q) ||
+        (p.descricao||'').toLowerCase().includes(q) ||
+        (p.familia||'').toLowerCase().includes(q) ||
+        (p.tipo||'').toLowerCase().includes(q) ||
+        (p.marca||'').toLowerCase().includes(q) ||
+        (p.ncm||'').toLowerCase().includes(q) ||
+        (p.codigo_antigo||'').toLowerCase().includes(q) ||
+        (p.part_number||'').toLowerCase().includes(q)
+      )) return false;
+      if (filtFamilia && p.familia !== filtFamilia) return false;
+      if (filtTipo    && p.tipo    !== filtTipo)    return false;
+      if (filtAtivo === 'sim' && p.ativo === false) return false;
+      if (filtAtivo === 'nao' && p.ativo !== false) return false;
+      return true;
+    });
+  }, [base, busca, filtFamilia, filtTipo, filtAtivo]);
+
+  const selCls = cn(inputCls, 'text-[11px] py-1.5');
 
   return (
-    <div className="animate-in fade-in duration-300 space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+    <div className="animate-in fade-in duration-300 space-y-2">
+
+      {/* ── FILTROS ── */}
+      <div className="grid grid-cols-4 gap-2">
+        <div className="col-span-2 relative">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input value={busca} onChange={e=>setBusca(e.target.value)}
-            placeholder="Buscar por SKU, descrição, família..."
-            className={cn(inputCls, 'pr-8')} />
+            placeholder="Buscar por SKU, descrição, marca, NCM, cód. antigo..."
+            className={cn(inputCls,'pr-8 text-[11px] py-1.5')} />
         </div>
-        <span className="text-[10px] font-black text-slate-500 whitespace-nowrap">{filtrados.length} produto(s)</span>
+        <select value={filtFamilia} onChange={e=>setFiltFamilia(e.target.value)} className={selCls}>
+          <option value="">— Todas as Famílias —</option>
+          {familias.map(f=><option key={f} value={f}>{f}</option>)}
+        </select>
+        <div className="flex gap-2">
+          <select value={filtTipo} onChange={e=>setFiltTipo(e.target.value)} className={selCls}>
+            <option value="">— Todos os Tipos —</option>
+            {tipos.map(t=><option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filtAtivo} onChange={e=>setFiltAtivo(e.target.value)} className={cn(selCls,'w-28 shrink-0')}>
+            <option value="">Todos</option>
+            <option value="sim">Ativo</option>
+            <option value="nao">Inativo</option>
+          </select>
+        </div>
       </div>
-      <div className="overflow-auto rounded-sm border border-slate-200 dark:border-slate-700" style={{maxHeight:'calc(100vh - 280px)'}}>
-        <table className="w-full text-[11px] border-collapse">
+
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black text-slate-500">{filtrados.length} de {base.length} produto(s)</span>
+        {(busca||filtFamilia||filtTipo||filtAtivo) &&
+          <button onClick={()=>{setBusca('');setFiltFamilia('');setFiltTipo('');setFiltAtivo('');}}
+            className="text-[10px] font-black text-yellow-600 hover:text-yellow-500 transition">
+            ✕ Limpar filtros
+          </button>}
+      </div>
+
+      {/* ── TABELA COMPLETA ── */}
+      <div className="overflow-auto rounded-sm border border-slate-200 dark:border-slate-700"
+        style={{maxHeight:'calc(100vh - 310px)'}}>
+        <table className="text-[11px] border-collapse" style={{minWidth:'2400px'}}>
           <thead className="sticky top-0 bg-slate-900 text-white z-10">
             <tr>
-              {['SKU','Descrição','Família','Tipo','Tipo Físico','NCM','Unid.','Ativo'].map(h => (
-                <th key={h} className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest whitespace-nowrap border-r border-slate-700 last:border-0">{h}</th>
+              {[
+                'SKU','Descrição','Família','Tipo','Tipo Físico',
+                'NCM','Unid.','Marca / Fabricante',
+                'Part Number','Cód. Integração Omie',
+                'Barcode EAN','Local de Estoque',
+                'Altura (cm)','Largura (cm)','Prof. (cm)',
+                'Peso Líq. (kg)','Peso Bruto (kg)',
+                'Cross-dock (dias)','Produto Pai SKU',
+                'Ativo','Cód. Antigo (Legado / Omie)',
+              ].map(h => (
+                <th key={h} className="text-left px-3 py-2 font-black text-[10px] uppercase tracking-widest whitespace-nowrap border-r border-slate-700 last:border-0 sticky top-0">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {filtrados.map((p, i) => (
-              <tr key={p.id}
-                onClick={() => onSelect(p.id)}
-                className={cn('cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors',
-                  i % 2 === 0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50 dark:bg-slate-900',
-                  'hover:bg-yellow-50 dark:hover:bg-yellow-900/20')}>
-                <td className="px-3 py-1.5 font-black text-slate-800 dark:text-white whitespace-nowrap">{p.sku}</td>
-                <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300 max-w-[240px] truncate">{p.descricao}</td>
-                <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{p.familia}</td>
-                <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{p.tipo}</td>
-                <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                  {p.atributos_tecnicos?.tipo_fisico
-                    ? TIPOS_FISICOS.find(t => t.code === p.atributos_tecnicos.tipo_fisico)?.label || p.atributos_tecnicos.tipo_fisico
-                    : '—'}
-                </td>
-                <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">{p.ncm || '—'}</td>
-                <td className="px-3 py-1.5 text-slate-500 dark:text-slate-400 text-center">{p.unidade}</td>
-                <td className="px-3 py-1.5 text-center">
-                  <span className={cn('px-1.5 py-0.5 rounded-sm text-[9px] font-black', p.ativo !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600')}>
-                    {p.ativo !== false ? 'SIM' : 'NÃO'}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {filtrados.map((p, i) => {
+              const at = p.atributos_tecnicos || {};
+              const tipoFisicoLabel = at.tipo_fisico
+                ? (TIPOS_FISICOS.find(t=>t.code===at.tipo_fisico)?.label || at.tipo_fisico)
+                : '—';
+              const rowCls = cn(
+                'cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors',
+                i%2===0 ? 'bg-white dark:bg-slate-950' : 'bg-slate-50 dark:bg-slate-900',
+                'hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
+              );
+              const td  = 'px-3 py-1.5 text-slate-600 dark:text-slate-300 whitespace-nowrap';
+              const tdb = 'px-3 py-1.5 font-black text-slate-800 dark:text-white whitespace-nowrap';
+              const tdn = 'px-3 py-1.5 text-slate-400 dark:text-slate-500 whitespace-nowrap text-center';
+              const val = (v) => v ?? '—';
+              return (
+                <tr key={p.id} onClick={()=>onSelect(p.id)} className={rowCls}>
+                  <td className={tdb}>{p.sku}</td>
+                  <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300 max-w-[280px] truncate">{p.descricao||'—'}</td>
+                  <td className={td}>{p.familia||'—'}</td>
+                  <td className={td}>{p.tipo||'—'}</td>
+                  <td className={td}>{tipoFisicoLabel}</td>
+                  <td className={td}>{p.ncm||'—'}</td>
+                  <td className={cn(tdn,'font-bold text-slate-700')}>{p.unidade||'—'}</td>
+                  <td className={td}>{p.marca||'—'}</td>
+                  <td className={td}>{p.part_number||'—'}</td>
+                  <td className={td}>{p.codigo_integracao||'—'}</td>
+                  <td className={td}>{p.ean||'—'}</td>
+                  <td className={td}>{p.local_estoque||p.enderecos_estoque?.[0]||'—'}</td>
+                  <td className={tdn}>{val(p.altura)}</td>
+                  <td className={tdn}>{val(p.largura)}</td>
+                  <td className={tdn}>{val(p.profundidade)}</td>
+                  <td className={tdn}>{val(p.peso_liquido)}</td>
+                  <td className={tdn}>{val(p.peso_bruto)}</td>
+                  <td className={tdn}>{val(p.dias_crossdocking)}</td>
+                  <td className={td}>{p.produto_pai_sku||'—'}</td>
+                  <td className="px-3 py-1.5 text-center">
+                    <span className={cn('px-1.5 py-0.5 rounded-sm text-[9px] font-black',
+                      p.ativo!==false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600')}>
+                      {p.ativo!==false ? 'SIM' : 'NÃO'}
+                    </span>
+                  </td>
+                  <td className={cn(td,'text-slate-500 italic')}>{p.codigo_antigo||'—'}</td>
+                </tr>
+              );
+            })}
             {filtrados.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400 text-xs">Nenhum produto encontrado</td></tr>
+              <tr><td colSpan={21} className="px-3 py-10 text-center text-slate-400 text-xs font-bold">
+                {base.length === 0 ? 'Nenhum produto cadastrado ainda.' : 'Nenhum produto corresponde aos filtros.'}
+              </td></tr>
             )}
           </tbody>
         </table>
       </div>
-      <p className="text-[10px] text-slate-400 font-bold text-center">Clique em um produto para abrir no formulário de cadastro</p>
+      <p className="text-[10px] text-slate-400 font-bold text-center">
+        Clique em qualquer linha para abrir o produto no formulário de cadastro
+      </p>
     </div>
   );
 }
