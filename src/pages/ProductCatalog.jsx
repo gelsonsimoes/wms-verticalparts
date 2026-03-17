@@ -283,8 +283,9 @@ function gerarEAN13() {
   return d.join('');
 }
 
-function buildSKU({ prefixo, tipo_fisico, atributos, compat, cor, material }) {
+function buildSKU({ prefixo, nome_sku, tipo_fisico, atributos, compat, cor, material }) {
   const parts = [prefixo];
+  if (nome_sku) parts.push(nome_sku.toUpperCase());
   if (tipo_fisico && ATTR_GROUPS[tipo_fisico]) {
     const seg = ATTR_GROUPS[tipo_fisico].skuFn(atributos || {});
     if (seg) parts.push(seg);
@@ -343,13 +344,14 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
   const [showBuilder, setShowBuilder] = useState(!prod.sku);
   const [copied, setCopied] = useState(false);
 
-  const prefixo    = prod.prefixo_vp || '';
-  const tipo_fisico = at.tipo_fisico  || '';
-  const compat     = (prod.compatibilidade||[])[0] || '';
-  const cor        = at.cor        || '';
-  const material   = at.material   || '';
+  const prefixo     = prod.prefixo_vp || '';
+  const nome_sku    = at.nome_sku    || '';
+  const tipo_fisico = at.tipo_fisico || '';
+  const compat      = (prod.compatibilidade||[])[0] || '';
+  const cor         = at.cor        || '';
+  const material    = at.material   || '';
 
-  const generatedSKU = buildSKU({ prefixo, tipo_fisico, atributos: at, compat, cor, material });
+  const generatedSKU = buildSKU({ prefixo, nome_sku, tipo_fisico, atributos: at, compat, cor, material });
 
   function setAtrib(key, val) {
     onChange('atributos_tecnicos', { ...at, [key]: val });
@@ -440,10 +442,40 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
               </div>
             )}
 
+            {/* PASSO 3 — NOME DO PRODUTO p/ SKU */}
+            {prefixo && (
+              <div>
+                <p className={cn(labelCls,'mb-1.5')}>Passo 3 — Nome do Produto <span className="text-yellow-600">(aparece no SKU)</span></p>
+                <input
+                  type="text"
+                  value={nome_sku}
+                  onChange={e => setAtrib('nome_sku', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8))}
+                  placeholder="Ex: ROLD, PP, PARA, CABO, MOTOR..."
+                  maxLength={8}
+                  className={cn(inputCls,'font-black tracking-widest uppercase')}
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Abreviação curta do produto · máx. 8 caracteres · somente letras e números</p>
+              </div>
+            )}
+
+            {/* PASSO 4 — DESCRIÇÃO RESUMIDA */}
+            {prefixo && (
+              <div>
+                <p className={cn(labelCls,'mb-1.5')}>Passo 4 — Descrição Resumida <span className="text-slate-400">(nome técnico completo)</span></p>
+                <input
+                  type="text"
+                  value={prod.descricao||''}
+                  onChange={e => onChange('descricao', e.target.value)}
+                  placeholder="Nome técnico do produto — Ex: Roldana de Desvio Nylon, Parafuso Allen M12..."
+                  className={inputCls}
+                />
+              </div>
+            )}
+
             {/* CAMPOS DINÂMICOS */}
             {group && (
               <div>
-                <p className={cn(labelCls,'mb-2')}>Passo 3 — {group.label}</p>
+                <p className={cn(labelCls,'mb-2')}>Passo 5 — {group.label}</p>
                 <div className="grid grid-cols-2 gap-3">
                   {group.fields.map(f => (
                     <Field key={f.key} label={f.label + (f.unit ? ` (${f.unit})` : '')}>
@@ -470,7 +502,7 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
             {/* COMPATIBILIDADE */}
             {prefixo && (
               <div>
-                <p className={cn(labelCls,'mb-1.5')}>Passo 4 — Compatibilidade</p>
+                <p className={cn(labelCls,'mb-1.5')}>Passo 6 — Compatibilidade</p>
                 <Field label="Compatibilidade — código SKU" tip="Primeira seleção define o CC no SKU. Para múltiplas marcas use a aba Compatibilidade.">
                   <Sel value={compat} onChange={v=>onChange('compatibilidade', v?[v]:[])}
                     options={MARCAS_COMPAT.map(m=>({v:m.abrev, l:`${m.nome}  →  ${m.abrev}`}))} />
@@ -534,10 +566,6 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
               </button>
             )}
           </div>
-        </Field>
-
-        <Field label="Descrição Resumida" required>
-          <Inp value={prod.descricao||''} onChange={v=>onChange('descricao',v)} placeholder="Nome técnico do produto" />
         </Field>
 
         <Field label="NCM" tip="Nomenclatura Comum do Mercosul — obrigatório para NF-e">
