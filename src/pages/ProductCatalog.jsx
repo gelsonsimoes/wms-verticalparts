@@ -169,6 +169,177 @@ const CORES_MATERIAL = [
   {code:'DO',l:'Dourado'},{code:'TR',l:'Transparente'},
 ];
 
+// ─── TIPO FÍSICO — gatilho para grupos de atributos condicionais ──────────────
+const TIPOS_FISICOS = [
+  { code:'CILINDRICO_OCO',      label:'Cilíndrico Oco',        desc:'Roldanas, Rolamentos, Buchas, Polias'                },
+  { code:'MACICO_ROSCADO',      label:'Maciço / Roscado',      desc:'Parafusos, Eixos, Pinos, Insertos, Espaçadores'      },
+  { code:'CORRENTE_CABO',       label:'Corrente / Cabo',       desc:'Correntes de transmissão, Cabos de aço, Cintas'       },
+  { code:'FLEXIVEL_PERFIL',     label:'Flexível / Perfil',     desc:'Corrimão de borracha, Correias, Vedações de perfil'   },
+  { code:'ELETRICO_ELETRONICO', label:'Elétrico / Eletrônico', desc:'Motores, Sensores, Botoeiras, Inversores, Placas'     },
+  { code:'FLUIDO_QUIMICO',      label:'Fluido / Químico',      desc:'Óleos, Graxas, Solventes, Adesivos, Primers'         },
+  { code:'ESTRUTURAL',          label:'Estrutural / Chapa',    desc:'Guias, Perfis, Vigas, Chapas, Cantoneiras'           },
+  { code:'PENTE',               label:'Pente',                 desc:'Pentes de alumínio para escadas/esteiras rolantes'   },
+  { code:'DEGRAU_PALLET',       label:'Degrau / Pallet',       desc:'Degraus e pallets de escadas/esteiras rolantes'      },
+  { code:'KIT_CONJUNTO',        label:'Kit / Conjunto',        desc:'Kits montados, conjuntos de componentes'             },
+  { code:'OUTRO',               label:'Outro',                 desc:'Outros itens sem dimensionamento padrão'             },
+];
+
+const ATTR_GROUPS = {
+  CILINDRICO_OCO: {
+    label: 'Geometria Cilíndrica Oca',
+    fields: [
+      { key:'de_mm',     label:'Diâm. Externo — DE (mm)', type:'number', required:true  },
+      { key:'di_mm',     label:'Diâm. Interno — DI (mm)', type:'number', required:true  },
+      { key:'larg_mm',   label:'Largura / Altura (mm)',   type:'number', required:true  },
+      { key:'rolamento', label:'Tipo de Vedação / Rolamento', type:'select', required:true,
+        options:['2RS','ZZ','Aberto','Nylon','Bronze','Poliuretano','Inox 2RS'] },
+      { key:'material',  label:'Material', type:'select',
+        options:['Aço','Nylon','Poliacetal','Alumínio','Inox','Bronze','Poliuretano'] },
+    ],
+    skuSegment: at => [at.de_mm&&`DE${at.de_mm}`, at.di_mm&&`DI${at.di_mm}`, at.larg_mm&&`L${at.larg_mm}`, at.rolamento].filter(Boolean).join('X'),
+  },
+  MACICO_ROSCADO: {
+    label: 'Maciço / Roscado',
+    fields: [
+      { key:'rosca', label:'Rosca / Diâm. Nominal', type:'select', required:true,
+        options:['M4','M5','M6','M8','M10','M12','M14','M16','M20','M24','1/4"','5/16"','3/8"','1/2"','5/8"','3/4"','Sem rosca'] },
+      { key:'comprimento_mm', label:'Comprimento (mm)', type:'number', required:true },
+      { key:'passo',   label:'Passo da rosca (mm)', type:'text', placeholder:'Ex: 1.25' },
+      { key:'classe',  label:'Classe de Resistência', type:'select',
+        options:['4.8','8.8','10.9','12.9','Inox A2','Inox A4','Galvanizado','Nylon'] },
+      { key:'cabeca',  label:'Tipo de Cabeça', type:'select',
+        options:['Sextavada','Allen — Cilíndrica','Allen — Chata','Phillips','Fenda','Borboleta','Porca','Pino liso'] },
+      { key:'material',label:'Material', type:'select',
+        options:['Aço Carbono','Inox 304','Inox 316','Alumínio','Latão','Nylon','Zinco'] },
+    ],
+    skuSegment: at => [at.rosca&&at.rosca.replace('"','P').replace('/','D'), at.comprimento_mm&&`${at.comprimento_mm}MM`, at.classe&&at.classe.replace('.','')].filter(Boolean).join('X'),
+  },
+  CORRENTE_CABO: {
+    label: 'Corrente / Cabo de Aço',
+    fields: [
+      { key:'tipo', label:'Tipo', type:'select', required:true,
+        options:['Corrente de Degrau','Corrente de Pallet','Corrente de Corrimão','Corrente Motriz','Cabo de Aço','Cinta de Aço','Cinta Têxtil'] },
+      { key:'passo_mm',      label:'Passo (mm)',        type:'number' },
+      { key:'bitola_mm',     label:'Bitola / Diâm. (mm)', type:'number' },
+      { key:'construcao',    label:'Construção / Spec.', type:'text', placeholder:'Ex: 6x19+AF, 101.6x50.8' },
+      { key:'comprimento_m', label:'Comprimento (m) — bobina/rolo', type:'number' },
+      { key:'carga_ruptura', label:'Carga de Ruptura (kN)', type:'number' },
+      { key:'material_nucleo', label:'Material do Núcleo', type:'select',
+        options:['Fibra Natural','Aço','Tecido','Polímero'] },
+    ],
+    skuSegment: at => [at.passo_mm&&`P${at.passo_mm}`, at.bitola_mm&&`${at.bitola_mm}MM`].filter(Boolean).join('X'),
+  },
+  FLEXIVEL_PERFIL: {
+    label: 'Flexível / Perfil de Borracha',
+    fields: [
+      { key:'referencia',    label:'Referência / Perfil',      type:'text', required:true, placeholder:'Ex: VP-1699, D90, T101' },
+      { key:'largura_mm',    label:'Largura (mm)',              type:'number' },
+      { key:'altura_mm',     label:'Altura (mm)',               type:'number' },
+      { key:'comprimento_m', label:'Comprimento padrão (m)',    type:'number' },
+      { key:'dureza',        label:'Dureza Shore',              type:'select',
+        options:['40A','50A','60A','70A','80A','90A','100A'] },
+      { key:'material',      label:'Material', type:'select',
+        options:['Borracha Natural','Neoprene Preto','Neoprene Natural','EPDM','PVC','Poliuretano','Silicone','TufFlex (Draka)'] },
+    ],
+    skuSegment: at => [at.referencia&&at.referencia.toUpperCase(), at.largura_mm&&`${at.largura_mm}MM`].filter(Boolean).join('-'),
+  },
+  ELETRICO_ELETRONICO: {
+    label: 'Elétrico / Eletrônico',
+    fields: [
+      { key:'subtipo', label:'Subtipo', type:'select', required:true,
+        options:['Motor','Inversor / VVVF','Sensor','Botoeira','Placa Eletrônica','Chave / Contator','Transformador','Fonte DC','Display / IHM','Outro'] },
+      { key:'tensao', label:'Tensão Nominal', type:'select', required:true,
+        options:['5V','12V','24V','48V','110V','127V','220V','380V','480V','Bivolt'] },
+      { key:'tipo_corrente', label:'Tipo de Corrente', type:'select',
+        options:['AC — Alternada','DC — Contínua'] },
+      { key:'frequencia', label:'Frequência', type:'select',
+        options:['50Hz','60Hz','50/60Hz','DC'] },
+      { key:'potencia',    label:'Potência', type:'text', placeholder:'Ex: 1.5kW, 2CV, 10W' },
+      { key:'corrente_a',  label:'Corrente Nominal (A)', type:'number' },
+      { key:'ip_rating',   label:'Grau de Proteção IP', type:'select',
+        options:['IP20','IP40','IP54','IP55','IP65','IP67','IP68','Não aplicável'] },
+      { key:'comunicacao', label:'Protocolo / Comunicação', type:'select',
+        options:['Não aplicável','Digital (on/off)','Analógico 4-20mA','Modbus RTU','Modbus TCP','CANopen','CAN','RS485','Ethernet'] },
+    ],
+    skuSegment: at => [at.tensao, at.tipo_corrente&&at.tipo_corrente.substring(0,2), at.potencia&&at.potencia.toUpperCase().replace(' ',''), at.ip_rating&&at.ip_rating!=='Não aplicável'&&at.ip_rating].filter(Boolean).join('-'),
+  },
+  FLUIDO_QUIMICO: {
+    label: 'Fluido / Químico',
+    fields: [
+      { key:'tipo', label:'Tipo de Produto', type:'select', required:true,
+        options:['Óleo Lubrificante','Óleo Hidráulico','Graxa','Solvente / Limpador','Adesivo / Cola','Primer','Desmoldante','Fluido de Freio'] },
+      { key:'volume', label:'Volume / Embalagem', type:'select', required:true,
+        options:['50ml','200ml','250ml','500ml','1L','2L','5L','18L','20L','200L'] },
+      { key:'viscosidade', label:'Viscosidade / Grau', type:'text', placeholder:'Ex: ISO VG 46, NLGI 2, SAE 90' },
+      { key:'base', label:'Base / Composição', type:'select',
+        options:['Mineral','Sintético','Semi-sintético','Vegetal','Silicone','PTFE'] },
+      { key:'aplicacao', label:'Aplicação Principal', type:'select',
+        options:['Hidráulico','Lubrificação Geral','Guias e Trilhos','Correntes','Redutores','Vulcanização Corrimão','Limpeza','Vedação'] },
+    ],
+    skuSegment: at => [at.viscosidade&&at.viscosidade.replace(' ','').toUpperCase(), at.volume&&at.volume.toUpperCase()].filter(Boolean).join('-'),
+  },
+  ESTRUTURAL: {
+    label: 'Estrutural / Chapa / Perfil',
+    fields: [
+      { key:'tipo_perfil', label:'Tipo de Perfil', type:'select', required:true,
+        options:['Guia T','Guia Trilho','Chapa Lisa','Tubo Redondo','Tubo Quadrado','Tubo Retangular','Viga I','Viga U / UDC','Cantoneira','Barra Chata','Barra Redonda','Vergalhão'] },
+      { key:'espessura_mm',  label:'Espessura (mm)',       type:'number' },
+      { key:'largura_mm',    label:'Largura / Aba (mm)',   type:'number' },
+      { key:'altura_mm',     label:'Altura / Alma (mm)',   type:'number' },
+      { key:'comprimento_m', label:'Comprimento padrão (m)', type:'number' },
+      { key:'norma_aco',     label:'Norma do Aço', type:'select',
+        options:['A36','SAE 1020','SAE 1045','Inox 304','Inox 316','Alumínio 6061','Alumínio 6063','Galvanizado'] },
+    ],
+    skuSegment: at => [at.largura_mm, at.altura_mm, at.espessura_mm&&`E${at.espessura_mm}`].filter(Boolean).join('X'),
+  },
+  PENTE: {
+    label: 'Pente (Escada / Esteira Rolante)',
+    fields: [
+      { key:'num_dentes',       label:'Número de Dentes',          type:'number', required:true },
+      { key:'largura_mm',       label:'Largura total (mm)',         type:'number', required:true },
+      { key:'passo_dente',      label:'Passo entre dentes (mm)',    type:'number' },
+      { key:'comprimento_dente',label:'Comprimento do dente (mm)',  type:'number' },
+      { key:'material', label:'Material', type:'select', required:true,
+        options:['Alumínio','Alumínio Anodizado','Aço Inox','Poliacetal','Nylon'] },
+      { key:'cor', label:'Cor', type:'select',
+        options:['Natural (prata)','Preto','Amarelo (segurança)','Vermelho'] },
+    ],
+    skuSegment: at => [at.num_dentes&&`${at.num_dentes}D`, at.largura_mm&&`${at.largura_mm}MM`, at.material&&at.material.substring(0,2).toUpperCase()].filter(Boolean).join('-'),
+  },
+  DEGRAU_PALLET: {
+    label: 'Degrau / Pallet (Escada / Esteira)',
+    fields: [
+      { key:'tipo', label:'Tipo', type:'select', required:true,
+        options:['Degrau Escada Rolante','Pallet Esteira Rolante'] },
+      { key:'largura_mm',      label:'Largura (mm)',              type:'number', required:true },
+      { key:'profundidade_mm', label:'Profundidade (mm)',          type:'number' },
+      { key:'material', label:'Material', type:'select',
+        options:['Alumínio','Aço Galvanizado','Aço Inox','Poliacetal'] },
+      { key:'acabamento', label:'Acabamento Superficial', type:'select',
+        options:['Antiderrapante padrão','Antiderrapante reforçado','Liso','Pintado'] },
+    ],
+    skuSegment: at => [at.tipo&&(at.tipo.includes('Degrau')?'DEG':'PAL'), at.largura_mm&&`${at.largura_mm}MM`].filter(Boolean).join('-'),
+  },
+  KIT_CONJUNTO: {
+    label: 'Kit / Conjunto',
+    fields: [
+      { key:'descricao_kit', label:'Composição do Kit', type:'text', required:true, placeholder:'Ex: Kit reparo bomba hidráulica' },
+      { key:'num_itens',     label:'N° de itens no kit', type:'number' },
+      { key:'aplicacao',     label:'Aplicação / Sistema', type:'text', placeholder:'Ex: Sistema de freio, Porta telescópica' },
+    ],
+    skuSegment: at => at.num_itens ? `KT${at.num_itens}` : 'KT',
+  },
+  OUTRO: {
+    label: 'Outro (forma livre)',
+    fields: [
+      { key:'spec1', label:'Especificação 1', type:'text' },
+      { key:'spec2', label:'Especificação 2', type:'text' },
+      { key:'spec3', label:'Especificação 3', type:'text' },
+    ],
+    skuSegment: at => [at.spec1, at.spec2].filter(Boolean).map(v=>v.toUpperCase()).join('-'),
+  },
+};
+
 const FAMILIAS = [
   'Motor','Freio','Cabine','Contrapeso','Guia de Corrediça','Painel Elétrico',
   'Porta de Pavimento','Porta de Cabina','Cabos e Cintas','Escada Rolante',
@@ -205,10 +376,15 @@ function gerarEAN13() {
   return d.join('');
 }
 
-function buildSKU({ prefixo, natureza, atrib, compat, cor }) {
+function buildSKU({ prefixo, natureza, atrib, compat, cor, tipoFisico }) {
   if (!prefixo) return '';
   const s = [prefixo];
-  if (natureza && atrib) {
+  // Segmento baseado no Tipo Físico (sistema novo — tem prioridade)
+  if (tipoFisico && atrib && ATTR_GROUPS[tipoFisico]) {
+    const seg = ATTR_GROUPS[tipoFisico].skuSegment(atrib);
+    if (seg) s.push(seg);
+  } else if (natureza && atrib) {
+    // Legado: natureza-based (mantido para compatibilidade)
     switch (natureza) {
       case 'eletrico': {
         const { tipo_el, potencia, potencia_un, tensao, frequencia } = atrib;
@@ -331,7 +507,7 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
   const compat   = (prod.compatibilidade||[])[0] || '';
   const cor      = prod.cor_material || '';
 
-  const generatedSKU = buildSKU({ prefixo, natureza, atrib: at, compat, cor });
+  const generatedSKU = buildSKU({ prefixo, natureza, atrib: at, compat, cor, tipoFisico: prod.tipo_fisico||'' });
 
   function setAtrib(key, val) {
     onChange('atributos_tecnicos', { ...at, [key]: val });
@@ -656,7 +832,93 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
   );
 }
 
-// ─── TAB 1 — COMPATIBILIDADE ─────────────────────────────────────────────────
+// ─── TAB 1 — ATRIBUTOS FÍSICOS ───────────────────────────────────────────────
+
+function TabAtributos({ prod, onChange }) {
+  const at  = prod.atributos_tecnicos || {};
+  const tf  = prod.tipo_fisico || '';
+  const group = ATTR_GROUPS[tf];
+
+  function setAtrib(key, val) {
+    onChange('atributos_tecnicos', { ...at, [key]: val });
+  }
+  function selectTipoFisico(code) {
+    onChange('tipo_fisico', code);
+    onChange('atributos_tecnicos', {});
+  }
+
+  const skuSeg = group ? group.skuSegment(at) : '';
+
+  return (
+    <div className="space-y-5 animate-in fade-in duration-300">
+      <div>
+        <p className={cn(labelCls,'mb-2')}>
+          Tipo Físico <span className="text-red-500 ml-0.5">*</span>
+          <span className="ml-2 text-[9px] text-slate-400 normal-case font-medium tracking-normal">
+            Define a forma física do produto e carrega os campos de medidas correspondentes
+          </span>
+        </p>
+        <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
+          {TIPOS_FISICOS.map(t => (
+            <button
+              key={t.code}
+              onClick={() => selectTipoFisico(t.code)}
+              className={cn(
+                'flex flex-col gap-0.5 px-3 py-2.5 rounded-sm border text-left transition',
+                tf === t.code
+                  ? 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20'
+                  : 'border-slate-200 dark:border-slate-700 hover:border-yellow-300 dark:hover:border-yellow-600'
+              )}>
+              <span className={cn('text-[10px] font-black uppercase tracking-wide',
+                tf===t.code ? 'text-yellow-800 dark:text-yellow-300' : 'text-slate-700 dark:text-slate-300')}>
+                {t.label}
+              </span>
+              <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-tight">{t.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {group ? (
+        <div className="space-y-4 border border-yellow-200 dark:border-yellow-900/40 rounded-sm p-4 bg-yellow-50/30 dark:bg-yellow-900/5">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-yellow-800 dark:text-yellow-400">
+              {group.label}
+            </p>
+            {skuSeg && (
+              <span className="text-[10px] font-black text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-sm">
+                Segmento SKU: <span className="text-yellow-700 dark:text-yellow-400 font-mono">{skuSeg}</span>
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {group.fields.map(f => (
+              <Field key={f.key} label={f.label} required={f.required}>
+                {f.type === 'select'
+                  ? <Sel value={at[f.key]||''} onChange={v => setAtrib(f.key, v)} options={f.options} />
+                  : <Inp type={f.type} value={at[f.key]||''} onChange={v => setAtrib(f.key, v)} placeholder={f.placeholder||''} />
+                }
+              </Field>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/40 rounded-sm p-4 border border-dashed border-slate-300 dark:border-slate-700">
+          <Settings className="w-5 h-5 text-slate-400 shrink-0" />
+          <div>
+            <p className="text-xs font-black text-slate-600 dark:text-slate-300">Selecione o Tipo Físico acima</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Os campos de medidas e especificações são carregados automaticamente.
+              Os valores preenchidos entram direto no código SKU gerado.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TAB 2 — COMPATIBILIDADE ─────────────────────────────────────────────────
 
 function TabCompatibilidade({ prod, onChange }) {
   const selected = prod.compatibilidade || [];
@@ -1105,12 +1367,15 @@ function TabDescricaoIA({ prod, onChange }) {
         body: JSON.stringify({
           vpType: prod.prefixo_vp||'',
           category: prod.natureza||prod.familia||'',
+          tipoFisico: prod.tipo_fisico||'',
+          tipoFisicoLabel: prod.tipo_fisico ? (ATTR_GROUPS[prod.tipo_fisico]?.label||'') : '',
           attributes: prod.atributos_tecnicos||{},
           selectedCompatibility: compat,
           manualReference: prod.marca||'',
           additionalDetails: custom,
           sku: prod.sku||'',
           descricao: prod.descricao||'',
+          ncm: prod.ncm||'',
         }),
       });
       if (!res.ok) throw new Error(`Erro ${res.status}`);
@@ -1185,7 +1450,7 @@ function produtoVazio() {
     sku:'', codigo_antigo:'', codigo_integracao:'', part_number:'',
     descricao:'', descricao_detalhada:'', observacao:'', ncm:'',
     tipo:'Peça', familia:'', marca:'', unidade:'PC',
-    prefixo_vp:'', natureza:'', atributos_tecnicos:{},
+    prefixo_vp:'', natureza:'', tipo_fisico:'', atributos_tecnicos:{},
     compatibilidade:[], cor_material:'',
     fotos:['','','',''],
     peso_liquido:'', peso_bruto:'', altura:'', largura:'', profundidade:'',
@@ -1201,12 +1466,13 @@ function produtoVazio() {
 // ─── TABS CONFIG ──────────────────────────────────────────────────────────────
 
 const TABS = [
-  { label:'Identificação',   Icon: Tag       },
-  { label:'Compatibilidade', Icon: Building2 },
-  { label:'Fotos',           Icon: Camera    },
-  { label:'Embalagens',      Icon: Package   },
-  { label:'Estoque & Regras',Icon: ArrowUpDown},
-  { label:'Descrição IA',    Icon: Bot       },
+  { label:'Identificação',    Icon: Tag        },
+  { label:'Atributos Físicos',Icon: Ruler      },
+  { label:'Compatibilidade',  Icon: Building2  },
+  { label:'Fotos',            Icon: Camera     },
+  { label:'Embalagens',       Icon: Package    },
+  { label:'Estoque & Regras', Icon: ArrowUpDown},
+  { label:'Descrição IA',     Icon: Bot        },
 ];
 
 // ─── QR CODE MODAL ────────────────────────────────────────────────────────────
@@ -1388,6 +1654,7 @@ export default function ProductCatalog() {
         embalagens:         p.embalagens         || [],
         enderecos_estoque:  Array.isArray(p.enderecos_estoque) ? p.enderecos_estoque : [],
         curva_abc:          p.curva_abc          || null,
+        tipo_fisico:        p.tipo_fisico        || '',
       }));
       setProdutos(adapted);
       const skuParam = searchParams.get('sku');
@@ -1441,6 +1708,7 @@ export default function ProductCatalog() {
         unidade:            selected.unidade            || 'PC',
         prefixo_vp:         selected.prefixo_vp         || null,
         natureza:           selected.natureza           || null,
+        tipo_fisico:        selected.tipo_fisico        || null,
         atributos_tecnicos: selected.atributos_tecnicos || {},
         compatibilidade:    selected.compatibilidade    || [],
         cor_material:       selected.cor_material       || null,
@@ -1979,12 +2247,13 @@ export default function ProductCatalog() {
 
               {/* content */}
               <div className="flex-1 overflow-y-auto p-5">
-                {activeTab===0 && <TabIdentificacao  prod={selected} onChange={fieldChange} onGoToIA={()=>setActiveTab(5)} />}
-                {activeTab===1 && <TabCompatibilidade prod={selected} onChange={fieldChange} />}
-                {activeTab===2 && <TabFotos          prod={selected} onChange={fieldChange} />}
-                {activeTab===3 && <TabEmbalagens     prod={selected} onChange={fieldChange} />}
-                {activeTab===4 && <TabEstoqueRegras  prod={selected} onChange={fieldChange} />}
-                {activeTab===5 && <TabDescricaoIA    prod={selected} onChange={fieldChange} />}
+                {activeTab===0 && <TabIdentificacao  prod={selected} onChange={fieldChange} onGoToIA={()=>setActiveTab(6)} />}
+                {activeTab===1 && <TabAtributos      prod={selected} onChange={fieldChange} />}
+                {activeTab===2 && <TabCompatibilidade prod={selected} onChange={fieldChange} />}
+                {activeTab===3 && <TabFotos          prod={selected} onChange={fieldChange} />}
+                {activeTab===4 && <TabEmbalagens     prod={selected} onChange={fieldChange} />}
+                {activeTab===5 && <TabEstoqueRegras  prod={selected} onChange={fieldChange} />}
+                {activeTab===6 && <TabDescricaoIA    prod={selected} onChange={fieldChange} />}
               </div>
             </>
           )}
