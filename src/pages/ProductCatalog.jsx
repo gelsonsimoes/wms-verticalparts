@@ -379,30 +379,26 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
 
             {/* STEP 1 */}
             <div>
-              <p className={cn(labelCls,'mb-2')}>Passo 1 — Prefixo VP *</p>
-              <div className="space-y-2">
+              <p className={cn(labelCls,'mb-1.5')}>Passo 1 — Prefixo VP *</p>
+              <select
+                value={prefixo}
+                onChange={e => setPrefixo(e.target.value)}
+                className={cn(inputCls, 'text-[11px]')}
+              >
+                <option value="">— Selecione o prefixo —</option>
                 {prefixGroups.map(group => (
-                  <div key={group}>
-                    <p className="text-[9px] font-black uppercase text-slate-400 mb-1">{group}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {VP_PREFIXES.filter(p=>p.group===group).map(p => (
-                        <button key={p.code} onClick={()=>setPrefixo(p.code)} title={p.desc}
-                          className={cn(
-                            'px-2 py-1 rounded-sm text-[10px] font-black border transition',
-                            prefixo===p.code
-                              ? 'bg-yellow-400 border-yellow-500 text-slate-900'
-                              : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:border-yellow-400'
-                          )}>{p.code}</button>
-                      ))}
-                    </div>
-                  </div>
+                  <optgroup key={group} label={group}>
+                    {VP_PREFIXES.filter(p => p.group === group).map(p => (
+                      <option key={p.code} value={p.code}>{p.code} — {p.desc}</option>
+                    ))}
+                  </optgroup>
                 ))}
-                {prefixo && (
+              </select>
+              {prefixo && (
                   <p className="text-[10px] text-slate-500 mt-1">
                     <span className="font-black text-yellow-600">{prefixo}</span> — {VP_PREFIXES.find(p=>p.code===prefixo)?.desc}
                   </p>
                 )}
-              </div>
             </div>
 
             {/* STEP 2 — natureza */}
