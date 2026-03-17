@@ -29,19 +29,17 @@ jobs:
       # 4. Criar arquivo .env com variáveis de produção
       - name: Create .env.production
         run: |
-          cat > .env.production << 'EOF'
-          VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SUPABASE_PROJECT_ID=clakkpyzinuheubkhdep
-          VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
-          VITE_API_URL=https://wms-verticalparts-production.up.railway.app
-          VITE_API_TIMEOUT=30000
-          VITE_ENABLE_REALTIME=true
-          VITE_ENABLE_SYNC=true
-          VITE_SYNC_INTERVAL=5000
-          VITE_DEBUG=false
-          VITE_ENVIRONMENT=production
-          EOF
+          printf 'VITE_SUPABASE_URL=%s\n' '${{ secrets.VITE_SUPABASE_URL }}' > .env.production
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n' '${{ secrets.VITE_SUPABASE_ANON_KEY }}' >> .env.production
+          printf 'VITE_SUPABASE_PROJECT_ID=clakkpyzinuheubkhdep\n' >> .env.production
+          printf 'VITE_GEMINI_API_KEY=%s\n' '${{ secrets.VITE_GEMINI_API_KEY }}' >> .env.production
+          printf 'VITE_API_URL=https://wms-verticalparts-production.up.railway.app\n' >> .env.production
+          printf 'VITE_API_TIMEOUT=30000\n' >> .env.production
+          printf 'VITE_ENABLE_REALTIME=true\n' >> .env.production
+          printf 'VITE_ENABLE_SYNC=true\n' >> .env.production
+          printf 'VITE_SYNC_INTERVAL=5000\n' >> .env.production
+          printf 'VITE_DEBUG=false\n' >> .env.production
+          printf 'VITE_ENVIRONMENT=production\n' >> .env.production
 
       # 5. Build do Vite
       - name: Build
