@@ -1549,6 +1549,7 @@ export default function ProductCatalog() {
   const [saving,       setSaving      ] = useState(false);
   const [importStatus, setImportStatus] = useState(null);
   const [showQRModal,  setShowQRModal ] = useState(false);
+  const [selectedIds,  setSelectedIds ] = useState(new Set());
 
   // ── fetch ──
   async function fetchProducts() {
@@ -1845,6 +1846,28 @@ export default function ProductCatalog() {
     setSelectedId(null);
   }
 
+  // ── bulk delete ──
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Excluir ${count} produto${count>1?'s':''}? Esta ação não pode ser desfeita.`)) return;
+    const ids = [...selectedIds];
+    const { error } = await supabase.from('produtos').delete().in('id', ids);
+    if (error) { alert('Erro ao excluir: ' + error.message); return; }
+    logActivity({
+      userName: _logUser(),
+      action: 'EXCLUIU_EM_MASSA',
+      entity: 'produto',
+      entityId: `${count} registros`,
+      entityName: `${count} produto(s)`,
+      description: `${count} produto(s) excluídos em massa pelo usuário.`,
+      level: 'WARNING',
+    });
+    if (ids.includes(selectedId)) { setSelectedId(null); setIsNew(false); }
+    setSelectedIds(new Set());
+    await fetchProducts();
+  }
+
   // ── import Omie ──
   async function handleImportOmie(e) {
     const file = e.target.files?.[0];
@@ -2022,8 +2045,35 @@ export default function ProductCatalog() {
             </div>
           )}
 
-          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800">
-            <p className="text-[10px] text-slate-500 font-bold">{filtered.length} produto{filtered.length!==1?'s':''}</p>
+          <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
+            <input
+              type="checkbox"
+              title="Selecionar todos"
+              checked={filtered.length > 0 && filtered.filter(p=>p.id!=='__new__').every(p => selectedIds.has(p.id))}
+              ref={el => {
+                if (el) {
+                  const real = filtered.filter(p=>p.id!=='__new__');
+                  el.indeterminate = selectedIds.size > 0 && !real.every(p => selectedIds.has(p.id));
+                }
+              }}
+              onChange={e => {
+                const real = filtered.filter(p=>p.id!=='__new__');
+                setSelectedIds(e.target.checked ? new Set(real.map(p=>p.id)) : new Set());
+              }}
+              className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer shrink-0"
+            />
+            <p className="text-[10px] text-slate-500 font-bold flex-1">
+              {selectedIds.size > 0
+                ? `${selectedIds.size} selecionado${selectedIds.size>1?'s':''}`
+                : `${filtered.length} produto${filtered.length!==1?'s':''}`}
+            </p>
+            {selectedIds.size > 0 && (
+              <button onClick={handleBulkDelete}
+                className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white rounded-sm px-2 py-0.5 text-[10px] font-black transition">
+                <Trash2 className="w-3 h-3" />
+                Excluir
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -2039,39 +2089,63 @@ export default function ProductCatalog() {
             ) : (
               filtered.map(p => {
                 const isSel = isNew ? p.id==='__new__' : p.id===selectedId;
+                const isChecked = selectedIds.has(p.id);
                 return (
-                  <button key={p.id}
-                    onClick={()=>{ setSelectedId(p.id); setIsNew(false); setActiveTab(0); }}
+                  <div key={p.id}
                     className={cn(
-                      'w-full text-left px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 transition',
-                      isSel && 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-l-yellow-400'
+                      'flex items-stretch border-b border-slate-100 dark:border-slate-800 transition',
+                      isSel && 'bg-yellow-50 dark:bg-yellow-900/20 border-l-2 border-l-yellow-400',
+                      isChecked && !isSel && 'bg-red-50 dark:bg-red-900/10'
                     )}>
-                    <div className="flex items-center justify-between gap-1">
-                      <p className={cn('text-[11px] font-black truncate',
-                        isSel?'text-yellow-700 dark:text-yellow-400':'text-slate-800 dark:text-slate-200')}>
-                        {p.sku || <span className="text-slate-400 italic">Novo produto</span>}
-                      </p>
-                      {p.prefixo_vp && (
-                        <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded-sm shrink-0">
-                          {p.prefixo_vp}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5">{p.descricao}</p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      {p.codigo_antigo && (
-                        <p className="text-[9px] text-amber-600 font-bold">Ant: {p.codigo_antigo}</p>
-                      )}
-                      {p.curva_abc && (
-                        <span className={cn('text-[9px] font-black px-1 py-0.5 rounded-sm border ml-auto',
-                          p.curva_abc==='A'?'bg-emerald-100 text-emerald-700 border-emerald-300':
-                          p.curva_abc==='B'?'bg-amber-100 text-amber-700 border-amber-300':
-                                           'bg-slate-100 text-slate-600 border-slate-300')}>
-                          {p.curva_abc}
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                    {/* Checkbox — não abre produto */}
+                    {p.id !== '__new__' && (
+                      <div className="flex items-center justify-center px-2 shrink-0"
+                        onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              e.target.checked ? next.add(p.id) : next.delete(p.id);
+                              return next;
+                            });
+                          }}
+                          className="w-3.5 h-3.5 accent-yellow-400 cursor-pointer"
+                        />
+                      </div>
+                    )}
+                    {/* Clique na linha — abre produto */}
+                    <button
+                      onClick={()=>{ setSelectedId(p.id); setIsNew(false); setActiveTab(0); }}
+                      className="flex-1 text-left py-2.5 pr-3 hover:bg-slate-50 dark:hover:bg-slate-900 transition min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className={cn('text-[11px] font-black truncate',
+                          isSel?'text-yellow-700 dark:text-yellow-400':'text-slate-800 dark:text-slate-200')}>
+                          {p.sku || <span className="text-slate-400 italic">Novo produto</span>}
+                        </p>
+                        {p.prefixo_vp && (
+                          <span className="text-[9px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 px-1 py-0.5 rounded-sm shrink-0">
+                            {p.prefixo_vp}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">{p.descricao}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        {p.codigo_antigo && (
+                          <p className="text-[9px] text-amber-600 font-bold">Ant: {p.codigo_antigo}</p>
+                        )}
+                        {p.curva_abc && (
+                          <span className={cn('text-[9px] font-black px-1 py-0.5 rounded-sm border ml-auto',
+                            p.curva_abc==='A'?'bg-emerald-100 text-emerald-700 border-emerald-300':
+                            p.curva_abc==='B'?'bg-amber-100 text-amber-700 border-amber-300':
+                                             'bg-slate-100 text-slate-600 border-slate-300')}>
+                            {p.curva_abc}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  </div>
                 );
               })
             )}
