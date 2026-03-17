@@ -1,0 +1,23 @@
+# Supabase Configuration
+[api]
+enabled = true
+max_body_size = 20
+default_headers = {}
+
+[auth]
+enabled = true
+# Token expires in 1 hour
+jwt_expiry = 3600
+
+[db]
+major_version = 15
+
+[realtime]
+enabled = true
+max_bytes_per_second = 1000000
+
+[studio]
+enabled = true
+
+[inbrowser_editor]
+enabled = true

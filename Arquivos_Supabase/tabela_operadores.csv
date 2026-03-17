@@ -1,0 +1,9 @@
+id,usuario,nome,email,cargo,nivel,departamento,status,entidade,avatar_url,created_at
+550e8400-e29b-41d4-a716-446655440001,danilo.supervisor,Danilo Ferreira Santos,danilo@verticalparts.com.br,Supervisor de Operações,Administrador,Logística,Ativo,VerticalParts Matriz,,2025-01-10T08:00:00Z
+550e8400-e29b-41d4-a716-446655440002,matheus.oper,Matheus Rodrigues Costa,matheus@verticalparts.com.br,Operador de Armazém,Operador,Expedição,Ativo,VerticalParts Matriz,,2025-01-15T08:00:00Z
+550e8400-e29b-41d4-a716-446655440003,thiago.almox,Thiago Almeida Lima,thiago@verticalparts.com.br,Almoxarife,Operador,Almoxarifado,Ativo,VerticalParts Matriz,,2025-01-20T08:00:00Z
+550e8400-e29b-41d4-a716-446655440004,gelson.estrat,Gelson Estratégias,gelson@verticalparts.com.br,Estratégias e Processos,Administrador,Estratégia,Ativo,VerticalParts Matriz,,2025-01-05T08:00:00Z
+550e8400-e29b-41d4-a716-446655440005,ana.expedicao,Ana Paula Mendes,ana.mendes@verticalparts.com.br,Operadora de Expedição,Operador,Expedição,Ativo,VerticalParts Matriz,,2025-02-01T08:00:00Z
+550e8400-e29b-41d4-a716-446655440006,carlos.fiscal,Carlos Eduardo Nunes,carlos.nunes@verticalparts.com.br,Analista Fiscal,Supervisor,Fiscal,Ativo,VerticalParts Matriz,,2025-02-10T08:00:00Z
+550e8400-e29b-41d4-a716-446655440007,patricia.inv,Patricia Oliveira,patricia.oliveira@verticalparts.com.br,Analista de Inventário,Supervisor,Controle de Estoque,Ativo,VerticalParts Matriz,,2025-03-01T08:00:00Z
+550e8400-e29b-41d4-a716-446655440008,roberto.rec,Roberto Souza Teixeira,roberto.souza@verticalparts.com.br,Operador de Recebimento,Operador,Recebimento,Inativo,VerticalParts Matriz,,2025-01-25T08:00:00Z

@@ -1,0 +1,9 @@
+id,name,cnpj,address,currency,timezone,status,tipo,email,telefone,cidade,estado,cep,created_at
+co000001-0000-0000-0000-000000000001,VerticalParts Matriz,12.345.678/0001-90,Rua Armandina Braga de Almeida, 383,BRL,GMT-3,Ativo,empresa,contato@verticalparts.com.br,(11) 4521-0000,Guarulhos,SP,07141-003,2025-01-01T08:00:00Z
+co000001-0000-0000-0000-000000000002,Mecânica Total Peças LTDA,23.456.789/0001-01,Av. Marginal Tietê, 1500,BRL,GMT-3,Ativo,cliente,compras@mecanicatotal.com.br,(11) 3321-4567,São Paulo,SP,02310-000,2025-02-01T08:00:00Z
+co000001-0000-0000-0000-000000000003,AutoPeças Sul Distribuidora,34.567.890/0001-02,Rua das Fábricas, 890,BRL,GMT-3,Ativo,cliente,pedidos@autopecassul.com.br,(51) 3344-5566,Porto Alegre,RS,90250-140,2025-02-15T08:00:00Z
+co000001-0000-0000-0000-000000000004,Transportes Rodo Express LTDA,45.678.901/0001-03,Rod. Anhanguera Km 30,BRL,GMT-3,Ativo,transportadora,operacoes@rodoexpress.com.br,(11) 4520-7890,Guarulhos,SP,07110-000,2025-01-10T08:00:00Z
+co000001-0000-0000-0000-000000000005,Jadlog Logística S.A.,56.789.012/0001-04,Rod. BR-116 Km 285,BRL,GMT-3,Ativo,transportadora,coleta@jadlog.com.br,(11) 3030-5050,São Paulo,SP,04795-100,2025-01-10T08:00:00Z
+co000001-0000-0000-0000-000000000006,Patrus Transportes LTDA,67.890.123/0001-05,Av. Nossa Senhora da Penha, 1000,BRL,GMT-3,Ativo,transportadora,entregas@patrus.com.br,(31) 3500-0000,Belo Horizonte,MG,30110-030,2025-01-10T08:00:00Z
+co000001-0000-0000-0000-000000000007,SKF do Brasil LTDA,78.901.234/0001-06,Av. Dr. Abrahão Ribeiro, 1350,BRL,GMT-3,Ativo,fornecedor,pedidos@skf.com.br,(11) 4163-9000,Cajamar,SP,07776-000,2025-01-15T08:00:00Z
+co000001-0000-0000-0000-000000000008,Parker Hannifin Brasil,89.012.345/0001-07,Av. Salmão, 100,BRL,GMT-3,Ativo,fornecedor,compras@parker.com.br,(11) 4612-3600,Jacareí,SP,12322-630,2025-01-15T08:00:00Z
