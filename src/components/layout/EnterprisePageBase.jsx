@@ -21,32 +21,15 @@ const MOCK_DATA = [
   { id: '1005', sku: 'VPER-LUM-LED-VRD-24V', desc: 'Luminária em LED Verde 24V', qty: 15, status: 'Ativo' }
 ];
 
-export default function EnterprisePageBase({ title, breadcrumbItems = [], actions, children }) {
-  const [registroId] = useState('VP-AUTO-001');
-  const [depositante, setDepositante] = useState('VerticalParts Matriz');
-  const [tipoOperacao, setTipoOperacao] = useState('Entrada Normal');
-  const [dataReferencia, setDataReferencia] = useState('2026-02-26');
-
+export default function EnterprisePageBase({ title, breadcrumbItems = [], actions, actionGroups: actionGroupsProp, children }) {
   const breadcrumbs = [
     { label: 'WMS', path: '/' },
     ...breadcrumbItems,
     { label: title, active: true }
   ];
 
-  const actionGroups = [
-    [
-      { label: 'Novo', primary: true, icon: <LayoutGrid className="w-3.5 h-3.5" /> },
-      { label: 'Duplicar', icon: <FileText className="w-3.5 h-3.5" /> }
-    ],
-    [
-      { label: 'Salvar', icon: <Settings2 className="w-3.5 h-3.5" /> },
-      { label: 'Salvar e Fechar' }
-    ],
-    [
-      { label: 'Relatórios', icon: <FileText className="w-3.5 h-3.5" /> },
-      { label: 'Exportar PDF' }
-    ]
-  ];
+  // Usa os actionGroups passados pela página ou um padrão vazio
+  const resolvedGroups = actionGroupsProp || [];
 
   return (
     <div className="flex flex-col h-full bg-white animate-in fade-in duration-500">
@@ -64,7 +47,7 @@ export default function EnterprisePageBase({ title, breadcrumbItems = [], action
           </div>
           {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
-        {!actions && <ActionPane groups={actionGroups} />}
+        {!actions && resolvedGroups.length > 0 && <ActionPane groups={resolvedGroups} />}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
