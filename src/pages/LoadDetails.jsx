@@ -40,13 +40,13 @@ export default function LoadDetails() {
 
   const actions = [
     [
-      { label: 'Novo', primary: true, icon: <Plus size={14}/>, onClick: () => {} },
-      { label: 'Salvar', icon: <Save size={14}/>, onClick: () => {} },
-      { label: 'Excluir', icon: <Trash2 size={14}/>, onClick: () => {} }
+      { label: 'Novo', primary: true, icon: Plus, onClick: () => {} },
+      { label: 'Salvar', icon: Save, onClick: () => {} },
+      { label: 'Excluir', icon: Trash2, onClick: () => {} }
     ],
     [
-      { label: 'Imprimir Picking', icon: <Printer size={14}/>, onClick: () => {} },
-      { label: 'Confirmar Embarque', icon: <CheckCircle2 size={14}/>, onClick: () => {} }
+      { label: 'Imprimir Picking', icon: Printer, onClick: () => {} },
+      { label: 'Confirmar Embarque', icon: CheckCircle2, onClick: () => {} }
     ]
   ];
 

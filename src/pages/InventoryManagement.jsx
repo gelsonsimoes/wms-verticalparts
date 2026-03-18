@@ -40,18 +40,18 @@ export default function InventoryManagement() {
   const actions = [
     [
       // ⚠️ INTEGRAÇÃO NECESSÁRIA: modal de criação de inventário
-      { label: 'Novo Inventário',     primary: true, icon: <Plus size={14}/>,     onClick: () => console.warn('Novo Inventário: INTEGRAÇÃO NECESSÁRIA') },
+      { label: 'Novo Inventário',     primary: true, icon: Plus,      onClick: () => console.warn('Novo Inventário: INTEGRAÇÃO NECESSÁRIA') },
       // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/inventory/balance-adjustment
-      { label: 'Ajuste de Saldo',    icon: <Edit2 size={14}/>,    onClick: () => console.warn('Ajuste de Saldo: INTEGRAÇÃO NECESSÁRIA') },
+      { label: 'Ajuste de Saldo',    icon: Edit2,    onClick: () => console.warn('Ajuste de Saldo: INTEGRAÇÃO NECESSÁRIA') },
     ],
     [
       // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/inventory/transfer
-      { label: 'Transferência',       icon: <RefreshCw size={14}/>, onClick: () => console.warn('Transferência: INTEGRAÇÃO NECESSÁRIA') },
-      { label: 'Monitorar Real-Time', icon: <Activity size={14}/>,  onClick: () => setView(VIEWS.MONITOR) },
+      { label: 'Transferência',       icon: RefreshCw, onClick: () => console.warn('Transferência: INTEGRAÇÃO NECESSÁRIA') },
+      { label: 'Monitorar Real-Time', icon: Activity,  onClick: () => setView(VIEWS.MONITOR) },
     ],
     [
       // ⚠️ INTEGRAÇÃO NECESSÁRIA: GET /api/inventory/reports
-      { label: 'Relatórios',          icon: <BarChart3 size={14}/>, onClick: () => console.warn('Relatórios: INTEGRAÇÃO NECESSÁRIA') },
+      { label: 'Relatórios',          icon: BarChart3, onClick: () => console.warn('Relatórios: INTEGRAÇÃO NECESSÁRIA') },
     ],
   ];
 

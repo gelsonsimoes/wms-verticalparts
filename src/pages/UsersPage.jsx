@@ -699,16 +699,16 @@ export default function UsersPage() {
 
   const actionGroups = [
     [
-      { label: 'Novo', primary: true, icon: <Plus className="w-3.5 h-3.5" />, onClick: handleNew },
-      { label: 'Salvar', icon: <Save className="w-3.5 h-3.5" />, onClick: handleSave },
+      { label: 'Novo', primary: true, icon: Plus, onClick: handleNew },
+      { label: 'Salvar', icon: Save, onClick: handleSave },
     ],
     [
-      { label: 'Excluir', icon: <Trash2 className="w-3.5 h-3.5" />, onClick: handleDelete,
+      { label: 'Excluir', icon: Trash2, onClick: handleDelete,
         disabled: !selectedUser || selectedUser.id === 'NOVO' },
     ],
     [
-      { label: 'Imprimir Crachá', icon: <Printer className="w-3.5 h-3.5" /> },
-      { label: 'Relatórios',      icon: <FileText className="w-3.5 h-3.5" /> },
+      { label: 'Imprimir Crachá', icon: Printer },
+      { label: 'Relatórios',      icon: FileText },
     ],
   ];
 
