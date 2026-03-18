@@ -13,6 +13,12 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Health check — usado pelo Nginx e pelo deploy automático
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', version: '4.3.27', timestamp: new Date().toISOString() });
+});
+
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" });
 
 app.post('/api/chat', async (req, res) => {
