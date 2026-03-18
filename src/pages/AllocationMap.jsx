@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useId } from 'react';
+import React, { useState, useMemo, useCallback, useId, useEffect } from 'react';
 import {
   Package,
   MapPin,
@@ -21,10 +21,14 @@ import {
   User,
   Check,
   RotateCcw,
+  RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useApp } from '../hooks/useApp';
+import { supabase } from '../lib/supabaseClient';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -82,28 +86,35 @@ function gerarLote(ordemId) {
   return `LOT-${ordemId}-${unique}`;
 }
 
-// ─── DADOS MOCK ────────────────────────────────────────────────────────────────
-// makeRow é pura: id é passado externamente, sem efeito colateral em _idCounter
-function makeRow({ id, ordemId, ...rest }) {
-  const produto     = rest.produto     ?? PRODUTOS_LIST[Math.floor(Math.random() * PRODUTOS_LIST.length)];
-  const depositante = rest.depositante ?? DEPOSITANTES[Math.floor(Math.random() * DEPOSITANTES.length)];
-  const tipoRec     = rest.tipoRecebimento ?? TIPO_RECEB[Math.floor(Math.random() * TIPO_RECEB.length)];
+// ─── HELPERS DE ROW ───────────────────────────────────────────────────────────
+function dbRowToRow(r) {
   return {
-    id, ordemId, depositante, tipoRecebimento: tipoRec, produto,
-    lote: null, enderecoSugerido: null, tipoLocal: null,
-    status: 'Pendente', selecionado: false,
-    ...rest,
+    id: r.id, ordemId: r.ordem_id,
+    depositante: r.depositante || '—',
+    tipoRecebimento: r.tipo_recebimento || '—',
+    produto: r.produto || '—',
+    lote: r.lote || null,
+    enderecoSugerido: r.endereco_sugerido || null,
+    tipoLocal: r.tipo_local || null,
+    status: r.status || 'Pendente',
+    selecionado: false,
   };
 }
 
-const ROWS_INIT = [
-  makeRow({ id:'r1', ordemId:'ORD-001', depositante:'VerticalParts SP',   tipoRecebimento:'Compra',        produto:'Motor de Tração 220V',    lote:'LOT-ORD001-A1B2C3', enderecoSugerido:'R1_PP2_B3', tipoLocal:'Pulmão',  status:'Posicionado' }),
-  makeRow({ id:'r2', ordemId:'ORD-002', depositante:'Elevadores ABC Ltda', tipoRecebimento:'Devolução',     produto:'Freio Magnético D-200',   lote:'LOT-ORD002-D4E5F6', enderecoSugerido:'R2_PP3_A7', tipoLocal:'Picking', status:'Finalizado'  }),
-  makeRow({ id:'r3', ordemId:'ORD-003', depositante:'Kone Brasil',         tipoRecebimento:'Transferência', produto:'Cabo de Aço 10mm'  }),
-  makeRow({ id:'r4', ordemId:'ORD-004', depositante:'Schindler Partes',    tipoRecebimento:'Compra',        produto:'Painel Elétrico 800W'  }),
-  makeRow({ id:'r5', ordemId:'ORD-005', depositante:'VerticalParts SP',    tipoRecebimento:'Cross-Docking', produto:'Porta de Cabine Inox'  }),
-  makeRow({ id:'r6', ordemId:'ORD-006', depositante:'Kone Brasil',         tipoRecebimento:'Compra',        produto:'Guia de Corrediça 40mm', lote:'LOT-ORD006-G7H8I9', enderecoSugerido:'R1_PP1_C1', tipoLocal:'Pulmão',  status:'Cancelado'   }),
-];
+function rowToDb(r, warehouseId) {
+  return {
+    id: r.id,
+    warehouse_id: warehouseId,
+    ordem_id: r.ordemId,
+    depositante: r.depositante,
+    tipo_recebimento: r.tipoRecebimento,
+    produto: r.produto,
+    lote: r.lote,
+    endereco_sugerido: r.enderecoSugerido,
+    tipo_local: r.tipoLocal,
+    status: r.status,
+  };
+}
 
 // ─── FILA DE TOASTS ───────────────────────────────────────────────────────────
 // Cada toast tem id único para empilhar sem sobrescrever
@@ -387,12 +398,58 @@ function ModalAutorizacaoSupervisor({ count, onClose, onAutorizado }) {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 export default function AllocationMap() {
-  const [rows,         setRows]         = useState(ROWS_INIT);
+  const { warehouseId } = useApp();
+  const [rows,         setRows]         = useState([]);
+  const [loading,      setLoading]      = useState(true);
   const [statusFiltro, setStatusFiltro] = useState('Todos');
   const [search,       setSearch]       = useState('');
   const [gerando,      setGerando]      = useState(false);
   const [modal,        setModal]        = useState(null); // 'alterar' | 'confirmar'
-  const { toasts, push: toast } = useToastQueue(); // fila de toasts com IDs únicos
+  const { toasts, push: toast } = useToastQueue();
+
+  // ── Fetch from Supabase ────────────────────────────────────────────────────
+  const fetchRows = useCallback(async () => {
+    if (!warehouseId) return;
+    const { data, error } = await supabase
+      .from('alocacoes')
+      .select('*')
+      .eq('warehouse_id', warehouseId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('alocacoes:', error); setLoading(false); return; }
+
+    // If no allocations yet, try to seed from ordens_recebimento (Aguardando Alocação)
+    if ((data || []).length === 0) {
+      const { data: ordens } = await supabase
+        .from('ordens_recebimento')
+        .select('id, codigo, depositante, tipo, nf')
+        .eq('warehouse_id', warehouseId)
+        .eq('status', 'Aguardando Alocação');
+      if (ordens && ordens.length > 0) {
+        const toInsert = ordens.map(or => ({
+          warehouse_id: warehouseId,
+          ordem_id: or.codigo,
+          depositante: or.depositante,
+          tipo_recebimento: or.tipo,
+          produto: or.nf || '—',
+          status: 'Pendente',
+        }));
+        const { data: inserted } = await supabase.from('alocacoes').insert(toInsert).select();
+        setRows((inserted || []).map(dbRowToRow));
+      }
+    } else {
+      setRows((data || []).map(dbRowToRow));
+    }
+    setLoading(false);
+  }, [warehouseId]);
+
+  useEffect(() => {
+    fetchRows();
+    if (!warehouseId) return;
+    const ch = supabase.channel('alocacoes-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alocacoes', filter: `warehouse_id=eq.${warehouseId}` }, fetchRows)
+      .subscribe();
+    return () => supabase.removeChannel(ch);
+  }, [warehouseId, fetchRows]);
 
   // ── Filtragem usando KPI do contexto filtrado ─────────────────────────────
   const filtrados = useMemo(() =>
@@ -424,28 +481,35 @@ export default function AllocationMap() {
 
   // ── Gerar Alocação — respeita seleção (se houver) ou pendentes ────────────
   const handleGenerate = () => {
-    // Se há selecionados pendentes, aloca só eles; senão, aloca todos os pendentes
     const selPendentes = selecionados.filter(r => r.status === 'Pendente');
     const targets = selPendentes.length > 0 ? selPendentes : pendentes;
-
     if (targets.length === 0) { toast('Nenhum registro Pendente para alocar.', 'warn'); return; }
     setGerando(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       const targetIds = new Set(targets.map(r => r.id));
+      let updatedRows = [];
       setRows(rs => {
         const ocupados = rs
           .filter(r => !targetIds.has(r.id) && r.enderecoSugerido && r.status !== 'Cancelado')
           .map(r => r.enderecoSugerido);
         const usados = [...ocupados];
-
-        return rs.map(r => {
+        const newRs = rs.map(r => {
           if (!targetIds.has(r.id)) return r;
           const { endereco, tipoLocal } = gerarEndereco(undefined, usados);
-          if (endereco) usados.push(endereco); // reserva para próxima iteração
-          if (!endereco) return { ...r, status: 'Pendente' }; // sem espaço disponível
+          if (endereco) usados.push(endereco);
+          if (!endereco) return { ...r, status: 'Pendente' };
           return { ...r, lote: gerarLote(r.ordemId), enderecoSugerido: endereco, tipoLocal, status: 'Posicionado' };
         });
+        updatedRows = newRs.filter(r => targetIds.has(r.id));
+        return newRs;
       });
+      // Persist to Supabase
+      for (const r of updatedRows) {
+        await supabase.from('alocacoes').update({
+          lote: r.lote, endereco_sugerido: r.enderecoSugerido,
+          tipo_local: r.tipoLocal, status: r.status,
+        }).eq('id', r.id);
+      }
       setGerando(false);
       toast(`${targets.length} alocação(ões) gerada(s) com sucesso!`);
     }, 1800);
@@ -457,10 +521,13 @@ export default function AllocationMap() {
     setModal('alterar');
   };
 
-  const handleSaveEndereco = (endereco, tipoLocal) => {
+  const handleSaveEndereco = async (endereco, tipoLocal) => {
     const ids = new Set(selecionados.map(r => r.id));
     setRows(rs => rs.map(r => ids.has(r.id) ? { ...r, enderecoSugerido: endereco, tipoLocal, status: 'Posicionado' } : r));
     setModal(null);
+    for (const id of ids) {
+      await supabase.from('alocacoes').update({ endereco_sugerido: endereco, tipo_local: tipoLocal, status: 'Posicionado' }).eq('id', id);
+    }
     toast(`Endereço ${endereco} aplicado em ${selecionados.length} registro(s).`);
   };
 
@@ -474,17 +541,20 @@ export default function AllocationMap() {
     setModal('confirmar');
   };
 
-  const handleAutorizado = () => {
+  const handleAutorizado = async () => {
     const ids = new Set(selecionados.filter(r => r.status === 'Posicionado').map(r => r.id));
     setRows(rs => rs.map(r => ids.has(r.id) ? { ...r, status: 'Finalizado', selecionado: false } : r));
     setModal(null);
+    for (const id of ids) {
+      await supabase.from('alocacoes').update({ status: 'Finalizado' }).eq('id', id);
+    }
     toast(`${ids.size} alocação(ões) CONFIRMADA(S)! Guarda registrada.`);
   };
 
   // ── Resetar Lote (anteriormente "Excluir") ────────────────────────────────
   // Ação correta: volta para Pendente, preserva a ordem; NÃO apaga o ordemId
   // O lote físico impresso ainda existe — avise o operador
-  const handleResetar = () => {
+  const handleResetar = async () => {
     if (selecionados.length === 0) { toast('Selecione ao menos um registro.', 'warn'); return; }
     const naoFinalizado = selecionados.filter(r => r.status !== 'Finalizado');
     if (naoFinalizado.length === 0) { toast('Registros Finalizados não podem ser resetados.', 'warn'); return; }
@@ -494,13 +564,27 @@ export default function AllocationMap() {
         ? { ...r, lote: null, enderecoSugerido: null, tipoLocal: null, status: 'Cancelado', selecionado: false }
         : r
     ));
+    for (const id of ids) {
+      await supabase.from('alocacoes').update({ lote: null, endereco_sugerido: null, tipo_local: null, status: 'Cancelado' }).eq('id', id);
+    }
     toast(`${naoFinalizado.length} registro(s) cancelado(s). Lotes físicos precisam ser inutilizados manualmente.`, 'warn');
   };
 
   const posicionadosSelect = selecionados.filter(r => r.status === 'Posicionado').length;
 
+  const actionGroups = [[
+    { label: gerando ? 'Gerando...' : 'Gerar Alocação', icon: gerando ? RefreshCw : Zap, primary: true, onClick: handleGenerate, disabled: gerando || pendentes.length === 0 },
+    { label: 'Alterar Endereço', icon: ArrowRightLeft, onClick: handleAlterar, disabled: selecionados.length === 0 },
+    { label: 'Confirmar',        icon: ShieldCheck,     onClick: handleConfirmar, disabled: posicionadosSelect === 0 },
+    { label: 'Cancelar',         icon: RotateCcw,       onClick: handleResetar,  disabled: selecionados.length === 0 },
+  ]];
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in duration-700">
+    <EnterprisePageBase
+      title="2.6 Gerar Mapa de Alocação"
+      breadcrumbItems={[{ label: 'Entrada e Recebimento' }]}
+      actionGroups={actionGroups}
+    >
 
       {/* ═══ MODAIS ═══ */}
       {modal === 'alterar' && (
@@ -529,38 +613,26 @@ export default function AllocationMap() {
         ))}
       </div>
 
-      {/* ═══ HEADER ═══ */}
-      <div className="bg-white dark:bg-slate-900 border-b-2 border-slate-100 dark:border-slate-800 px-6 py-5 shrink-0 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-600 via-emerald-500 to-green-600" />
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 flex items-center justify-center shadow-lg shrink-0">
-            <LayoutGrid className="w-6 h-6 text-white" aria-hidden="true" />
+      {/* ═══ KPIs ═══ */}
+      <div className="flex gap-3 flex-wrap">
+        {[
+          { label: 'Pendentes',    val: kpiPendentes,    color: 'text-amber-500' },
+          { label: 'Posicionados', val: kpiPosicionados, color: 'text-blue-500'  },
+          { label: 'Finalizados',  val: kpiFinalizados,  color: 'text-green-600' },
+        ].map(k => (
+          <div key={k.label} className="text-center bg-white dark:bg-slate-800 border border-slate-100 rounded-2xl px-5 py-3 min-w-[80px]"
+            title={statusFiltro !== 'Todos' ? `Filtrado por: ${statusFiltro}` : 'Total do sistema'}>
+            <p className={cn('text-2xl font-black', k.color)}>{k.val}</p>
+            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-tight">{k.label}</p>
           </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 3 — Entrada e Recebimento</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">2.6 Gerar Mapa de Alocação</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Inteligência de armazenamento · Endereçamento automático Pulmão / Picking</p>
-          </div>
-
-          {/* KPIs refletem filtro atual */}
-          <div className="ml-auto flex gap-3">
-            {[
-              { label: 'Pendentes',    val: kpiPendentes,    color: 'text-amber-500' },
-              { label: 'Posicionados', val: kpiPosicionados, color: 'text-blue-500'  },
-              { label: 'Finalizados',  val: kpiFinalizados,  color: 'text-green-600' },
-            ].map(k => (
-              <div key={k.label} className="text-center bg-slate-50 dark:bg-slate-800 rounded-2xl px-4 py-2.5 min-w-[72px]"
-                title={statusFiltro !== 'Todos' ? `Filtrado por: ${statusFiltro}` : 'Total do sistema'}>
-                <p className={cn('text-xl font-black', k.color)}>{k.val}</p>
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{k.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
+        <p className="text-xs text-slate-500 font-medium self-center ml-1">
+          Inteligência de armazenamento · Endereçamento automático Pulmão / Picking
+        </p>
       </div>
 
       {/* ═══ BARRA DE FILTROS ═══ */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-3 flex flex-wrap gap-3 items-center shrink-0">
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative">
           <input
             value={search}
@@ -571,8 +643,6 @@ export default function AllocationMap() {
           />
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
         </div>
-
-        {/* Botões de filtro — cores corretas sem split hack */}
         <div className="flex gap-1" role="group" aria-label="Filtrar por status">
           {STATUS_OPTS.map(s => {
             const isActive = statusFiltro === s;
@@ -580,12 +650,8 @@ export default function AllocationMap() {
               ? (isActive ? 'bg-slate-800 text-white border-slate-700' : '')
               : (isActive ? STATUS_COLOR[s]?.filterActive : '');
             return (
-              <button
-                key={s}
-                onClick={() => setStatusFiltro(s)}
-                aria-pressed={isActive}
-                className={cn(
-                  'px-3 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all',
+              <button key={s} onClick={() => setStatusFiltro(s)} aria-pressed={isActive}
+                className={cn('px-3 py-1.5 rounded-xl text-[10px] font-black border-2 transition-all',
                   isActive ? colorCls : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:border-slate-200 dark:hover:border-slate-700'
                 )}>
                 {s}
@@ -593,51 +659,17 @@ export default function AllocationMap() {
             );
           })}
         </div>
-
-        <div className="flex-1" />
-
-        {/* ═══ TOOLBAR DE AÇÕES ═══ */}
-        <div className="flex items-center gap-2">
-          {/* Gerar Alocação — respeita seleção */}
-          <button
-            onClick={handleGenerate}
-            disabled={gerando || pendentes.length === 0}
-            title={pendentes.length === 0 ? 'Nenhum registro Pendente disponível' : selecionados.filter(r=>r.status==='Pendente').length > 0 ? `Alocar ${selecionados.filter(r=>r.status==='Pendente').length} selecionado(s)` : `Alocar ${pendentes.length} pendente(s)`}
-            aria-disabled={gerando || pendentes.length === 0}
-            className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-black hover:bg-green-700 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
-            {gerando ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />}
-            {gerando ? 'Gerando...' : 'Gerar Alocação'}
-          </button>
-
-          <button
-            onClick={handleAlterar}
-            disabled={selecionados.length === 0}
-            title={selecionados.length === 0 ? 'Selecione ao menos um registro' : `Alterar endereço de ${selecionados.length} registro(s)`}
-            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl text-xs font-black hover:bg-amber-600 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
-            <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" />Alterar Endereço
-          </button>
-
-          <button
-            onClick={handleConfirmar}
-            disabled={posicionadosSelect === 0}
-            title={posicionadosSelect === 0 ? 'Selecione registros "Posicionados" para confirmar' : `Confirmar ${posicionadosSelect} alocação(ões)`}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
-            <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />Confirmar Alocação
-          </button>
-
-          {/* Renomeado: "Cancelar Lotes" — behavior correto + aviso */}
-          <button
-            onClick={handleResetar}
-            disabled={selecionados.length === 0}
-            title={selecionados.length === 0 ? 'Selecione ao menos um registro' : 'Cancelar lotes selecionados (retorna para Pendente)'}
-            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-black hover:bg-red-700 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed">
-            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />Cancelar Lotes
-          </button>
-        </div>
+        <div className="ml-auto text-[10px] text-slate-400 font-medium">{filtrados.length} registro(s)</div>
       </div>
 
       {/* ═══ GRID ═══ */}
-      <div className="flex-1 overflow-auto p-4">
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <RefreshCw className="w-6 h-6 text-secondary animate-spin" />
+          <span className="ml-2 text-sm text-slate-400 font-bold">Carregando alocações...</span>
+        </div>
+      ) : null}
+      <div>
         {selecionados.length > 0 && (
           <div className="mb-3 flex items-center gap-2 px-4 py-2 bg-secondary/10 border-2 border-secondary/30 rounded-xl text-xs font-black text-secondary animate-in fade-in duration-200"
             aria-live="polite">
@@ -742,6 +774,6 @@ export default function AllocationMap() {
           <p className="text-[9px] text-slate-400 ml-auto font-medium">{filtrados.length} registro(s) exibido(s)</p>
         </div>
       </div>
-    </div>
+    </EnterprisePageBase>
   );
 }
