@@ -104,21 +104,18 @@ export default function CrossDockingMonitoring() {
 
   const handlePrint = useCallback(() => window.print(), []);
 
-  // ── Barra de ações ────────────────────────────────────────────────────────
+  // ── Barra de ações (formato: array de arrays) ─────────────────────────────
   const actionGroups = [
-    {
-      items: [
-        { label: 'Nova NF',   icon: <Plus className="w-4 h-4" />,      variant: 'primary',  onClick: () => alert('Formulário nova NF — a implementar') },
-        { label: 'Atualizar', icon: <RefreshCw className="w-4 h-4" />, variant: 'secondary', onClick: fetchNFs },
-        { label: 'Imprimir',  icon: <Printer className="w-4 h-4" />,   variant: 'secondary', onClick: handlePrint },
-        {
-          label: isTvMode ? 'Sair Modo TV' : 'Modo TV',
-          icon: isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />,
-          variant: isTvMode ? 'danger' : 'secondary',
-          onClick: () => setIsTvMode(!isTvMode),
-        },
-      ],
-    },
+    [
+      { label: 'Nova NF',   icon: <Plus className="w-4 h-4" />,      primary: true,  onClick: () => alert('Formulário nova NF — a implementar') },
+      { label: 'Atualizar', icon: <RefreshCw className="w-4 h-4" />,                 onClick: fetchNFs },
+      { label: 'Imprimir',  icon: <Printer className="w-4 h-4" />,                   onClick: handlePrint },
+      {
+        label: isTvMode ? 'Sair Modo TV' : 'Modo TV',
+        icon: isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />,
+        onClick: () => setIsTvMode(!isTvMode),
+      },
+    ],
   ];
 
   return (
