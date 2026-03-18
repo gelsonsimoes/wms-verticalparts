@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
   CheckCircle2, Clock, XCircle, ChevronRight,
   FileText, Boxes, Truck, Hash, Monitor, Tv, AlertTriangle, Printer,
-  RefreshCw, Plus,
+  RefreshCw, Plus, Trash2, Save,
 } from 'lucide-react';
 import { useApp } from '../hooks/useApp';
 import { cn } from '../utils/cn';
@@ -11,7 +11,8 @@ import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import Tooltip from '../components/ui/Tooltip';
 
 const BAR_COLORS = { amber: 'bg-amber-400', emerald: 'bg-emerald-500', slate: 'bg-slate-200' };
-const FILTROS = ['Pendente', 'Processada', 'Cancelada'];
+const FILTROS    = ['Pendente', 'Processada', 'Cancelada'];
+const STATUS_OPT = ['Pendente', 'Processada', 'Cancelada'];
 
 const Zap = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,24 +27,201 @@ const ProgressBar = ({ value, color = 'amber', label }) => (
       <span className="text-[9px] font-black text-slate-700 dark:text-slate-300">{value}%</span>
     </div>
     <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800">
-      <div
-        className={cn('h-full transition-all duration-700 rounded-full', BAR_COLORS[color] ?? BAR_COLORS.slate)}
+      <div className={cn('h-full transition-all duration-700 rounded-full', BAR_COLORS[color] ?? BAR_COLORS.slate)}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-        role="progressbar" aria-valuenow={value} aria-valuemin="0" aria-valuemax="100"
-      />
+        role="progressbar" aria-valuenow={value} aria-valuemin="0" aria-valuemax="100" />
     </div>
   </div>
 );
 
+const ITEM_VAZIO = () => ({ _id: crypto.randomUUID(), sku: '', descricao: '', ean: '', quantidade_solicitada: 1, quantidade_atendida: 0 });
+const FORM_VAZIO = () => ({
+  numero_nf: '', ordem_referencia: '', doca: '', numero_coleta: '',
+  status: 'Pendente', conferido: false,
+  perc_alocada: 0, perc_expedida: 0,
+  itens: [ITEM_VAZIO()],
+});
+
+// ── Modal Nova / Editar NF ────────────────────────────────────────────────────
+function ModalNF({ aberto, onFechar, onSalvar, salvando }) {
+  const [form, setForm] = useState(FORM_VAZIO());
+
+  useEffect(() => { if (aberto) setForm(FORM_VAZIO()); }, [aberto]);
+
+  const setField = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const setItem = (idx, k, v) =>
+    setForm(p => ({ ...p, itens: p.itens.map((it, i) => i === idx ? { ...it, [k]: v } : it) }));
+
+  const addItem    = () => setForm(p => ({ ...p, itens: [...p.itens, ITEM_VAZIO()] }));
+  const removeItem = (idx) => setForm(p => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
+
+  const handleSalvar = () => {
+    if (!form.numero_nf.trim()) return alert('Informe o número da NF.');
+    if (form.itens.some(it => !it.sku.trim())) return alert('Todos os itens precisam de SKU.');
+    onSalvar(form);
+  };
+
+  if (!aberto) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-sm shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl max-h-[90vh] flex flex-col">
+
+        {/* Header modal */}
+        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-sm bg-amber-400 flex items-center justify-center">
+              <Plus className="w-4 h-4 text-slate-900" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Nova Nota Fiscal — Cross-Docking</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Preencha os dados e adicione os itens da carga</p>
+            </div>
+          </div>
+          <button onClick={onFechar} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Corpo do modal */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+          {/* Cabeçalho da NF */}
+          <section>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Dados da NF</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { label: 'Nº NF *',            key: 'numero_nf',        placeholder: 'NF-10001' },
+                { label: 'Ordem / Ref.',         key: 'ordem_referencia', placeholder: 'OR-55920' },
+                { label: 'Doca',                 key: 'doca',             placeholder: 'Doca 08' },
+                { label: 'Nº Coleta',            key: 'numero_coleta',    placeholder: 'COL-001' },
+              ].map(f => (
+                <label key={f.key} className="flex flex-col gap-1">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{f.label}</span>
+                  <input
+                    value={form[f.key]}
+                    onChange={e => setField(f.key, e.target.value)}
+                    placeholder={f.placeholder}
+                    className="border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </label>
+              ))}
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</span>
+                <select value={form.status} onChange={e => setField('status', e.target.value)}
+                  className="border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400">
+                  {STATUS_OPT.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">% Alocada</span>
+                <input type="number" min="0" max="100" value={form.perc_alocada}
+                  onChange={e => setField('perc_alocada', Number(e.target.value))}
+                  className="border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">% Expedida</span>
+                <input type="number" min="0" max="100" value={form.perc_expedida}
+                  onChange={e => setField('perc_expedida', Number(e.target.value))}
+                  className="border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-400" />
+              </label>
+            </div>
+
+            <label className="flex items-center gap-2 mt-3 cursor-pointer w-fit">
+              <input type="checkbox" checked={form.conferido} onChange={e => setField('conferido', e.target.checked)}
+                className="w-4 h-4 rounded accent-amber-400" />
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">NF Conferida</span>
+            </label>
+          </section>
+
+          {/* Itens da carga */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Itens da Carga</p>
+              <button onClick={addItem}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-400 text-slate-900 rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 transition-colors">
+                <Plus className="w-3 h-3" /> Adicionar Item
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {form.itens.map((item, idx) => (
+                <div key={item._id} className="grid grid-cols-12 gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-sm border border-slate-100 dark:border-slate-700">
+                  <div className="col-span-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">SKU *</span>
+                    <input value={item.sku} onChange={e => setItem(idx, 'sku', e.target.value.toUpperCase())}
+                      placeholder="VPER-ESS-NY-27MM"
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1.5 text-xs font-mono font-bold bg-white dark:bg-slate-900 text-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="col-span-4">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Descrição</span>
+                    <input value={item.descricao} onChange={e => setItem(idx, 'descricao', e.target.value)}
+                      placeholder="Escova de Segurança Nylon 27mm"
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1.5 text-xs font-bold bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">EAN</span>
+                    <input value={item.ean} onChange={e => setItem(idx, 'ean', e.target.value)}
+                      placeholder="7891234560001"
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-900 text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="col-span-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Solicit.</span>
+                    <input type="number" min="1" value={item.quantidade_solicitada}
+                      onChange={e => setItem(idx, 'quantidade_solicitada', Number(e.target.value))}
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="col-span-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Atend.</span>
+                    <input type="number" min="0" value={item.quantidade_atendida}
+                      onChange={e => setItem(idx, 'quantidade_atendida', Number(e.target.value))}
+                      className="w-full border border-slate-200 dark:border-slate-700 rounded-sm px-2 py-1.5 text-xs font-black text-center bg-white dark:bg-slate-900 text-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="col-span-1 flex items-end justify-center pb-1">
+                    <button onClick={() => removeItem(idx)} disabled={form.itens.length === 1}
+                      className="p-1.5 text-slate-300 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Footer modal */}
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/30">
+          <span className="text-[10px] text-slate-400 font-bold">{form.itens.length} item{form.itens.length !== 1 ? 's' : ''} adicionado{form.itens.length !== 1 ? 's' : ''}</span>
+          <div className="flex gap-3">
+            <button onClick={onFechar}
+              className="px-4 py-2 text-slate-500 hover:text-slate-700 text-[10px] font-black uppercase tracking-widest transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSalvar} disabled={salvando}
+              className="flex items-center gap-2 px-5 py-2 bg-amber-400 hover:bg-amber-500 text-slate-900 rounded-sm text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow">
+              {salvando ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {salvando ? 'Salvando...' : 'Salvar NF'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function CrossDockingMonitoring() {
   const { warehouseId, isTvMode, setIsTvMode } = useApp();
   const [filter, setFilter]         = useState('Pendente');
   const [selectedNF, setSelectedNF] = useState(null);
   const [nfs, setNfs]               = useState([]);
   const [loading, setLoading]       = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [salvando, setSalvando]     = useState(false);
   const detailRef                   = useRef(null);
 
-  // ── Buscar dados do Supabase ──────────────────────────────────────────────
+  // ── Buscar dados ──────────────────────────────────────────────────────────
   const fetchNFs = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -94,22 +272,71 @@ export default function CrossDockingMonitoring() {
   const filteredNFs  = useMemo(() => nfs.filter(nf => nf.status === filter), [nfs, filter]);
   const selectedData = useMemo(() => nfs.find(n => n.id === selectedNF), [nfs, selectedNF]);
 
-  // ── Rota Expressa salva no Supabase ───────────────────────────────────────
+  // ── Salvar nova NF ────────────────────────────────────────────────────────
+  const handleSalvarNF = async (form) => {
+    setSalvando(true);
+    try {
+      const { data: nfData, error: nfErr } = await supabase
+        .from('cross_docking')
+        .insert({
+          warehouse_id:      warehouseId,
+          numero_nf:         form.numero_nf.trim(),
+          ordem_referencia:  form.ordem_referencia.trim() || null,
+          doca:              form.doca.trim() || null,
+          numero_coleta:     form.numero_coleta.trim() || null,
+          status:            form.status,
+          conferido:         form.conferido,
+          perc_alocada:      form.perc_alocada,
+          perc_expedida:     form.perc_expedida,
+        })
+        .select()
+        .single();
+
+      if (nfErr) throw nfErr;
+
+      const itens = form.itens
+        .filter(it => it.sku.trim())
+        .map(it => ({
+          cross_docking_id:      nfData.id,
+          sku:                   it.sku.trim(),
+          descricao:             it.descricao.trim() || null,
+          ean:                   it.ean.trim() || null,
+          quantidade_solicitada: it.quantidade_solicitada,
+          quantidade_atendida:   it.quantidade_atendida,
+        }));
+
+      if (itens.length > 0) {
+        const { error: itensErr } = await supabase.from('cross_docking_itens').insert(itens);
+        if (itensErr) throw itensErr;
+      }
+
+      setModalAberto(false);
+      setFilter(form.status);
+      await fetchNFs();
+    } catch (err) {
+      alert('Erro ao salvar: ' + err.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // ── Rota Expressa ─────────────────────────────────────────────────────────
   const handleRotaExpressa = async (nfId, value) => {
     await supabase
       .from('cross_docking')
       .update({ rota_expressa: value, rota_expressa_definida: true })
       .eq('id', nfId);
+    await fetchNFs();
   };
 
   const handlePrint = useCallback(() => window.print(), []);
 
-  // ── Barra de ações (formato: array de arrays) ─────────────────────────────
+  // ── Barra de ações ────────────────────────────────────────────────────────
   const actionGroups = [
     [
-      { label: 'Nova NF',   icon: <Plus className="w-4 h-4" />,      primary: true,  onClick: () => alert('Formulário nova NF — a implementar') },
-      { label: 'Atualizar', icon: <RefreshCw className="w-4 h-4" />,                 onClick: fetchNFs },
-      { label: 'Imprimir',  icon: <Printer className="w-4 h-4" />,                   onClick: handlePrint },
+      { label: 'Nova NF',   icon: <Plus className="w-4 h-4" />,      primary: true, onClick: () => setModalAberto(true) },
+      { label: 'Atualizar', icon: <RefreshCw className="w-4 h-4" />,               onClick: fetchNFs },
+      { label: 'Imprimir',  icon: <Printer className="w-4 h-4" />,                 onClick: handlePrint },
       {
         label: isTvMode ? 'Sair Modo TV' : 'Modo TV',
         icon: isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />,
@@ -124,9 +351,12 @@ export default function CrossDockingMonitoring() {
       breadcrumbItems={[{ label: 'OPERAR', path: '/operacao' }]}
       actionGroups={actionGroups}
     >
+      {/* Modal Nova NF */}
+      <ModalNF aberto={modalAberto} onFechar={() => setModalAberto(false)} onSalvar={handleSalvarNF} salvando={salvando} />
+
       <div className={cn('space-y-6 pb-20 transition-all duration-500', isTvMode && 'p-6 bg-slate-50 dark:bg-slate-950')}>
 
-        {/* Subtítulo + filtros */}
+        {/* Filtros */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <p className={cn('text-slate-500 font-medium italic', isTvMode ? 'text-xl' : 'text-sm')}>
             Monitoramento de transbordo e expedição direta
@@ -142,7 +372,7 @@ export default function CrossDockingMonitoring() {
           </nav>
         </div>
 
-        {/* KPIs — só no Modo TV */}
+        {/* KPIs — Modo TV */}
         {isTvMode && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 duration-500">
             <button onClick={() => setFilter('Pendente')}
@@ -194,8 +424,17 @@ export default function CrossDockingMonitoring() {
                   </td></tr>
                 )}
                 {!loading && filteredNFs.length === 0 && (
-                  <tr><td colSpan={6} className="p-12 text-center text-slate-400 text-sm italic">
-                    Nenhuma NF com status "{filter}" registrada.
+                  <tr><td colSpan={6} className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-400">
+                      <FileText className="w-10 h-10 opacity-30" />
+                      <p className="text-sm italic">Nenhuma NF com status "{filter}" registrada.</p>
+                      {filter === 'Pendente' && (
+                        <button onClick={() => setModalAberto(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-amber-400 text-slate-900 rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 transition-colors mt-1">
+                          <Plus className="w-3 h-3" /> Registrar primeira NF
+                        </button>
+                      )}
+                    </div>
                   </td></tr>
                 )}
                 {filteredNFs.map(nf => (
@@ -249,7 +488,6 @@ export default function CrossDockingMonitoring() {
           <article ref={detailRef} tabIndex="-1"
             className="bg-white dark:bg-slate-900 rounded-sm border-2 border-amber-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 scroll-mt-6 focus:outline-none">
 
-            {/* Header detalhe */}
             <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-sm bg-amber-100 border border-amber-200 flex items-center justify-center">
@@ -263,7 +501,6 @@ export default function CrossDockingMonitoring() {
                 </div>
               </div>
 
-              {/* Rota Expressa */}
               <div className="bg-slate-800 px-4 py-3 rounded-sm border border-amber-400/30 flex items-center gap-3 shadow">
                 <div className="w-9 h-9 rounded-sm bg-amber-400 flex items-center justify-center shrink-0">
                   <Truck className="w-4 h-4 text-slate-900" />
@@ -303,7 +540,6 @@ export default function CrossDockingMonitoring() {
               </button>
             </div>
 
-            {/* Tabela de itens */}
             <div className="overflow-x-auto p-4">
               <table className="w-full text-left border-separate border-spacing-y-1">
                 <thead>
@@ -346,7 +582,6 @@ export default function CrossDockingMonitoring() {
               </table>
             </div>
 
-            {/* Footer detalhe */}
             <footer className="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 flex justify-between items-center gap-4">
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-amber-500" />
