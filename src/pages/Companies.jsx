@@ -181,13 +181,13 @@ export default function Companies() {
 
   const actionGroups = [
     [
-      { label: 'Novo',   primary: true, icon: <Plus className="w-3.5 h-3.5" />,  onClick: handleNew },
-      { label: 'Salvar', icon: <Save className="w-3.5 h-3.5" />,                  onClick: handleSave,   disabled: !selectedCompany },
+      { label: 'Novo',   primary: true, icon: Plus,   onClick: handleNew },
+      { label: 'Salvar', icon: Save,                  onClick: handleSave,   disabled: !selectedCompany },
     ],
     [
       {
         label: 'Excluir',
-        icon: <Trash2 className="w-3.5 h-3.5" />,
+        icon: Trash2,
         onClick: handleDelete,
         disabled: !selectedCompany || isNew,
         title: !selectedCompany || isNew ? 'Selecione uma empresa para excluir' : 'Excluir empresa selecionada',
@@ -195,7 +195,7 @@ export default function Companies() {
     ],
     [
       // Relatórios: placeholder informativo enquanto não implementado
-      { label: 'Relatórios', icon: <FileText className="w-3.5 h-3.5" />, disabled: true, title: 'Disponível em breve' },
+      { label: 'Relatórios', icon: FileText, disabled: true, title: 'Disponível em breve' },
     ],
   ];
 

@@ -27,16 +27,16 @@ export default function OrderManagement() {
 
   const orderGroups = [
     [
-      { label: 'Novo Pedido',       primary: true, icon: <Plus size={14}/>,         onClick: () => alert('Funcionalidade "Novo Pedido" em desenvolvimento.') },
-      { label: 'Liberar para WMS',              icon: <CheckCircle2 size={14}/>,   onClick: () => alert('Funcionalidade "Liberar para WMS" em desenvolvimento.') },
+      { label: 'Novo Pedido',       primary: true, icon: Plus,         onClick: () => alert('Funcionalidade "Novo Pedido" em desenvolvimento.') },
+      { label: 'Liberar para WMS',              icon: CheckCircle2,   onClick: () => alert('Funcionalidade "Liberar para WMS" em desenvolvimento.') },
     ],
     [
-      { label: 'Bloquear Ordem',               icon: <AlertCircle size={14}/>,    onClick: () => alert('Funcionalidade "Bloquear Ordem" em desenvolvimento.') },
-      { label: 'Cancelar',                      icon: <Clock size={14}/>,           onClick: () => alert('Funcionalidade "Cancelar Ordem" em desenvolvimento.') },
+      { label: 'Bloquear Ordem',               icon: AlertCircle,    onClick: () => alert('Funcionalidade "Bloquear Ordem" em desenvolvimento.') },
+      { label: 'Cancelar',                      icon: Clock,           onClick: () => alert('Funcionalidade "Cancelar Ordem" em desenvolvimento.') },
     ],
     [
-      { label: 'Imprimir Etiquetas',            icon: <Printer size={14}/>,         onClick: () => alert('Funcionalidade "Imprimir Etiquetas" em desenvolvimento.') },
-      { label: 'Exportar XML/CSV',              icon: <Download size={14}/>,        onClick: () => alert('Funcionalidade "Exportar XML/CSV" em desenvolvimento.') },
+      { label: 'Imprimir Etiquetas',            icon: Printer,         onClick: () => alert('Funcionalidade "Imprimir Etiquetas" em desenvolvimento.') },
+      { label: 'Exportar XML/CSV',              icon: Download,        onClick: () => alert('Funcionalidade "Exportar XML/CSV" em desenvolvimento.') },
     ]
   ];
 

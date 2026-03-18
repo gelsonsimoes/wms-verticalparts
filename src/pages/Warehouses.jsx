@@ -106,15 +106,15 @@ export default function Warehouses() {
 
   const actionGroups = [
     [
-      { label: 'Novo', primary: true, icon: <Plus className="w-3.5 h-3.5" aria-hidden="true" />, onClick: handleNew },
-      { label: 'Salvar', icon: <Save className="w-3.5 h-3.5" aria-hidden="true" />, onClick: handleSave }
+      { label: 'Novo', primary: true, icon: Plus, onClick: handleNew },
+      { label: 'Salvar', icon: Save, onClick: handleSave }
     ],
     [
-      { label: 'Excluir', icon: <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />, onClick: handleDelete, disabled: !selectedWarehouse || selectedWarehouse.id === 'NOVO' }
+      { label: 'Excluir', icon: Trash2, onClick: handleDelete, disabled: !selectedWarehouse || selectedWarehouse.id === 'NOVO' }
     ],
     [
-      { label: 'Configurar Layout', icon: <Settings2 className="w-3.5 h-3.5" aria-hidden="true" /> },
-      { label: 'Relatórios', icon: <FileText className="w-3.5 h-3.5" aria-hidden="true" /> }
+      { label: 'Configurar Layout', icon: Settings2 },
+      { label: 'Relatórios', icon: FileText }
     ]
   ];
 

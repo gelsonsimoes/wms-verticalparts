@@ -334,12 +334,12 @@ export default function CrossDockingMonitoring() {
   // ── Barra de ações ────────────────────────────────────────────────────────
   const actionGroups = [
     [
-      { label: 'Nova NF',   icon: <Plus className="w-4 h-4" />,      primary: true, onClick: () => setModalAberto(true) },
-      { label: 'Atualizar', icon: <RefreshCw className="w-4 h-4" />,               onClick: fetchNFs },
-      { label: 'Imprimir',  icon: <Printer className="w-4 h-4" />,                 onClick: handlePrint },
+      { label: 'Nova NF',   icon: Plus,      primary: true, onClick: () => setModalAberto(true) },
+      { label: 'Atualizar', icon: RefreshCw,               onClick: fetchNFs },
+      { label: 'Imprimir',  icon: Printer,                 onClick: handlePrint },
       {
         label: isTvMode ? 'Sair Modo TV' : 'Modo TV',
-        icon: isTvMode ? <Monitor className="w-4 h-4" /> : <Tv className="w-4 h-4" />,
+        icon: isTvMode ? Monitor : Tv,
         onClick: () => setIsTvMode(!isTvMode),
       },
     ],
