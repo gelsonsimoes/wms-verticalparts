@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -33,24 +36,6 @@ const STATUS_COLOR = {
 };
 const STATUS_OPTS = ['Todos', 'Pendente', 'Em Conferência', 'Divergente', 'Finalizado'];
 
-/* ─── makeItens — IDs com UUID para evitar colisão ─────────────────────── */
-const makeItens = (ordemId) => [
-  { id: `${ordemId}-${crypto.randomUUID()}`, barcode:'VEPEL-BPI-174FX',        descricao:'Barreira de Proteção Infravermelha', qtEsperada:4, qtContada:0, lote:'', validade:'' },
-  { id: `${ordemId}-${crypto.randomUUID()}`, barcode:'VEPEL-BTI-JX02-CCS',     descricao:'Botoeira de Inspeção - Mod. JX02',   qtEsperada:2, qtContada:0, lote:'', validade:'' },
-  { id: `${ordemId}-${crypto.randomUUID()}`, barcode:'VPER-LUM-LED-VRD-24V',   descricao:'Luminária em LED Verde 24V',          qtEsperada:6, qtContada:0, lote:'', validade:'' },
-];
-
-const ORDENS_INIT = [
-  { id:'OR001', ordemId:'ORD-001', nf:'NF-45123', depositante:'VerticalParts Matriz',        status:'Pendente',      itens: makeItens('OR001') },
-  { id:'OR002', ordemId:'ORD-002', nf:'NF-45124', depositante:'Elevadores Atlas Schindler',  status:'Em Conferência',itens: makeItens('OR002') },
-  { id:'OR003', ordemId:'ORD-003', nf:'NF-45125', depositante:'Thyssenkrupp Elevadores',     status:'Divergente',    itens:[
-    { id:'OR003-A', barcode:'VEPEL-BPI-174FX',          descricao:'Barreira de Proteção Infravermelha', qtEsperada:3, qtContada:2, lote:'', validade:'' },
-    { id:'OR003-B', barcode:'VPER-PNT-AL-22D-202X145-CT',descricao:'Pente de Alumínio - 22 Dentes',      qtEsperada:1, qtContada:1, lote:'', validade:'' },
-  ]},
-  { id:'OR004', ordemId:'ORD-004', nf:'NF-45126', depositante:'Otis Elevadores',             status:'Finalizado',    itens:[
-    { id:'OR004-A', barcode:'VPER-INC-ESQ', descricao:'InnerCap (Esquerdo)', qtEsperada:8, qtContada:8, lote:'', validade:'' },
-  ]},
-];
 
 /* ─── Validação de validade ─────────────────────────────────────────────── */
 function validateValidade(dateStr) {
@@ -656,11 +641,93 @@ function ModalConferencia({ ordem, onClose, onSave }) {
 
 /* ─── Root ─────────────────────────────────────────────────────────────── */
 export default function BlindCheck() {
-  const [ordens, setOrdens]   = useState(ORDENS_INIT);
+  const { warehouseId } = useApp();
+  const [ordens, setOrdens]   = useState([]);
+  const [loading, setLoading] = useState(false);
   const [statusFiltro, setFiltro] = useState('Todos');
   const [search, setSearch]   = useState('');
   const [modalOR, setModalOR] = useState(null);
   const { toasts, add: addToast } = useToastQueue();
+
+  /* ── helpers para mapear DB → estado local ── */
+  const mapCC = (cc) => ({
+    id: cc.id,
+    ordemId: cc.ordem_id,
+    nf: cc.nf || '',
+    depositante: cc.depositante || '',
+    status: cc.status,
+    tentativas: cc.tentativas || 0,
+    itens: (cc.conferencia_cega_itens || []).map(i => ({
+      id: i.id,
+      barcode: i.barcode,
+      descricao: i.descricao || '',
+      qtEsperada: i.qt_esperada,
+      qtContada: i.qt_contada,
+      lote: i.lote || '',
+      validade: i.validade || '',
+      peso: i.peso || '',
+      cor: i.cor || '',
+    })),
+  });
+
+  const fetchOrdens = useCallback(async () => {
+    if (!warehouseId) return;
+    setLoading(true);
+    const { data: ccs, error } = await supabase
+      .from('conferencia_cega')
+      .select('*, conferencia_cega_itens(*)')
+      .eq('warehouse_id', warehouseId)
+      .order('created_at', { ascending: false });
+    if (error) { setLoading(false); addToast('Erro ao carregar conferências', 'warn'); return; }
+
+    let list = (ccs || []).map(mapCC);
+
+    /* Seed a partir de ordens_recebimento quando vazio */
+    if (list.length === 0) {
+      const { data: ors } = await supabase
+        .from('ordens_recebimento')
+        .select('*, ordens_recebimento_itens(*)')
+        .eq('warehouse_id', warehouseId)
+        .in('status', ['Pendente', 'Aguardando Alocação']);
+      if (ors && ors.length > 0) {
+        for (const or of ors) {
+          const { data: cc } = await supabase
+            .from('conferencia_cega')
+            .insert({ warehouse_id: warehouseId, ordem_id: or.codigo, nf: or.nf || '', depositante: or.depositante || '' })
+            .select().single();
+          if (cc && or.ordens_recebimento_itens?.length > 0) {
+            await supabase.from('conferencia_cega_itens').insert(
+              or.ordens_recebimento_itens.map(i => ({
+                conferencia_id: cc.id,
+                barcode: i.sku,
+                descricao: i.descricao || '',
+                qt_esperada: i.quantidade,
+              }))
+            );
+          }
+        }
+        const { data: refreshed } = await supabase
+          .from('conferencia_cega')
+          .select('*, conferencia_cega_itens(*)')
+          .eq('warehouse_id', warehouseId)
+          .order('created_at', { ascending: false });
+        list = (refreshed || []).map(mapCC);
+      }
+    }
+    setOrdens(list);
+    setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warehouseId]);
+
+  useEffect(() => {
+    fetchOrdens();
+    if (!warehouseId) return;
+    const ch = supabase
+      .channel('conferencia_cega_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conferencia_cega', filter: `warehouse_id=eq.${warehouseId}` }, fetchOrdens)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [warehouseId, fetchOrdens]);
 
   const filtered = useMemo(() =>
     ordens.filter(o =>
@@ -675,8 +742,20 @@ export default function BlindCheck() {
     setModalOR(o);
   };
 
-  const handleSave = (itensAtualizados, logAtualizado, novoStatus) => {
+  const handleSave = async (itensAtualizados, logAtualizado, novoStatus) => {
     const id = modalOR.id;
+    /* Persiste status no Supabase */
+    await supabase.from('conferencia_cega').update({ status: novoStatus }).eq('id', id);
+    /* Persiste contagens de cada item */
+    for (const item of itensAtualizados) {
+      await supabase.from('conferencia_cega_itens').update({
+        qt_contada: item.qtContada,
+        lote:       item.lote     || null,
+        validade:   item.validade || null,
+        peso:       item.peso     || null,
+        cor:        item.cor      || null,
+      }).eq('id', item.id);
+    }
     setOrdens(prev => prev.map(o =>
       o.id === id ? { ...o, itens: itensAtualizados, log: logAtualizado, status: novoStatus } : o
     ));
@@ -697,8 +776,16 @@ export default function BlindCheck() {
     return `${divs.length} item(ns) divergente(s)`;
   };
 
+  const actionGroups = [[
+    { label: 'Atualizar', icon: RefreshCw, onClick: fetchOrdens, disabled: loading },
+  ]];
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
+    <EnterprisePageBase
+      title="Conferência Cega"
+      breadcrumbItems={[{ label: 'Operação', href: '/operacao' }, { label: 'Conferência Cega' }]}
+      actionGroups={actionGroups}
+    >
       {/* Modal */}
       {modalOR && <ModalConferencia ordem={modalOR} onClose={() => setModalOR(null)} onSave={handleSave} />}
 
@@ -717,36 +804,24 @@ export default function BlindCheck() {
         ))}
       </div>
 
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border-b-2 border-slate-100 dark:border-slate-800 px-6 py-5 relative overflow-hidden shrink-0">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 via-green-500 to-amber-400" />
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-400 flex items-center justify-center shadow-lg shrink-0">
-            <ClipboardCheck className="w-6 h-6 text-black" />
+      {/* KPIs */}
+      <div className="flex gap-3 mb-4">
+        {[
+          { label:'Pendentes',      val: ordens.filter(o=>o.status==='Pendente').length,      color:'text-slate-500' },
+          { label:'Em Conferência', val: ordens.filter(o=>o.status==='Em Conferência').length, color:'text-blue-500'  },
+          { label:'Divergentes',    val: ordens.filter(o=>o.status==='Divergente').length,     color:'text-red-600'   },
+          { label:'Finalizados',    val: ordens.filter(o=>o.status==='Finalizado').length,     color:'text-green-600' },
+        ].map(k => (
+          <div key={k.label} className="text-center bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl px-3.5 py-2.5 min-w-[80px]">
+            <p className={cn('text-xl font-black', k.color)}>{k.val}</p>
+            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-tight">{k.label}</p>
           </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cat. 3 — Entrada e Recebimento</p>
-            <h1 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">2.7 Realizar Conferência Cega</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Quantidade esperada oculta durante contagem · Tratamento de divergências com supervisor</p>
-          </div>
-          <div className="ml-auto flex gap-3">
-            {[
-              { label:'Pendentes',      val: ordens.filter(o=>o.status==='Pendente').length,      color:'text-slate-500' },
-              { label:'Em Conferência', val: ordens.filter(o=>o.status==='Em Conferência').length, color:'text-blue-500'  },
-              { label:'Divergentes',    val: ordens.filter(o=>o.status==='Divergente').length,     color:'text-red-600'   },
-              { label:'Finalizados',    val: ordens.filter(o=>o.status==='Finalizado').length,     color:'text-green-600' },
-            ].map(k => (
-              <div key={k.label} className="text-center bg-slate-50 dark:bg-slate-800 rounded-2xl px-3.5 py-2.5 min-w-[70px]">
-                <p className={cn('text-xl font-black', k.color)}>{k.val}</p>
-                <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest leading-tight">{k.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
+        {loading && <div className="flex items-center gap-2 text-xs text-slate-400"><Loader2 className="w-4 h-4 animate-spin" />Carregando...</div>}
       </div>
 
       {/* Filtros */}
-      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 px-5 py-3 flex gap-3 items-center flex-wrap shrink-0">
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-3 flex gap-3 items-center flex-wrap mb-4">
         <div className="relative">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ordem, NF ou Depositante..."
             className="pr-8 pl-3 py-1.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium outline-none transition-all w-56" />
@@ -768,7 +843,7 @@ export default function BlindCheck() {
       </div>
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto p-4">
+      <div className="overflow-auto">
         <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-100 dark:border-slate-800 overflow-hidden">
           <table className="w-full text-sm" role="grid">
             <thead>
@@ -819,6 +894,6 @@ export default function BlindCheck() {
           </table>
         </div>
       </div>
-    </div>
+    </EnterprisePageBase>
   );
 }
