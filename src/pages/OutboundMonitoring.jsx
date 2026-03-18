@@ -51,7 +51,6 @@ export default function OutboundMonitoring() {
     const [drawerOpen,    setDrawerOpen]    = useState(false);
     const [drawerType,    setDrawerType]    = useState('');
     const [activeNf,      setActiveNf]      = useState(null);
-    const [periodoOpen,   setPeriodoOpen]   = useState(false);
     const [periodo,       setPeriodo]       = useState('Hoje');
 
     const loadingRef = useRef(null);
@@ -253,44 +252,23 @@ export default function OutboundMonitoring() {
                             {isLoading ? 'Carregando...' : 'Exibir Dados'}
                         </button>
 
-                        {/* Dropdown de Período — FIX: trigger button reflete estado selecionado */}
-                        <div className="relative mb-0.5">
-                            <button
-                                onClick={() => setPeriodoOpen(v => !v)}
-                                aria-haspopup="listbox"
-                                aria-expanded={periodoOpen}
-                                aria-label={`Período: ${periodo}`}
-                                className={`rounded-xl px-4 py-2.5 font-bold text-xs uppercase tracking-widest outline-none transition-all flex items-center gap-2 ${
-                                    periodo
-                                        ? 'bg-secondary text-primary border-2 border-secondary shadow-lg'
-                                        : 'bg-white/10 border-2 border-white/20 text-white hover:border-secondary'
-                                }`}
-                            >
-                                <CalendarDays className="w-4 h-4" aria-hidden="true" /> {periodo}
-                            </button>
-                            {periodoOpen && (
-                                <div
-                                    role="listbox"
-                                    aria-label="Selecionar período"
-                                    className="absolute top-full mt-2 left-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 overflow-hidden min-w-[160px]"
+                        {/* Pills de Período — inline, sem dropdown (evita overflow-hidden do pai) */}
+                        <div className="flex items-center gap-1 bg-white/10 border border-white/20 rounded-2xl p-1 mb-0.5" role="group" aria-label="Selecionar período">
+                            <CalendarDays className="w-4 h-4 text-white/50 ml-2 shrink-0" aria-hidden="true" />
+                            {Object.keys(PERIODO_DIAS).map(p => (
+                                <button
+                                    key={p}
+                                    onClick={() => setPeriodo(p)}
+                                    aria-pressed={periodo === p}
+                                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                        periodo === p
+                                            ? 'bg-secondary text-primary shadow-md'
+                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                    }`}
                                 >
-                                    {Object.keys(PERIODO_DIAS).map(p => (
-                                        <button
-                                            key={p}
-                                            role="option"
-                                            aria-selected={periodo === p}
-                                            onClick={() => { setPeriodo(p); setPeriodoOpen(false); }}
-                                            className={`w-full px-5 py-3 text-left text-xs font-black uppercase tracking-wider transition-colors ${
-                                                periodo === p
-                                                    ? 'bg-secondary text-primary'
-                                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                            }`}
-                                        >
-                                            {p}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                                    {p}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
