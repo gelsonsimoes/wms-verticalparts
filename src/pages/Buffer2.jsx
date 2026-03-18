@@ -1,3 +1,9 @@
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ⚠️  LAYOUT PROTEGIDO — NÃO SIMPLIFICAR / NÃO REVERTER  ⚠️
+// Página 2.18 — Buffer 2 (Zona de Saída / Expedição)
+// Layout profissional com grade de posições, TV Mode e filtros visuais.
+// Restaurado de v4.3.25.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../hooks/useApp';
@@ -22,7 +28,7 @@ const dadosBuffer2 = [
 
 const Buffer2 = () => {
     const location = useLocation();
-    useApp();
+    const { isTvMode } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [hoveredPos, setHoveredPos] = useState(null);
 
@@ -43,15 +49,15 @@ const Buffer2 = () => {
              data?.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
 
         return (
-            <div 
+            <div
                 onMouseEnter={() => setHoveredPos({ linha, coluna, data, address })}
                 onMouseLeave={() => setHoveredPos(null)}
                 className={`
                     group relative w-10 h-10 flex items-center justify-center rounded-sm transition-all duration-300
-                    border border-purple-500/20
-                    ${occupied 
-                        ? 'bg-red-600/90 border-red-400 scale-[0.98] shadow-[inset_0_0_15px_rgba(0,0,0,0.5)]' 
-                        : 'bg-purple-500/10 text-purple-400 hover:scale-110 hover:z-10 cursor-pointer'
+                    border border-purple-400/50
+                    ${occupied
+                        ? 'bg-red-600/90 border-red-400 scale-[0.98] shadow-[0_0_8px_rgba(239,68,68,0.4)]'
+                        : 'bg-purple-500/25 text-purple-300 hover:bg-purple-400/40 hover:border-purple-300/70 hover:scale-110 hover:z-10 cursor-pointer'
                     }
                     ${isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-black z-20 scale-110 !border-white' : ''}
                 `}
@@ -59,7 +65,7 @@ const Buffer2 = () => {
                 {occupied ? (
                     <X size={24} className="text-white opacity-80 group-hover:opacity-100 transition-opacity" strokeWidth={3} />
                 ) : (
-                    <span className="text-[9px] font-black opacity-30 group-hover:opacity-100">{linha}{coluna}</span>
+                    <span className="text-[9px] font-semibold text-white/70 group-hover:text-white">{linha}{coluna}</span>
                 )}
             </div>
         );
@@ -72,14 +78,14 @@ const Buffer2 = () => {
             actions={
                 <div className="flex items-center gap-3">
                     <div className="relative group">
-                        <input
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#ffcd00]" size={16} />
+                        <input 
                             type="text"
                             placeholder="Buscar SKU ou Endereço (ex: B2_1A)..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-black border border-white/10 rounded-lg pr-10 pl-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#ffcd00] w-64 transition-all"
+                            className="bg-black border border-white/10 rounded-lg pl-10 pr-4 py-2 text-xs font-bold text-white focus:outline-none focus:border-[#ffcd00] w-64 transition-all"
                         />
-                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#ffcd00]" size={16} />
                     </div>
                     <button className="flex items-center gap-2 px-4 py-2 bg-[#ffcd00] text-black rounded-lg font-black text-xs hover:bg-[#ffe066] transition-all shadow-lg active:scale-95">
                         <Monitor size={14} />
@@ -239,7 +245,18 @@ const Buffer2 = () => {
                             </div>
                         </div>
 
-                        <div className="bg-black/40 border border-white/5 rounded-2xl p-8 relative">
+                        <div className="bg-[#0f172a] border border-slate-700 rounded-2xl p-8 relative shadow-2xl">
+                            {/* Legenda */}
+                            <div className="flex gap-5 mb-6 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-sm bg-purple-500/25 border border-purple-400/50" />
+                                    <span className="text-xs text-slate-300">Livre</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-sm bg-red-600/90 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
+                                    <span className="text-xs text-slate-300">Ocupado</span>
+                                </div>
+                            </div>
                              {/* CSS Grid for perfect Excel-like alignment */}
                              <div className="grid grid-cols-[40px_repeat(6,1fr)] gap-4 w-fit">
                                 {/* Header: Column Labels */}
