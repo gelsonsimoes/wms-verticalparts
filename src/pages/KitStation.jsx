@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabaseClient';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
+import Tooltip from '../components/ui/Tooltip';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
@@ -370,60 +371,82 @@ function KitPanel({ mode, warehouseId }) {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
 
           <div className="space-y-1.5">
-            <label htmlFor="kit-codigo-servico" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Hash className="w-3 h-3" /> Código Serviço
-            </label>
-            <input id="kit-codigo-servico" value={codigoServico} onChange={e => setCodigoServico(e.target.value)}
-              placeholder="SRV-001..." className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            <Tooltip content="Identificador interno da ordem de serviço. Se deixado em branco, será gerado automaticamente ao consolidar." showIcon>
+              <label htmlFor="kit-codigo-servico" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Hash className="w-3 h-3" /> Código Serviço
+              </label>
+            </Tooltip>
+            <Tooltip content="Ex: SRV-001. Usado para rastrear esta operação no histórico." side="bottom">
+              <input id="kit-codigo-servico" value={codigoServico} onChange={e => setCodigoServico(e.target.value)}
+                placeholder="SRV-001..." className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            </Tooltip>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="kit-sku" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <Package className="w-3 h-3" /> {isAssembly ? 'SKU do Kit Final' : 'SKU a Desmontar'}
-            </label>
+            <Tooltip content={isAssembly ? 'SKU do kit final que será formado. Pressione Enter ou clique na lupa para carregar a receita com os componentes necessários.' : 'SKU do kit que será desmontado em componentes individuais.'} showIcon>
+              <label htmlFor="kit-sku" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Package className="w-3 h-3" /> {isAssembly ? 'SKU do Kit Final' : 'SKU a Desmontar'}
+              </label>
+            </Tooltip>
             <div className="relative">
-              <input id="kit-sku" value={kitSku} onChange={e => setKitSku(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleKitSearch()}
-                placeholder="VP-KIT-..."
-                className="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
-                list="kit-sku-list"
-              />
+              <Tooltip content="Digite o código do kit e pressione Enter ou clique na lupa para buscar a receita." side="bottom">
+                <input id="kit-sku" value={kitSku} onChange={e => setKitSku(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleKitSearch()}
+                  placeholder="VP-KIT-..."
+                  className="w-full pl-3 pr-8 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all"
+                  list="kit-sku-list"
+                />
+              </Tooltip>
               <datalist id="kit-sku-list">
                 {recipes.map(r => <option key={r.id} value={r.kit_sku}>{r.descricao}</option>)}
               </datalist>
-              <button onClick={handleKitSearch} aria-label="Buscar receita"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-secondary transition-colors">
-                <Search className="w-3.5 h-3.5" />
-              </button>
+              <Tooltip content="Buscar receita do kit cadastrada no sistema" side="right">
+                <button onClick={handleKitSearch} aria-label="Buscar receita"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-secondary transition-colors">
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
             </div>
           </div>
 
           <div className="space-y-1.5 md:col-span-1">
-            <label htmlFor="kit-desc" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
-            <input id="kit-desc" value={kitDesc} onChange={e => setKitDesc(e.target.value)}
-              placeholder="Ex: Kit Freio Completo..."
-              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            <Tooltip content="Descrição comercial do kit. Preenchida automaticamente ao buscar a receita." showIcon>
+              <label htmlFor="kit-desc" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
+            </Tooltip>
+            <Tooltip content="Preenchida automaticamente quando a receita é encontrada. Pode ser editada manualmente." side="bottom">
+              <input id="kit-desc" value={kitDesc} onChange={e => setKitDesc(e.target.value)}
+                placeholder="Ex: Kit Freio Completo..."
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            </Tooltip>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="kit-valor" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-              <DollarSign className="w-3 h-3" /> Valor por Kit
-            </label>
+            <Tooltip content="Valor unitário do kit para fins de registro fiscal e inventário." showIcon>
+              <label htmlFor="kit-valor" className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <DollarSign className="w-3 h-3" /> Valor por Kit
+              </label>
+            </Tooltip>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
-              <input id="kit-valor" type="number" min="0" step="0.01" value={valorKit}
-                onChange={e => setValorKit(e.target.value)} placeholder="0,00"
-                className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+              <Tooltip content="Valor em reais por unidade de kit. O total é calculado automaticamente com base na quantidade." side="bottom">
+                <input id="kit-valor" type="number" min="0" step="0.01" value={valorKit}
+                  onChange={e => setValorKit(e.target.value)} placeholder="0,00"
+                  className="w-full pl-8 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+              </Tooltip>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="kit-qtd" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              {isAssembly ? 'Qtd a Montar' : 'Qtd a Desmontar'}
-            </label>
-            <input id="kit-qtd" type="number" min="1" step="1" value={qtdKits}
-              onChange={e => setQtdKits(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            <Tooltip content={isAssembly ? 'Quantos kits serão montados nesta operação. Afeta o cálculo do valor total.' : 'Quantas unidades do kit serão desmontadas. Os componentes são multiplicados por este número.'} showIcon>
+              <label htmlFor="kit-qtd" className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                {isAssembly ? 'Qtd a Montar' : 'Qtd a Desmontar'}
+              </label>
+            </Tooltip>
+            <Tooltip content={isAssembly ? 'Número de kits a produzir nesta rodada.' : 'Número de kits a desfazer. Os componentes resultantes serão multiplicados por este valor.'} side="bottom">
+              <input id="kit-qtd" type="number" min="1" step="1" value={qtdKits}
+                onChange={e => setQtdKits(parseInt(e.target.value) || 1)}
+                className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold outline-none focus:border-secondary transition-all" />
+            </Tooltip>
           </div>
         </div>
 
@@ -453,17 +476,21 @@ function KitPanel({ mode, warehouseId }) {
 
       {/* === TOOLBAR === */}
       <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={() => setShowScanner(true)}
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-secondary text-primary text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-black/10">
-          <Barcode className="w-4 h-4" />
-          {isAssembly ? 'Adicionar Componente' : 'Bipar Componente do Kit'}
-        </button>
+        <Tooltip content={isAssembly ? 'Abre o scanner para bipar ou digitar o SKU de um componente a incluir neste kit.' : 'Bipe o SKU de um componente que faz parte do kit a ser desmontado.'}>
+          <button onClick={() => setShowScanner(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-secondary text-primary text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-black/10">
+            <Barcode className="w-4 h-4" />
+            {isAssembly ? 'Adicionar Componente' : 'Bipar Componente do Kit'}
+          </button>
+        </Tooltip>
 
-        <button disabled={componentes.length === 0} onClick={handleClearAll}
-          aria-label="Limpar todos os componentes"
-          className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-red-600 text-xs font-black uppercase tracking-wider hover:bg-red-50 disabled:opacity-30 transition-all">
-          <RefreshCcw className="w-4 h-4" /> Limpar Tudo
-        </button>
+        <Tooltip content="Remove todos os componentes da lista e reinicia a montagem do zero.">
+          <button disabled={componentes.length === 0} onClick={handleClearAll}
+            aria-label="Limpar todos os componentes"
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-red-600 text-xs font-black uppercase tracking-wider hover:bg-red-50 disabled:opacity-30 transition-all">
+            <RefreshCcw className="w-4 h-4" /> Limpar Tudo
+          </button>
+        </Tooltip>
 
         <div className="flex-1" />
 
@@ -602,6 +629,16 @@ function KitPanel({ mode, warehouseId }) {
 
       {/* === BOTÃO CONSOLIDAR === */}
       <div className="flex justify-end">
+        <Tooltip
+          content={
+            !kitSku        ? 'Informe o SKU do kit antes de consolidar.' :
+            !allOk         ? 'Todos os componentes precisam atingir a quantidade exigida antes de consolidar.' :
+            saving         ? 'Gravando a ordem no sistema...' :
+            isAssembly     ? 'Grava a montagem no Supabase e libera o kit formado para o estoque.' :
+                             'Grava a desmontagem e libera os componentes individuais para o estoque.'
+          }
+          side="top"
+        >
         <button
           disabled={!allOk || !kitSku || saving}
           onClick={handleConsolidate}
@@ -617,6 +654,7 @@ function KitPanel({ mode, warehouseId }) {
           {saving ? 'Gravando...' : isAssembly ? 'Consolidar Montagem' : 'Confirmar Desmontagem'}
           {allOk && kitSku && !saving && <Zap className="w-4 h-4 text-primary/60" />}
         </button>
+        </Tooltip>
       </div>
 
       {/* === MODAL SCANNER === */}
