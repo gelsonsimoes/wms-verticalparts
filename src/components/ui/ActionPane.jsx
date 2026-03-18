@@ -20,6 +20,7 @@ export default function ActionPane({ title, groups = [] }) {
           <React.Fragment key={groupIndex}>
             <div className="flex items-center gap-1">
               {group.map((action, actionIndex) => {
+                const Icon = action.icon;
                 const buttonContent = (
                   <button
                     key={actionIndex}
@@ -28,13 +29,13 @@ export default function ActionPane({ title, groups = [] }) {
                     className={`
                       flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all
                       ${action.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
-                      ${action.primary 
-                        ? 'btn-primary' 
+                      ${action.primary
+                        ? 'btn-primary'
                         : 'btn-secondary'
                       }
                     `}
                   >
-                    {action.icon && <span className="shrink-0">{action.icon}</span>}
+                    {Icon && <Icon className="w-4 h-4 shrink-0" />}
                     <span className="whitespace-nowrap">{action.label}</span>
                   </button>
                 );
