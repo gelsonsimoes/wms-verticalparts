@@ -2,10 +2,13 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import {
   PackageSearch, CheckCircle2, AlertTriangle, Printer,
-  AlertCircle, X, Lock, ShieldAlert, RefreshCw
+  AlertCircle, X, Lock, ShieldAlert, RefreshCw, Play
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -28,17 +31,7 @@ function useToastQueue() {
   return { queue, push };
 }
 
-// ─── Mock NF-es (em produção: fetch('/api/nfe?status=aguardando')) ────────────
-const MOCK_NFE = [
-  { id: 'NF-78901', desc: 'VerticalParts Matriz (OR-55920)', items: [
-    { id: crypto.randomUUID(), ean: 'VPER-PNT-AL-22D-202X145-CT', produto: 'Pente de Alumínio - 22 Dentes (202x145mm)', qtdNF: 10 },
-    { id: crypto.randomUUID(), ean: 'VEPEL-BTI-JX02-CCS',         produto: 'Botoeira de Inspeção - Mod. JX02',          qtdNF: 5  },
-    { id: crypto.randomUUID(), ean: 'VPER-LUM-LED-VRD-24V',       produto: 'Luminária em LED Verde 24V',                qtdNF: 12 },
-  ]},
-  { id: 'NF-78845', desc: 'VerticalParts Matriz (OR-55921)', items: [
-    { id: crypto.randomUUID(), ean: 'VPER-ESS-NY-27MM', produto: 'Escova de Segurança Nylon 27mm', qtdNF: 20 },
-  ]},
-];
+// MOCK_NFE removido — dados vêm de ordens_recebimento no Supabase
 
 function buildItemState(items) {
   return items.map(i => ({
@@ -190,10 +183,16 @@ function ModalFinalizar({ nfe, items, onConfirm, onCancel }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ConferirRecebimento() {
+  const { warehouseId } = useApp();
+
   const [nfe,       setNfe]       = useState('');
   const [isStarted, setIsStarted] = useState(false);
   const [recId]                   = useState(() => `REC-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 5).toUpperCase()}`);
   const [items,     setItems]     = useState([]);
+
+  // NF options from Supabase
+  const [nfeOptions,     setNfeOptions]     = useState([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   const [scanned, setScanned] = useState('');
   const [qty,     setQty]     = useState('');
@@ -214,8 +213,6 @@ export default function ConferirRecebimento() {
   const { queue: toasts, push: pushToast } = useToastQueue();
   const inputRef = useRef(null);
 
-  const nfeOptions = useMemo(() => MOCK_NFE, []);
-
   // Progresso baseado em unidades, não em itens
   const { totalUnidades, conferidas } = useMemo(() => ({
     totalUnidades: items.reduce((s, i) => s + i.qtdNF, 0),
@@ -223,6 +220,46 @@ export default function ConferirRecebimento() {
   }), [items]);
   const pct = totalUnidades > 0 ? Math.round((conferidas / totalUnidades) * 100) : 0;
   const divergentes = items.filter(i => i.status === 'Divergente');
+
+  // Fetch NF options from Supabase
+  useEffect(() => {
+    if (!warehouseId) return;
+    setLoadingOptions(true);
+    supabase
+      .from('ordens_recebimento')
+      .select('id, codigo, nf, depositante, status')
+      .eq('warehouse_id', warehouseId)
+      .in('status', ['Pendente','Aguardando Alocação'])
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error('ordens_recebimento options:', error);
+        setNfeOptions((data || []).map(or => ({
+          id: or.id,
+          nf: or.nf || or.codigo,
+          desc: `${or.nf || or.codigo} — ${or.depositante || ''} (${or.codigo})`,
+          items: [],
+        })));
+        setLoadingOptions(false);
+      });
+  }, [warehouseId]);
+
+  // Fetch items when NF is selected
+  const handleNfeChange = async (selectedId) => {
+    setNfe(selectedId);
+    if (!selectedId) { setItems([]); return; }
+    const { data: itens } = await supabase
+      .from('ordens_recebimento_itens')
+      .select('*')
+      .eq('ordem_id', selectedId);
+    const mapped = (itens || []).map(i => ({
+      id: i.id,
+      ean: i.sku,
+      produto: i.descricao || i.sku,
+      qtdNF: i.quantidade || 1,
+    }));
+    // If no items in DB, show a placeholder so conference can start
+    setNfeOptions(prev => prev.map(o => o.id === selectedId ? { ...o, items: mapped } : o));
+  };
 
   useEffect(() => {
     if (isStarted && inputRef.current) inputRef.current.focus();
@@ -312,55 +349,67 @@ export default function ConferirRecebimento() {
     setShowFinalizar(true);
   };
 
-  const handleFinalizarConfirm = () => {
+  const handleFinalizarConfirm = async () => {
     setShowFinalizar(false);
-    pushToast(`Conferência ${nfe} finalizada. OR movida para Aguardando Alocação.`, 'ok');
+    // Atualiza status da OR no Supabase
+    if (nfe) {
+      const { error } = await supabase
+        .from('ordens_recebimento')
+        .update({ status: 'Aguardando Alocação', conferidos: items.reduce((s, i) => s + Math.min(i.qtdConferida, i.qtdNF), 0) })
+        .eq('id', nfe);
+      if (error) console.error('finalizar conferência:', error);
+    }
+    const nfeObj = nfeOptions.find(n => n.id === nfe);
+    pushToast(`Conferência ${nfeObj?.nf || nfe} finalizada. OR → Aguardando Alocação.`, 'ok');
     setIsStarted(false);
     setNfe(''); setItems([]);
     resetPanel();
   };
 
+  const actionGroups = [[
+    { label: 'Finalizar Carga', icon: CheckCircle2, primary: true, onClick: handleFinalizarClick, disabled: !isStarted },
+    { label: 'Imprimir',        icon: Printer,       onClick: handlePrint,                         disabled: !isStarted },
+  ]];
+
   return (
-    <div className="space-y-6 pb-24">
-      <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.shake{animation:shake 0.4s ease}`}</style>
+    <EnterprisePageBase
+      title="2.5 Conferir Recebimento"
+      breadcrumbItems={[{ label: 'Entrada e Recebimento' }]}
+      actionGroups={actionGroups}
+    >
+    <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}.shake{animation:shake 0.4s ease}`}</style>
 
-      {/* Toasts */}
-      <div className="fixed bottom-20 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className={cn(
-            'px-5 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2 border-2',
-            t.type === 'erro' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
-          )}>
-            {t.type === 'erro' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-            {t.msg}
-          </div>
-        ))}
-      </div>
+    {/* Toasts */}
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      {toasts.map(t => (
+        <div key={t.id} className={cn(
+          'px-5 py-3 rounded-2xl shadow-xl text-sm font-bold flex items-center gap-2 border-2',
+          t.type === 'erro' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
+        )}>
+          {t.type === 'erro' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+          {t.msg}
+        </div>
+      ))}
+    </div>
 
-      {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight border-l-4 border-amber-400 pl-4">2.5 Conferir Recebimento</h1>
-          <p className="text-sm text-slate-500">Conferência física via leitor de código de barras</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="bg-white dark:bg-slate-800 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">ID Operação</span>
-            <span className="text-sm font-bold font-mono text-slate-700 dark:text-white">{recId}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <select value={nfe} onChange={e => setNfe(e.target.value)} disabled={isStarted}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400/30 transition-all disabled:opacity-50 min-w-[240px]">
-              <option value="">Selecione a NF-e…</option>
-              {nfeOptions.map(n => <option key={n.id} value={n.id}>{n.id} — {n.desc}</option>)}
-            </select>
-            <button onClick={handleStart} disabled={isStarted || !nfe}
-              className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg bg-amber-400 text-slate-900 hover:bg-amber-500 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale">
-              Iniciar
-            </button>
-          </div>
-        </div>
+    {/* Seleção de NF-e + Iniciar */}
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 shadow-sm flex flex-wrap items-center gap-4">
+      <div className="bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">ID Operação</span>
+        <span className="text-sm font-bold font-mono text-slate-700 dark:text-white">{recId}</span>
       </div>
+      <div className="flex items-center gap-2 flex-1">
+        <select value={nfe} onChange={e => handleNfeChange(e.target.value)} disabled={isStarted || loadingOptions}
+          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400/30 transition-all disabled:opacity-50 min-w-[240px]">
+          <option value="">{loadingOptions ? 'Carregando...' : 'Selecione a Ordem de Recebimento…'}</option>
+          {nfeOptions.map(n => <option key={n.id} value={n.id}>{n.desc}</option>)}
+        </select>
+        <button onClick={handleStart} disabled={isStarted || !nfe}
+          className="px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg bg-amber-400 text-slate-900 hover:bg-amber-500 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale flex items-center gap-2">
+          <Play className="w-4 h-4" />Iniciar
+        </button>
+      </div>
+    </div>
 
       {/* Barra de progresso por unidades */}
       {isStarted && (
@@ -533,14 +582,6 @@ export default function ConferirRecebimento() {
         </div>
       </div>
 
-      {/* Footer fixo */}
-      <div className="fixed bottom-0 right-0 left-0 lg:left-72 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 px-8 flex justify-end z-40">
-        <button disabled={!isStarted} onClick={handleFinalizarClick}
-          className="bg-amber-400 text-slate-900 px-10 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-amber-500 transition-all disabled:opacity-50 disabled:grayscale active:scale-95">
-          Finalizar Carga
-        </button>
-      </div>
-
       {/* Modais */}
       {showSupervisor && (
         <ModalSupervisor
@@ -549,8 +590,8 @@ export default function ConferirRecebimento() {
           onCancel={() => { setShowSupervisor(false); setPendingItemIndex(null); setPendingQty(0); }} />
       )}
       {showFinalizar && (
-        <ModalFinalizar nfe={nfe} items={items} onConfirm={handleFinalizarConfirm} onCancel={() => setShowFinalizar(false)} />
+        <ModalFinalizar nfe={nfeOptions.find(n => n.id === nfe)?.nf || nfe} items={items} onConfirm={handleFinalizarConfirm} onCancel={() => setShowFinalizar(false)} />
       )}
-    </div>
+    </EnterprisePageBase>
   );
 }
