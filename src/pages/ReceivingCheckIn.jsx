@@ -7,7 +7,7 @@ import {
     QrCode, Check, Database, ListFilter, Calendar,
     User as UserIcon, RefreshCw, ScanBarcode, BarChart3
 } from 'lucide-react';
-import EnterprisePageBase from '../components/EnterprisePageBase';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
 // ── Catálogo local para autocomplete (substituível por tabela futura) ──
 const PRODUCT_MASTER = [
