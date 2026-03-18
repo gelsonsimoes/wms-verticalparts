@@ -204,7 +204,7 @@ function ModalNovaDevolucao({ onClose, onSalvar, salvando, totalExistente }) {
 
   const salvar = () => {
     if (!form.ordem_cliente || !form.nf_original || !form.depositante) {
-      alert('Preencha OC, NF e Depositante.'); return;
+      return; // campos obrigatórios — validação visual feita via required nos inputs
     }
     onSalvar({
       id_insucesso:     idGerado,
