@@ -5,7 +5,7 @@ import {
     List, PackageCheck, Scissors, FileSignature, Zap,
     Check, BarChart3, CalendarDays,
 } from 'lucide-react';
-import EnterprisePageBase from '../components/EnterprisePageBase';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 
