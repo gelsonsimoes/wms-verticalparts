@@ -1,439 +1,474 @@
-import React, { useState, useEffect, useCallback, useId } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  Search,
-  Filter,
-  Plus,
-  RefreshCw,
-  Edit2,
-  Activity,
-  ArrowLeft,
-  TrendingUp,
-  BarChart3,
-  Box,
-  X,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  Save,
-  MapPin,
+    Search, Filter, Package, MapPin, AlertTriangle,
+    RefreshCw, ChevronDown, X, Check, Minus, Plus,
+    Layers, Database, BarChart2,
 } from 'lucide-react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import Breadcrumbs from '../components/ui/Breadcrumbs';
-import ActionPane from '../components/ui/ActionPane';
-import FastTab from '../components/ui/FastTab';
-import DataGrid from '../components/ui/DataGrid';
-import { useLocation } from 'react-router-dom';
-import { appRoutes } from '../routes';
-import { useApp } from '../hooks/useApp';
-import { supabase } from '../lib/supabaseClient';
+import { useApp }       from '../hooks/useApp';
+import { useInventory } from '../hooks/useInventory';
 
-function cn(...inputs) { return twMerge(clsx(inputs)); }
+// ─── CONSTANTES ───────────────────────────────────────────────────────────────
+const RUAS = ['Todas', 'R1', 'R2', 'R3'];
+const NIVEIS_ESTOQUE = ['Todos', 'Normal', 'Crítico', 'Vazio'];
 
-const VIEWS = Object.freeze({ MASTER: 'master', MONITOR: 'monitor' });
+const NIVEL_CONFIG = {
+    Normal:  { badge: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+    Crítico: { badge: 'bg-red-100 text-red-700',     dot: 'bg-red-500' },
+    Vazio:   { badge: 'bg-slate-100 text-slate-500', dot: 'bg-slate-300' },
+};
 
-// ─── Modal de Ajuste de Quantidade ────────────────────────────────
-function AjusteModal({ item, onClose, onSave }) {
-  const [qty,     setQty]     = useState(String(item.qty ?? 0));
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState('');
-  const uid = useId();
+// ─── MODAL DE AJUSTE DE ESTOQUE ───────────────────────────────────────────────
+function ModalAjuste({ row, onClose, onSave, saving }) {
+    const [novaQtd, setNovaQtd] = useState(String(row.quantidade ?? 0));
+    const [motivo,  setMotivo]  = useState('');
+    const [err,     setErr]     = useState('');
 
-  const handle = async () => {
-    const n = Number(qty);
-    if (!Number.isFinite(n) || n < 0) { setError('Quantidade inválida.'); return; }
-    setSaving(true);
-    try {
-      await onSave(item.id, n);
-      onClose();
-    } catch (e) {
-      setError(e.message);
-    } finally { setSaving(false); }
-  };
+    const qtdNum = Number(novaQtd);
+    const diff   = qtdNum - (row.quantidade ?? 0);
+    const isOk   = !isNaN(qtdNum) && qtdNum >= 0 && novaQtd !== '';
 
-  return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-amber-600 px-7 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Edit2 className="w-5 h-5 text-white" />
-            <div>
-              <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">Inventário</p>
-              <h2 className="text-base font-black text-white uppercase">Ajuste de Saldo</h2>
+    const handleSave = () => {
+        if (!isOk) { setErr('Informe uma quantidade válida (≥ 0).'); return; }
+        if (diff === 0) { setErr('A quantidade não foi alterada.'); return; }
+        onSave({ novaQuantidade: qtdNum, motivo });
+    };
+
+    return (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl border-2 border-slate-200 w-full max-w-md shadow-2xl overflow-hidden">
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center">
+                        <Package className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-slate-800 truncate">{row.sku ?? '—'}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{row.produto ?? 'Endereço vazio'}</p>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Info do endereço */}
+                <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="font-mono">{row.endereco}</span>
+                    <span className="text-slate-300">·</span>
+                    <span>{row.tipo_endereco ?? '—'}</span>
+                    <span className="ml-auto font-black text-slate-800">
+                        Atual: <span className="text-blue-600">{row.quantidade ?? 0}</span> {row.unidade ?? 'PC'}
+                    </span>
+                </div>
+
+                {/* Formulário */}
+                <div className="px-6 py-5 space-y-4">
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                            Nova Quantidade
+                        </label>
+                        {/* Stepper */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setNovaQtd(v => String(Math.max(0, Number(v) - 1)))}
+                                className="w-9 h-9 rounded-xl border-2 border-slate-200 flex items-center justify-center hover:border-slate-400 transition-colors"
+                            >
+                                <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <input
+                                type="number"
+                                min="0"
+                                value={novaQtd}
+                                onChange={e => { setNovaQtd(e.target.value); setErr(''); }}
+                                className="flex-1 text-center text-2xl font-black border-2 border-slate-200 focus:border-amber-400 rounded-xl py-2 outline-none transition-colors"
+                            />
+                            <button
+                                onClick={() => setNovaQtd(v => String(Number(v) + 1))}
+                                className="w-9 h-9 rounded-xl border-2 border-slate-200 flex items-center justify-center hover:border-slate-400 transition-colors"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Diff badge */}
+                        {isOk && diff !== 0 && (
+                            <div className={`text-center text-[11px] font-black py-1 rounded-lg ${diff > 0 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>
+                                {diff > 0 ? `+${diff}` : diff} {row.unidade ?? 'PC'} (ajuste {diff > 0 ? 'entrada' : 'saída'})
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                            Motivo do Ajuste <span className="font-normal">(opcional)</span>
+                        </label>
+                        <input
+                            value={motivo}
+                            onChange={e => setMotivo(e.target.value)}
+                            placeholder="Ex: Contagem de inventário, avaria, etc."
+                            className="w-full px-3 py-2 bg-slate-50 border-2 border-slate-200 focus:border-amber-400 rounded-xl text-sm outline-none transition-colors"
+                        />
+                    </div>
+
+                    {err && (
+                        <p className="text-[10px] text-red-600 font-bold flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5" /> {err}
+                        </p>
+                    )}
+
+                    {/* Aviso automação */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-[9px] text-blue-700 font-bold flex items-start gap-1.5">
+                        <BarChart2 className="w-3 h-3 shrink-0 mt-0.5" />
+                        O saldo em <strong>produtos</strong> será atualizado automaticamente via Trigger SQL.
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+                    <button onClick={onClose} className="px-4 py-2 border-2 border-slate-200 rounded-xl text-xs font-black text-slate-500 hover:border-slate-400 transition-all">
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={!isOk || diff === 0 || saving}
+                        className="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-md active:scale-95"
+                    >
+                        {saving
+                            ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Salvando...</>
+                            : <><Check className="w-3.5 h-3.5" />Confirmar Ajuste</>
+                        }
+                    </button>
+                </div>
             </div>
-          </div>
-          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
-        <div className="p-7 space-y-5">
-          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl space-y-1">
-            <p className="text-[9px] font-black text-slate-400 uppercase">SKU</p>
-            <p className="text-sm font-black text-slate-800 dark:text-white">{item.sku}</p>
-            <p className="text-xs text-slate-500">{item.name}</p>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor={`${uid}-qty`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nova Quantidade *</label>
-            <input id={`${uid}-qty`} type="number" min={0} value={qty} onChange={e => { setQty(e.target.value); setError(''); }}
-              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-black text-center outline-none focus:border-amber-400 transition-all" />
-            {error && <p className="text-[10px] text-red-500 font-bold">{error}</p>}
-          </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all uppercase">Cancelar</button>
-            <button onClick={handle} disabled={saving}
-              className="flex-1 py-3 rounded-2xl bg-amber-600 text-white text-sm font-black hover:opacity-90 active:scale-95 disabled:opacity-60 transition-all flex items-center justify-center gap-2 uppercase">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
 
-// ─── Modal de Transferência (move endereço) ────────────────────────
-function TransfModal({ item, onClose, onSave }) {
-  const [endereco, setEndereco] = useState(item.location ?? '');
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState('');
-  const uid = useId();
-
-  const handle = async () => {
-    if (!endereco.trim()) { setError('Informe o endereço de destino.'); return; }
-    setSaving(true);
-    try {
-      await onSave(item.id, endereco.trim());
-      onClose();
-    } catch (e) {
-      setError(e.message);
-    } finally { setSaving(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-[28px] border-2 border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-blue-600 px-7 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <MapPin className="w-5 h-5 text-white" />
-            <div>
-              <p className="text-[9px] font-black text-white/60 uppercase tracking-widest">Inventário</p>
-              <h2 className="text-base font-black text-white uppercase">Mover Produto</h2>
-            </div>
-          </div>
-          <button onClick={onClose} aria-label="Fechar modal" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-7 space-y-5">
-          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl space-y-1">
-            <p className="text-[9px] font-black text-slate-400 uppercase">SKU</p>
-            <p className="text-sm font-black text-slate-800 dark:text-white">{item.sku}</p>
-            <p className="text-[9px] text-slate-400">Endereço atual: <strong>{item.location}</strong></p>
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor={`${uid}-end`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Novo Endereço *</label>
-            <input id={`${uid}-end`} value={endereco} onChange={e => { setEndereco(e.target.value); setError(''); }}
-              placeholder="Ex: R1_PP1_CL001_N001"
-              className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold outline-none focus:border-blue-400 transition-all" />
-            {error && <p className="text-[10px] text-red-500 font-bold">{error}</p>}
-          </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-3 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all uppercase">Cancelar</button>
-            <button onClick={handle} disabled={saving}
-              className="flex-1 py-3 rounded-2xl bg-blue-600 text-white text-sm font-black hover:opacity-90 active:scale-95 disabled:opacity-60 transition-all flex items-center justify-center gap-2 uppercase">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Mover
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+// ─── SKELETON ─────────────────────────────────────────────────────────────────
+function SkeletonRow() {
+    return (
+        <tr className="border-t border-slate-100 animate-pulse">
+            {[80, 160, 120, 80, 70, 90, 80].map((w, i) => (
+                <td key={i} className="p-3">
+                    <div className="h-3 bg-slate-100 rounded" style={{ width: w }} />
+                </td>
+            ))}
+        </tr>
+    );
 }
 
+// ─── INVENTORY MANAGEMENT ─────────────────────────────────────────────────────
 export default function InventoryManagement() {
-  const { warehouseId } = useApp();
-  const [view,                setView]                = useState(VIEWS.MASTER);
-  const [searchTerm,          setSearchTerm]          = useState('');
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [stockData,           setStockData]           = useState([]);
-  const [loading,             setLoading]             = useState(true);
-  const [toast,               setToast]               = useState(null);
-  const [modalAjuste,         setModalAjuste]         = useState(null); // item | null
-  const [modalTransf,         setModalTransf]         = useState(null); // item | null
+    const { warehouseId, currentUser } = useApp();
+    const { rows, loading, error, stats, adjusting, refetch, ajustarEstoque } = useInventory(warehouseId);
 
-  const location    = useLocation();
-  const currentRoute = appRoutes.find(r => r.path === location.pathname);
-  const pageTitle   = currentRoute?.meta ? `${currentRoute.meta.codigo} ${currentRoute.meta.titulo}` : 'Gerenciamento de Estoque';
-  const breadcrumbItems = [
-    { label: 'Home', path: '/' },
-    { label: 'Estoque', path: location.pathname },
-    { label: currentRoute?.meta?.titulo || 'Gerenciamento', path: null },
-  ];
+    // ── Filtros ────────────────────────────────────────────────────────────────
+    const [search,        setSearch]        = useState('');
+    const [ruaFiltro,     setRuaFiltro]     = useState('Todas');
+    const [nivelFiltro,   setNivelFiltro]   = useState('Todos');
+    const [apenasOcup,    setApenasOcup]    = useState(false);
 
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+    // ── Modal de ajuste ────────────────────────────────────────────────────────
+    const [modalRow, setModalRow] = useState(null);
+    const [toast,    setToast]    = useState(null);
 
-  // ── fetch alocacao_estoque + produtos ────────────────────────────
-  const fetchStock = useCallback(async () => {
-    if (!warehouseId) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('alocacao_estoque')
-        .select('*, produtos(sku, descricao, unidade_medida)')
-        .eq('warehouse_id', warehouseId);
+    const showToast = useCallback((msg, type = 'success') => {
+        const id = Date.now();
+        setToast({ id, msg, type });
+        setTimeout(() => setToast(null), 3500);
+    }, []);
 
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        const { data: prods } = await supabase
-          .from('produtos')
-          .select('id, sku, descricao, unidade_medida')
-          .limit(4);
-
-        if (prods && prods.length > 0) {
-          const seeds = prods.map((p, i) => ({
-            warehouse_id: warehouseId,
-            produto_id:   p.id,
-            endereco_id:  `R${i + 1}_PP1_CL001_N00${i + 1}`,
-            quantidade:   (i + 1) * 60,
-          }));
-          await supabase.from('alocacao_estoque').insert(seeds);
-          return fetchStock();
+    const handleAjustar = useCallback(async ({ novaQuantidade, motivo }) => {
+        if (!modalRow) return;
+        const res = await ajustarEstoque({
+            produtoId:       modalRow.produto_id,
+            enderecoId:      modalRow.endereco_id,
+            sku:             modalRow.sku,
+            descricao:       modalRow.produto,
+            novaQuantidade,
+            quantidadeAtual: modalRow.quantidade,
+            operadorId:      currentUser?.id ?? null,
+            motivo,
+        });
+        if (res.error) {
+            showToast(res.error, 'error');
+        } else {
+            showToast(`Estoque de ${modalRow.sku} ajustado para ${novaQuantidade} ${modalRow.unidade ?? 'PC'}.`);
+            setModalRow(null);
         }
-      }
+    }, [modalRow, ajustarEstoque, currentUser, showToast]);
 
-      const normalized = (data || []).map(r => ({
-        id:        r.id,
-        sku:       r.produtos?.sku             ?? '—',
-        name:      r.produtos?.descricao       ?? '—',
-        location:  r.endereco_id               ?? '—',
-        qty:       r.quantidade                ?? 0,
-        available: r.quantidade                ?? 0,
-        unit:      r.produtos?.unidade_medida  ?? 'UN',
-        updated:   r.updated_at
-          ? new Date(r.updated_at).toLocaleString('pt-BR')
-          : '—',
-        _rawId: r.id,
-      }));
-      setStockData(normalized);
-    } catch (err) {
-      showToast(`Erro ao carregar estoque: ${err.message}`, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [warehouseId, showToast]);
+    // ── Dados filtrados ────────────────────────────────────────────────────────
+    const filtrados = useMemo(() => {
+        const q = search.toLowerCase();
+        return rows.filter(r => {
+            if (apenasOcup && !r.sku) return false;
+            if (ruaFiltro !== 'Todas' && r.rua !== ruaFiltro) return false;
+            if (nivelFiltro !== 'Todos' && r.nivel_estoque !== nivelFiltro) return false;
+            if (q && !(
+                (r.sku ?? '').toLowerCase().includes(q) ||
+                (r.produto ?? '').toLowerCase().includes(q) ||
+                (r.endereco ?? '').toLowerCase().includes(q) ||
+                (r.familia ?? '').toLowerCase().includes(q)
+            )) return false;
+            return true;
+        });
+    }, [rows, search, ruaFiltro, nivelFiltro, apenasOcup]);
 
-  useEffect(() => { fetchStock(); }, [fetchStock]);
-
-  // ── CRUD: ajuste de quantidade ────────────────────────────────────
-  const handleAjusteQty = useCallback(async (id, novaQtd) => {
-    const { error } = await supabase
-      .from('alocacao_estoque')
-      .update({ quantidade: novaQtd })
-      .eq('id', id);
-    if (error) throw error;
-    showToast('Saldo ajustado com sucesso!');
-    await fetchStock();
-  }, [fetchStock, showToast]);
-
-  // ── CRUD: mover endereço ──────────────────────────────────────────
-  const handleMoverEndereco = useCallback(async (id, novoEndereco) => {
-    const { error } = await supabase
-      .from('alocacao_estoque')
-      .update({ endereco_id: novoEndereco })
-      .eq('id', id);
-    if (error) throw error;
-    showToast('Produto movido com sucesso!');
-    await fetchStock();
-  }, [fetchStock, showToast]);
-
-  const stockColumns = [
-    { header: 'SKU',            accessor: 'sku',      render: (v) => <span className="font-bold text-black">{v}</span> },
-    { header: 'Descrição',      accessor: 'name' },
-    { header: 'Localização',    accessor: 'location', render: (v) => <span className="font-mono text-[var(--vp-text-label)]">{v}</span> },
-    { header: 'Qtd Total',      accessor: 'qty',      render: (v) => <span className="font-bold">{v}</span> },
-    { header: 'Disponível',     accessor: 'available',render: (v) => <span className="font-bold text-green-700">{v}</span> },
-    { header: 'Unidade',        accessor: 'unit' },
-    { header: 'Última Atu.',    accessor: 'updated',  render: (v) => <span className="text-[11px] text-gray-500">{v}</span> },
-    {
-      header: 'Ações',
-      accessor: '_rawId',
-      render: (_, row) => (
-        <div className="flex gap-1.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); setModalAjuste(row); }}
-            className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700 text-[10px] font-black hover:bg-amber-200 transition-all uppercase"
-          >Ajustar</button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setModalTransf(row); }}
-            className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-[10px] font-black hover:bg-blue-200 transition-all uppercase"
-          >Mover</button>
-        </div>
-      ),
-    },
-  ];
-
-  const filteredData = stockData.filter(i => {
-    const q = searchTerm.toLowerCase();
     return (
-      i.sku.toUpperCase().includes(searchTerm.toUpperCase()) ||
-      i.name.toLowerCase().includes(q) ||
-      (i.location ?? '').toLowerCase().includes(q)
+        <main className="space-y-4 p-2">
+            {/* ─── Header ─────────────────────────────────────────────── */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-[var(--vp-border)]">
+                <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-black rounded-sm border border-white/10 shadow-lg">
+                        <Layers className="w-4 h-4 text-[var(--vp-primary)]" />
+                    </div>
+                    <div>
+                        <h1 className="text-sm font-black tracking-tight text-black uppercase">
+                            4.3 Análise de Estoque — Mapa de Posições
+                        </h1>
+                        <p className="text-[10px] text-[var(--vp-text-label)] font-bold uppercase tracking-widest mt-0.5">
+                            CD Central Guarulhos · Realtime · Powered by Gemini Triggers
+                        </p>
+                    </div>
+                </div>
+                <button
+                    onClick={refetch}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 hover:text-black border border-[var(--vp-border)] px-3 py-1.5 rounded-sm hover:border-slate-400 transition-all disabled:opacity-40"
+                >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    Atualizar
+                </button>
+            </header>
+
+            {/* ─── KPI Row ────────────────────────────────────────────── */}
+            <section aria-label="Resumo do estoque" className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                    { label: 'Total Endereços', value: stats.totalEnderecos, icon: Database,      color: 'text-blue-600' },
+                    { label: 'Ocupados',         value: stats.ocupados,       icon: Package,       color: 'text-green-600' },
+                    { label: 'Vazios',           value: stats.vazios,         icon: Layers,        color: 'text-slate-500' },
+                    { label: 'SKUs Distintos',   value: stats.totalSkus,      icon: BarChart2,     color: 'text-amber-500' },
+                    { label: 'Nível Crítico',    value: stats.criticos,       icon: AlertTriangle, color: stats.criticos > 0 ? 'text-red-600' : 'text-slate-400' },
+                ].map(({ label, value, icon: Icon, color }) => (
+                    <div key={label} className="bg-white border border-[var(--vp-border)] rounded-sm px-4 py-3 flex items-center gap-3 hover:shadow-sm transition-shadow">
+                        <Icon className={`w-5 h-5 shrink-0 ${color}`} />
+                        <div>
+                            <p className={`text-xl font-black ${color}`}>{loading ? '…' : value}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">{label}</p>
+                        </div>
+                    </div>
+                ))}
+            </section>
+
+            {/* ─── Filtros ────────────────────────────────────────────── */}
+            <div className="flex flex-wrap gap-2 items-center bg-white border border-[var(--vp-border)] rounded-sm px-4 py-3">
+                {/* Busca */}
+                <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Buscar SKU, produto, endereço..."
+                        className="pl-8 pr-3 py-1.5 bg-slate-50 border-2 border-slate-200 focus:border-amber-400 rounded-xl text-xs font-medium outline-none transition-colors w-56"
+                    />
+                    {search && (
+                        <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                            <X className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Filtro Rua */}
+                <div className="flex items-center gap-1" role="group" aria-label="Filtrar por rua">
+                    <Filter className="w-3 h-3 text-slate-400" />
+                    {RUAS.map(r => (
+                        <button
+                            key={r}
+                            onClick={() => setRuaFiltro(r)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black border-2 transition-all ${ruaFiltro === r
+                                ? 'border-amber-400 bg-amber-50 text-amber-700'
+                                : 'border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-200'
+                            }`}
+                        >
+                            {r}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Filtro Nível */}
+                <div className="flex items-center gap-1" role="group" aria-label="Filtrar por nível de estoque">
+                    {NIVEIS_ESTOQUE.map(n => {
+                        const cfg = NIVEL_CONFIG[n];
+                        return (
+                            <button
+                                key={n}
+                                onClick={() => setNivelFiltro(n)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black border-2 transition-all flex items-center gap-1 ${nivelFiltro === n
+                                    ? (cfg ? cfg.badge + ' border-current' : 'border-slate-800 bg-slate-800 text-white')
+                                    : 'border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-200'
+                                }`}
+                            >
+                                {cfg && <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />}
+                                {n}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Toggle apenas ocupados */}
+                <label className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 cursor-pointer ml-auto">
+                    <input
+                        type="checkbox"
+                        checked={apenasOcup}
+                        onChange={e => setApenasOcup(e.target.checked)}
+                        className="rounded border-slate-300 accent-amber-500"
+                    />
+                    Apenas ocupados
+                </label>
+
+                <span className="text-[9px] text-slate-400 font-medium">
+                    {filtrados.length} endereço(s)
+                </span>
+            </div>
+
+            {/* ─── Erro ───────────────────────────────────────────────── */}
+            {error && (
+                <div role="alert" className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-sm text-red-700 text-xs font-bold">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> {error}
+                </div>
+            )}
+
+            {/* ─── Tabela ─────────────────────────────────────────────── */}
+            <div className="bg-white border border-[var(--vp-border)] rounded-sm overflow-hidden shadow-sm">
+                <table className="w-full text-sm" role="grid">
+                    <thead>
+                        <tr className="bg-slate-50 border-b-2 border-slate-100">
+                            {['Endereço', 'Rua / PP / Nível', 'SKU', 'Produto', 'Família', 'Qtd', 'Nível', 'Ação'].map(h => (
+                                <th key={h} className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                    {h}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading
+                            ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)
+                            : filtrados.length === 0
+                                ? (
+                                    <tr>
+                                        <td colSpan={8} className="p-12 text-center text-slate-400 text-xs font-bold">
+                                            Nenhum endereço encontrado para os filtros selecionados.
+                                        </td>
+                                    </tr>
+                                )
+                                : filtrados.map(row => {
+                                    const cfg = NIVEL_CONFIG[row.nivel_estoque] ?? NIVEL_CONFIG.Vazio;
+                                    return (
+                                        <tr
+                                            key={row.endereco_id}
+                                            className="border-t border-slate-100 hover:bg-slate-50/70 transition-colors"
+                                        >
+                                            {/* Endereço */}
+                                            <td className="p-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                                    <span className="font-mono text-xs font-black text-slate-700">{row.endereco}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* Localização */}
+                                            <td className="p-3 text-[10px] text-slate-500 font-bold font-mono">
+                                                {row.rua} · {row.porta_palete} · {row.nivel}
+                                            </td>
+
+                                            {/* SKU */}
+                                            <td className="p-3">
+                                                {row.sku
+                                                    ? <span className="font-mono text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg">{row.sku}</span>
+                                                    : <span className="text-[9px] text-slate-300 italic">vazio</span>
+                                                }
+                                            </td>
+
+                                            {/* Produto */}
+                                            <td className="p-3 text-xs font-bold text-slate-700 max-w-[200px] truncate">
+                                                {row.produto ?? '—'}
+                                            </td>
+
+                                            {/* Família */}
+                                            <td className="p-3">
+                                                {row.familia
+                                                    ? <span className="text-[9px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg font-bold">{row.familia}</span>
+                                                    : <span className="text-[9px] text-slate-300">—</span>
+                                                }
+                                            </td>
+
+                                            {/* Quantidade */}
+                                            <td className="p-3">
+                                                <span className={`text-sm font-black ${row.quantidade == null ? 'text-slate-300' : row.nivel_estoque === 'Crítico' ? 'text-red-600' : 'text-slate-800'}`}>
+                                                    {row.quantidade != null ? row.quantidade.toLocaleString('pt-BR') : '—'}
+                                                </span>
+                                                {row.unidade && row.quantidade != null && (
+                                                    <span className="text-[8px] text-slate-400 font-bold ml-1">{row.unidade}</span>
+                                                )}
+                                            </td>
+
+                                            {/* Nível */}
+                                            <td className="p-3">
+                                                <span className={`text-[9px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 w-fit ${cfg.badge}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                                                    {row.nivel_estoque}
+                                                </span>
+                                            </td>
+
+                                            {/* Ação */}
+                                            <td className="p-3">
+                                                <button
+                                                    onClick={() => setModalRow(row)}
+                                                    disabled={!row.sku}
+                                                    title={row.sku ? 'Ajustar estoque' : 'Endereço vazio — sem produto para ajustar'}
+                                                    className="flex items-center gap-1 text-[9px] font-black px-2.5 py-1.5 rounded-lg border-2 border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    <ChevronDown className="w-3 h-3" />
+                                                    Ajustar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            {/* ─── Modal ──────────────────────────────────────────────── */}
+            {modalRow && (
+                <ModalAjuste
+                    row={modalRow}
+                    saving={adjusting}
+                    onClose={() => setModalRow(null)}
+                    onSave={handleAjustar}
+                />
+            )}
+
+            {/* ─── Toast ──────────────────────────────────────────────── */}
+            {toast && (
+                <div
+                    role="status"
+                    className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-2xl border-2 text-sm font-bold animate-in slide-in-from-bottom-4 duration-300 ${
+                        toast.type === 'error'
+                            ? 'bg-red-50 text-red-700 border-red-200'
+                            : 'bg-green-50 text-green-700 border-green-200'
+                    }`}
+                >
+                    {toast.type === 'error'
+                        ? <AlertTriangle className="w-4 h-4 shrink-0" />
+                        : <Check className="w-4 h-4 shrink-0" />
+                    }
+                    {toast.msg}
+                </div>
+            )}
+        </main>
     );
-  });
-
-  // ── KPIs ─────────────────────────────────────────────────────────
-  const totalQty      = stockData.reduce((s, i) => s + (i.qty ?? 0), 0);
-  const totalSkus     = stockData.length;
-  const ocupacao      = totalSkus > 0 ? Math.min(((totalQty / (totalSkus * 500)) * 100).toFixed(1), 100) : 0;
-
-  const actions = [
-    [
-      { label: 'Atualizar Dados', primary: true, icon: RefreshCw, onClick: fetchStock },
-    ],
-    [
-      { label: 'Monitorar Real-Time', icon: Activity, onClick: () => setView(VIEWS.MONITOR) },
-    ],
-    [
-      { label: 'Relatórios', icon: BarChart3, onClick: () => showToast('Relatórios em desenvolvimento.', 'error') },
-    ],
-  ];
-
-  if (view === VIEWS.MONITOR) {
-    return (
-      <div className="p-6 bg-[var(--vp-bg-alt)] min-h-screen font-sans">
-        {toast && (
-          <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300">
-            <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 text-white ${
-              toast.type === 'success' ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'
-            }`}>
-              {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-              <p className="text-sm font-bold">{toast.message}</p>
-              <button onClick={() => setToast(null)} className="ml-4 hover:bg-black/10 p-1 rounded-full" aria-label="Fechar"><X className="w-4 h-4" /></button>
-            </div>
-          </div>
-        )}
-        <button onClick={() => setView(VIEWS.MASTER)} aria-label="Voltar para Gestão de Estoque"
-          className="flex items-center gap-2 text-xs font-black text-[var(--vp-text-label)] hover:text-[var(--vp-primary)] mb-6 uppercase tracking-widest transition-colors">
-          <ArrowLeft size={16} aria-hidden="true"/> Voltar para {pageTitle}
-        </button>
-        <div className="mb-6">
-          <h1 className="text-2xl font-black text-[var(--vp-text-data)] flex items-center gap-3 tracking-tight">
-            <Activity className="text-[var(--vp-primary)]" size={28}/> MONITORAMENTO EM TEMPO REAL
-          </h1>
-          <p className="text-xs font-bold text-gray-500 uppercase mt-1 tracking-wider">Acompanhamento de movimentações e críticas de inventário</p>
-        </div>
-        {loading
-          ? <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-[var(--vp-primary)]" /></div>
-          : <DataGrid columns={stockColumns} data={filteredData} />
-        }
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[var(--vp-bg-alt)] font-sans">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300">
-          <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4 text-white ${
-            toast.type === 'success' ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'
-          }`}>
-            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-            <p className="text-sm font-bold">{toast.message}</p>
-            <button onClick={() => setToast(null)} className="ml-4 hover:bg-black/10 p-1 rounded-full" aria-label="Fechar"><X className="w-4 h-4" /></button>
-          </div>
-        </div>
-      )}
-
-      {/* Modais */}
-      {modalAjuste && (
-        <AjusteModal
-          item={modalAjuste}
-          onClose={() => setModalAjuste(null)}
-          onSave={handleAjusteQty}
-        />
-      )}
-      {modalTransf && (
-        <TransfModal
-          item={modalTransf}
-          onClose={() => setModalTransf(null)}
-          onSave={handleMoverEndereco}
-        />
-      )}
-
-      {/* Header */}
-      <div className="bg-white px-6 py-4 border-b border-[var(--vp-border)]">
-        <Breadcrumbs items={breadcrumbItems} />
-        <div className="flex items-center gap-3 mt-2">
-          <div className="bg-[var(--vp-secondary)] p-2 rounded-sm shadow-sm">
-            <Box className="text-[var(--vp-primary)]" size={20}/>
-          </div>
-          <h1 className="text-2xl font-black text-[var(--vp-text-data)] leading-tight tracking-tight uppercase">{pageTitle}</h1>
-        </div>
-      </div>
-
-      <ActionPane title="Operações de Inventário" groups={actions} />
-
-      <div className="p-6 space-y-4">
-        {/* KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-l-4 border-l-[var(--vp-primary)]">
-            <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Ocupação Estimada</label>
-            <div className="text-2xl font-black text-[var(--vp-text-data)]">{loading ? '—' : `${ocupacao}%`}</div>
-            <div className="flex items-center gap-1 text-[10px] text-green-600 font-bold mt-1 uppercase">
-              <TrendingUp size={10}/> Estável
-            </div>
-          </div>
-          <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-l-4 border-l-blue-600">
-            <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">SKUs Ativos</label>
-            <div className="text-2xl font-black text-blue-600">{loading ? '—' : totalSkus}</div>
-            <div className="text-[10px] text-gray-400 font-bold mt-1 uppercase">No armazém</div>
-          </div>
-          <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-l-4 border-l-green-600">
-            <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Qty. Total</label>
-            <div className="text-2xl font-black text-green-700">{loading ? '—' : totalQty.toLocaleString('pt-BR')}</div>
-            <div className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Unidades</div>
-          </div>
-          <div className="bg-white p-4 border border-[var(--vp-border)] rounded-sm shadow-sm border-l-4 border-l-amber-500">
-            <label className="text-[10px] font-black text-[var(--vp-text-label)] uppercase tracking-widest">Baixo Estoque</label>
-            <div className="text-2xl font-black text-amber-600">{loading ? '—' : stockData.filter(i => i.qty < 10).length}</div>
-            <div className="text-[10px] text-gray-400 font-bold mt-1 uppercase">Itens {'<'} 10 un.</div>
-          </div>
-        </div>
-
-        <FastTab title="Visão Geral do Estoque Disponível" defaultOpen={true}>
-          <div className="mb-4 flex gap-3">
-            <div className="flex-1 relative">
-              <label htmlFor="search-inventory" className="sr-only">Buscar produto por SKU, Localização ou Descrição</label>
-              <input id="search-inventory" type="text" placeholder="Buscar por SKU, Localização ou Descrição..."
-                className="w-full pr-10 pl-4 py-2 border border-[var(--vp-border)] rounded-sm text-sm focus:border-[var(--vp-primary)] outline-none font-medium"
-                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} aria-hidden="true"/>
-            </div>
-            <button onClick={() => setShowAdvancedFilters(prev => !prev)} aria-expanded={showAdvancedFilters}
-              aria-controls="advanced-filters-panel"
-              className="btn-secondary p-2 flex items-center gap-2">
-              <Filter size={16} aria-hidden="true"/>
-              <span className="text-[10px] font-bold uppercase">Filtros Avançados</span>
-            </button>
-          </div>
-
-          {showAdvancedFilters && (
-            <div id="advanced-filters-panel" role="region" aria-label="Filtros avançados"
-              className="mb-4 flex items-center gap-3 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-sm text-xs font-bold text-yellow-700 animate-in fade-in duration-200">
-              Filtros avançados por status, localização e data disponíveis em breve.
-              <button onClick={() => setShowAdvancedFilters(false)} className="ml-auto text-yellow-600 hover:text-yellow-800" aria-label="Fechar filtros avançados">
-                <X size={14} aria-hidden="true"/>
-              </button>
-            </div>
-          )}
-
-          {loading
-            ? <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-[var(--vp-primary)]" /></div>
-            : <DataGrid columns={stockColumns} data={filteredData} />
-          }
-        </FastTab>
-      </div>
-    </div>
-  );
 }
