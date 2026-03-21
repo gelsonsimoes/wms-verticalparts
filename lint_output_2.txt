@@ -1,0 +1,616 @@
+
+> wms-verticalparts@0.0.0 lint
+> eslint .
+
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\server\index.js
+   9:14  error  'process' is not defined  no-undef
+  14:38  error  'process' is not defined  no-undef
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\App.jsx
+  149:6  warning  React Hook useEffect has a missing dependency: 'isCheckingAuth'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\components\integration\FileLayoutMapper.jsx
+  44:29  error  'setDetectedColumns' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\components\ui\StatsCard.jsx
+  11:80  error  'Icon' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\components\ui\Tooltip.jsx
+  5:10  error  'cn' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\context\AppContext.jsx
+  1:32  error  'useContext' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                           no-unused-vars
+  3:14  error  Fast refresh only works when a file only exports components. Move your React context(s) to a separate file  react-refresh/only-export-components
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\hooks\useRealtimeSync.js
+  169:7  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  167 |   useEffect(() => {
+  168 |     if (isOnline && pending.length > 0) {
+> 169 |       processPending();
+      |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  170 |     }
+  171 |   }, [isOnline, processPending]);
+  172 |  react-hooks/set-state-in-effect
+  171:6  warning  React Hook useEffect has a missing dependency: 'pending.length'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ActivityManager.jsx
+  436:50  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  434 |   const [modal, setModal]             = useState(null);
+  435 |   const [acao, setAcao]               = useState(null);
+> 436 |   const [now, setNow]                 = useState(Date.now()); // for├ºa re-render p/ rel├│gio vivo
+      |                                                  ^^^^^^^^^^ Cannot call impure function
+  437 |
+  438 |   // Map O(1) para lookup de operador por id ÔÇö evita O(n┬▓) no map da tabela
+  439 |   const operadoresMap = useMemo(  react-hooks/purity
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\AddressManagement.jsx
+  459:32  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  457 |     // Sincronizar page quando filtro reduz totalPages ÔÇö estado real corrigido, n├úo s├│ UI
+  458 |     useEffect(() => {
+> 459 |         if (page > totalPages) setPage(totalPages);
+      |                                ^^^^^^^ Avoid calling setState() directly within an effect
+  460 |     }, [totalPages]); // eslint-disable-line react-hooks/exhaustive-deps
+  461 |
+  462 |     const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);  react-hooks/set-state-in-effect
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\AllocationKanban.jsx
+    2:10  error    'motion' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                  no-unused-vars
+  409:10  error    'loading' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                        no-unused-vars
+  473:6   warning  React Hook useEffect has a missing dependency: 'fetchTasks'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\AllocationMap.jsx
+  292:9  error  'handleErroCredencial' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\AuditLogs.jsx
+   31:10  error  'parseDateBR' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  212:31  error  'Icon' is defined but never used                                                    no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\BillingReports.jsx
+  120:9  warning  The 'rawData' logical expression could make the dependencies of useMemo Hook (at line 163) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'rawData' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\BlindCheck.jsx
+    1:68  error  'useId' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                  no-unused-vars
+   71:9   error  'divergentes' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u   no-unused-vars
+  116:9   error  'triggerShake' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Buffer1.jsx
+  27:13  error  'isTvMode' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Buffer2.jsx
+  25:13  error  'isTvMode' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\CTeControl.jsx
+  367:54  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  365 | function HistoricoDrawer({ log, onClose }) {
+  366 |   const [selected, setSelected] = useState(log[0] ?? null);
+> 367 |   useEffect(() => { if (log.length > 0 && !selected) setSelected(log[0]); }, [log]);
+      |                                                      ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  368 |
+  369 |   const timelineSteps = (item) => [
+  370 |     { event: 'Arquivo XML recebido e lido', done: item.status !== null },  react-hooks/set-state-in-effect
+  367:78  warning  React Hook useEffect has a missing dependency: 'selected'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ConferirRecebimento.jsx
+   77:14  error    'e' is defined but never used                                                                   no-unused-vars
+  263:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ContractManager.jsx
+  1:36  error  'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  1:44  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\CrossDockingMonitoring.jsx
+  57:6  warning  React Hook useEffect has missing dependencies: 'isTvMode' and 'setIsTvMode'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\CustomerCatalog.jsx
+   1:36  error  'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                 no-unused-vars
+  61:21  error  'setCustomers' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Dashboard.jsx
+  1:17  error  'useMemo' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\DataPurge.jsx
+  243:6  warning  React Hook useEffect has missing dependencies: 'onDone', 'startTime', and 'tabelasSel.length'. Either include them or remove the dependency array. If 'onDone' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\FileIntegration.jsx
+  61:12  error    'uploadMsg' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            no-unused-vars
+  76:26  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  74 |     // Sele├º├úo autom├ítica da primeira linha com erro
+  75 |     useEffect(() => {
+> 76 |         if (!selectedId) setSelectedId('INT-4421');
+     |                          ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  77 |     }, []);
+  78 |
+  79 |     // Cleanup do timeout ao desmontar ÔÇö evita memory leak  react-hooks/set-state-in-effect
+  77:8   warning  React Hook useEffect has a missing dependency: 'selectedId'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\GeneralSettings.jsx
+  30:43  error  'Icon' is defined but never used  no-unused-vars
+  45:49  error  'Icon' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\GeneralWarehouseFiscal.jsx
+   77:10  error  'step' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+   77:16  error  'setStep' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  222:38  error  'chave' is defined but never used                                                        no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\IntegrationWaves.jsx
+   36:24  error  'setIntegrations' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  335:64  error  'Icon' is defined but never used                                                                 no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\LabelManager.jsx
+   88:18  error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+  385:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  383 |     // Ajusta p├ígina atual quando o filtro reduz o total de p├íginas
+  384 |     useEffect(() => {
+> 385 |         setCurrentPage(prev => Math.min(prev, totalPages));
+      |         ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  386 |     }, [totalPages]);
+  387 |
+  388 |     const paginated = useMemo(() => filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage), [filtered, currentPage]);  react-hooks/set-state-in-effect
+  392:9   error  Unnecessary try/catch wrapper                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 no-useless-catch
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Login.jsx
+  11:33  error  'onLogin' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\OmieIntegration.jsx
+  149:30  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  147 |
+  148 |                         <div className="space-y-4">
+> 149 |                             <Toggle
+      |                              ^^^^^^ This component is created during render
+  150 |                                 id="toggle-reserva-estoque"
+  151 |                                 checked={reservaEstoque}
+  152 |                                 onChange={setReservaEstoque}
+
+  50 |
+  51 |     // Toggle acess├¡vel como componente interno
+> 52 |     function Toggle({ id, checked, onChange, label, description }) {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |         return (
+     | ^^^^^^^^^^^^^^^^
+> 54 |             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+     ÔÇª
+     | ^^^^^^^^^^^^^^^^
+> 73 |         );
+     | ^^^^^^^^^^^^^^^^
+> 74 |     }
+     | ^^^^^^ The component is created during render here
+  75 |
+  76 |     return (
+  77 |         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">                                                   react-hooks/static-components
+  156:30  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  154 |                                 description="Bloquear saldo no ERP ao iniciar separa├º├úo"
+  155 |                             />
+> 156 |                             <Toggle
+      |                              ^^^^^^ This component is created during render
+  157 |                                 id="toggle-webhooks"
+  158 |                                 checked={webhooks}
+  159 |                                 onChange={setWebhooks}
+
+  50 |
+  51 |     // Toggle acess├¡vel como componente interno
+> 52 |     function Toggle({ id, checked, onChange, label, description }) {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 53 |         return (
+     | ^^^^^^^^^^^^^^^^
+> 54 |             <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800">
+     ÔÇª
+     | ^^^^^^^^^^^^^^^^
+> 73 |         );
+     | ^^^^^^^^^^^^^^^^
+> 74 |     }
+     | ^^^^^^ The component is created during render here
+  75 |
+  76 |     return (
+  77 |         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">  react-hooks/static-components
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\OperatorPerformance.jsx
+  413:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  411 |                   <tr className="bg-slate-50 dark:bg-slate-800 border-b-2 border-slate-100 dark:border-slate-700">
+  412 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">#</th>
+> 413 |                     <ThBtn k="operador"  label="Nome do Usu├írio" />
+      |                      ^^^^^ This component is created during render
+  414 |                     <ThBtn k="data"      label="Data" />
+  415 |                     <ThBtn k="hIni"      label="Hora In├¡cio" />
+  416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                   react-hooks/static-components
+  414:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  412 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">#</th>
+  413 |                     <ThBtn k="operador"  label="Nome do Usu├írio" />
+> 414 |                     <ThBtn k="data"      label="Data" />
+      |                      ^^^^^ This component is created during render
+  415 |                     <ThBtn k="hIni"      label="Hora In├¡cio" />
+  416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+  417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                                                                      react-hooks/static-components
+  415:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  413 |                     <ThBtn k="operador"  label="Nome do Usu├írio" />
+  414 |                     <ThBtn k="data"      label="Data" />
+> 415 |                     <ThBtn k="hIni"      label="Hora In├¡cio" />
+      |                      ^^^^^ This component is created during render
+  416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+  417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+  418 |                     <ThBtn k="volumes"   label="Qtde Volumes" />
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                                                                                                                                         react-hooks/static-components
+  416:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  414 |                     <ThBtn k="data"      label="Data" />
+  415 |                     <ThBtn k="hIni"      label="Hora In├¡cio" />
+> 416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+      |                      ^^^^^ This component is created during render
+  417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+  418 |                     <ThBtn k="volumes"   label="Qtde Volumes" />
+  419 |                     <ThBtn k="itens"     label="Qtde Itens" />
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                                                                                                                                              react-hooks/static-components
+  417:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  415 |                     <ThBtn k="hIni"      label="Hora In├¡cio" />
+  416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+> 417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+      |                      ^^^^^ This component is created during render
+  418 |                     <ThBtn k="volumes"   label="Qtde Volumes" />
+  419 |                     <ThBtn k="itens"     label="Qtde Itens" />
+  420 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                                                                react-hooks/static-components
+  418:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  416 |                     <ThBtn k="hFim"      label="Hora Fim" />
+  417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+> 418 |                     <ThBtn k="volumes"   label="Qtde Volumes" />
+      |                      ^^^^^ This component is created during render
+  419 |                     <ThBtn k="itens"     label="Qtde Itens" />
+  420 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+  421 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance</th>
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |  react-hooks/static-components
+  419:22  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+  417 |                     <ThBtn k="tempo"     label="Tempo Total" />
+  418 |                     <ThBtn k="volumes"   label="Qtde Volumes" />
+> 419 |                     <ThBtn k="itens"     label="Qtde Itens" />
+      |                      ^^^^^ This component is created during render
+  420 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipo</th>
+  421 |                     <th scope="col" className="p-3 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Performance</th>
+  422 |                   </tr>
+
+  194 |   };
+  195 |
+> 196 |   const ThBtn = ({ k, label }) => {
+      |                 ^^^^^^^^^^^^^^^^^^^
+> 197 |     const sorted_ = sortKey === k ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |     return (
+      ÔÇª
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 207 |     );
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 208 |   };
+      | ^^^^ The component is created during render here
+  209 |
+  210 |   const displayRows = showAll ? sorted : sorted.slice(0, 15);
+  211 |                                       react-hooks/static-components
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\OutboundMonitoring.jsx
+  8:10  error  'useApp' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\PickingManagement.jsx
+  59:17  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  57 |             const order = orders.find(o => o.id === savedOrderId);
+  58 |             if (order && order.status !== 'Conclu├¡do') {
+> 59 |                 setSelectedOrder(order);
+     |                 ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  60 |                 setView('ACTIVE');
+  61 |             }
+  62 |         }  react-hooks/set-state-in-effect
+  63:8   warning  React Hook useEffect has a missing dependency: 'view'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ProductCatalog.jsx
+  503:10  error    'fetching' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                       no-unused-vars
+  513:9   warning  The 'fetchProducts' function makes the dependencies of useEffect Hook (at line 549) change on every render. To fix this, wrap the definition of 'fetchProducts' in its own useCallback() Hook  react-hooks/exhaustive-deps
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ReceivingCheckIn.jsx
+  598:62  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  596 |                                 <p className="text-[10px] tracking-widest">LOCAL: DOCA-RECEBIMENTO</p>
+  597 |                                 <p className="text-xl">
+> 598 |                                     PALET-{String(Math.floor(Date.now() / 1000) % 10000).padStart(4, '0')}
+      |                                                              ^^^^^^^^^^ Cannot call impure function
+  599 |                                 </p>
+  600 |                                 <p className="text-[9px] mt-1">{new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</p>
+  601 |                             </div>  react-hooks/purity
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\ReceivingManager.jsx
+   41:39  error  'Icon' is defined but never used  no-unused-vars
+   67:9   error  Unexpected empty object pattern   no-empty-pattern
+  209:54  error  'Tag' is not defined              no-undef
+  240:19  error  'setScanLog' is not defined       no-undef
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\RoadWeighingStation.jsx
+   42:28  error  'divergencia' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              no-unused-vars
+  274:11  error  'base' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 no-unused-vars
+  288:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  286 |   // Ao montar, inicializa o peso simulado
+  287 |   useEffect(() => {
+> 288 |     setCurrentWeight(tara === null ? 8420 : 31560);
+      |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  289 |   }, [tara]);
+  290 |
+  291 |   const handleCapture = () => {  react-hooks/set-state-in-effect
+  650:23  error  'motivo' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\SKUGenerator.jsx
+  31:10  error  'step' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Sectors.jsx
+  80:38  error  'Icon' is defined but never used     no-unused-vars
+  80:51  error  'columns' is defined but never used  no-unused-vars
+  80:60  error  'headers' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\StockAnalysis.jsx
+   96:5   error  Error: Cannot reassign variable after render completes
+
+Reassigning `accumulated` after render has completed can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+  94 |     const gap   = circumference - dash;
+  95 |     const offset = circumference * (1 - accumulated) - circumference * 0.25;
+> 96 |     accumulated += pct;
+     |     ^^^^^^^^^^^ Cannot reassign `accumulated` after render completes
+  97 |     return { ...d, dash, gap, offset, pct };
+  98 |   });
+  99 |  react-hooks/immutability
+  429:21  error  'isAvar' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                    no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\StockReplenishment.jsx
+  1:34  error  'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u     no-unused-vars
+  1:42  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\TransportSchedule.jsx
+  264:27  error  'Icon' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\UserGroups.jsx
+  10:42  error  'Icon' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\UsersPage.jsx
+  123:14  error  'error' is defined but never used  no-unused-vars
+  145:14  error  'error' is defined but never used  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\WarehouseAreas.jsx
+  1:43  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\WarehouseVisualMap.jsx
+  11:13  error  'isTvMode' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+  19:19  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  17 |     useEffect(() => {
+  18 |         const addr = searchParams.get('endereco');
+> 19 |         if (addr) setSearchTerm(addr);
+     |                   ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  20 |     }, [searchParams]);
+  21 |
+  22 |     // Conecta com o Supabase Realtime  react-hooks/set-state-in-effect
+  23:29  error  'error' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-unused-vars
+  53:51  error  'isOdd' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\Warehouses.jsx
+  1:27  error  'useMemo' is defined but never used. Allowed unused vars must match /^[A-Z_]/u    no-unused-vars
+  1:36  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\WavePickingWizard.jsx
+  16:10  error  'allProducts' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+  39:20  error  'setColmeias' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\WaveSLADashboard.jsx
+    1:27  error  'useEffect' is defined but never used. Allowed unused vars must match /^[A-Z_]/u          no-unused-vars
+  106:17  error  'setWaves' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\src\pages\WeighingStation.jsx
+   1:45  error  'useRef' is defined but never used. Allowed unused vars must match /^[A-Z_]/u             no-unused-vars
+  28:9   error  'selectId' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\temp_bkp.jsx
+  1:1  error  Parsing error: Unexpected character '´┐¢'
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\tools\checkSbase.js
+  5:21  error  'process' is not defined  no-undef
+  6:21  error  'process' is not defined  no-undef
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\tools\forceMock.js
+  5:31  error  'process' is not defined  no-undef
+  5:62  error  'process' is not defined  no-undef
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\tools\generatePicking.js
+  5:31  error  'process' is not defined  no-undef
+  5:62  error  'process' is not defined  no-undef
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\tools\insertMockPickingTask.js
+   5:21  error  'process' is not defined                                                              no-undef
+   6:21  error  'process' is not defined                                                              no-undef
+  12:35  error  'eErr' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+C:\Users\gelso\Projetos_Antigravity\WMS_VerticalParts\tools\inspect_enderecos.js
+  24:68  error  Unnecessary escape character: \.  no-useless-escape
+  53:63  error  Unnecessary escape character: \-  no-useless-escape
+  71:64  error  Unnecessary escape character: \-  no-useless-escape
+  79:43  error  'process' is not defined          no-undef
+
+Ô£û 111 problems (100 errors, 11 warnings)
+  0 errors and 1 warning potentially fixable with the `--fix` option.
+

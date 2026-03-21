@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { 
-  ShoppingCart, 
-  Search, 
-  Filter, 
-  Plus, 
-  CheckCircle2, 
-  Clock, 
+import React, { useState, useEffect } from 'react';
+import {
+  ShoppingCart,
+  Search,
+  Filter,
+  Plus,
+  CheckCircle2,
+  Clock,
   AlertCircle,
   Download,
   Printer,
@@ -18,6 +18,13 @@ import DataGrid from '../components/ui/DataGrid';
 
 export default function OrderManagement() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const breadcrumbItems = [
     { label: 'Home', path: '/' },
@@ -27,16 +34,16 @@ export default function OrderManagement() {
 
   const orderGroups = [
     [
-      { label: 'Novo Pedido',       primary: true, icon: Plus,         onClick: () => alert('Funcionalidade "Novo Pedido" em desenvolvimento.') },
-      { label: 'Liberar para WMS',              icon: CheckCircle2,   onClick: () => alert('Funcionalidade "Liberar para WMS" em desenvolvimento.') },
+      { label: 'Novo Pedido',       primary: true, icon: Plus,         onClick: () => setToast({ message: 'Funcionalidade "Novo Pedido" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
+      { label: 'Liberar para WMS',              icon: CheckCircle2,   onClick: () => setToast({ message: 'Funcionalidade "Liberar para WMS" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
     ],
     [
-      { label: 'Bloquear Ordem',               icon: AlertCircle,    onClick: () => alert('Funcionalidade "Bloquear Ordem" em desenvolvimento.') },
-      { label: 'Cancelar',                      icon: Clock,           onClick: () => alert('Funcionalidade "Cancelar Ordem" em desenvolvimento.') },
+      { label: 'Bloquear Ordem',               icon: AlertCircle,    onClick: () => setToast({ message: 'Funcionalidade "Bloquear Ordem" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
+      { label: 'Cancelar',                      icon: Clock,           onClick: () => setToast({ message: 'Funcionalidade "Cancelar Ordem" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
     ],
     [
-      { label: 'Imprimir Etiquetas',            icon: Printer,         onClick: () => alert('Funcionalidade "Imprimir Etiquetas" em desenvolvimento.') },
-      { label: 'Exportar XML/CSV',              icon: Download,        onClick: () => alert('Funcionalidade "Exportar XML/CSV" em desenvolvimento.') },
+      { label: 'Imprimir Etiquetas',            icon: Printer,         onClick: () => setToast({ message: 'Funcionalidade "Imprimir Etiquetas" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
+      { label: 'Exportar XML/CSV',              icon: Download,        onClick: () => setToast({ message: 'Funcionalidade "Exportar XML/CSV" em desenvolvimento.', color: 'bg-amber-500 text-white' }) },
     ]
   ];
 
@@ -51,9 +58,9 @@ export default function OrderManagement() {
     { header: 'Data Pedido', accessor: 'date' },
     { header: 'Itens', accessor: 'itemsCount', render: (v) => <span className="font-bold">{v}</span> },
     { header: 'Total (BRL)', accessor: 'total', render: (v) => <span className="font-mono font-bold">R$ {v}</span> },
-    { 
-      header: 'Status WMS', 
-      accessor: 'status', 
+    {
+      header: 'Status WMS',
+      accessor: 'status',
       render: (v) => {
         const styles = {
           'Pendente': 'bg-yellow-100 text-yellow-800',
@@ -85,6 +92,15 @@ export default function OrderManagement() {
 
   return (
     <div className="min-h-screen bg-[var(--vp-bg-alt)] font-sans">
+
+      {/* Toast */}
+      {toast && (
+        <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white px-6 py-4 border-b border-[var(--vp-border)]">
         <Breadcrumbs items={breadcrumbItems} />
@@ -123,19 +139,19 @@ export default function OrderManagement() {
             <button
               className="btn-secondary px-4 flex items-center gap-2"
               aria-label="Abrir filtros avançados de pedidos"
-              onClick={() => alert('Filtros avançados — funcionalidade em desenvolvimento.')}
+              onClick={() => setToast({ message: 'Filtros avançados — funcionalidade em desenvolvimento.', color: 'bg-amber-500 text-white' })}
             >
               <Filter size={16} aria-hidden="true"/> <span className="text-[10px] font-bold uppercase">Filtros</span>
             </button>
           </div>
-          
-          <DataGrid 
-            columns={orderColumns} 
-            data={orderData.filter(o => 
-              o.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+
+          <DataGrid
+            columns={orderColumns}
+            data={orderData.filter(o =>
+              o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
               o.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
               o.status.toLowerCase().includes(searchTerm.toLowerCase())
-            )} 
+            )}
           />
         </FastTab>
 

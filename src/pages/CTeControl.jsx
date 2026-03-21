@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
@@ -39,21 +41,8 @@ function StatusBadge({ status }) {
   );
 }
 
-// ─── Dados mock ───────────────────────────────────────────────────────────────
-const INITIAL_CTES = [
-  { id: 1, numero: 'CT-002241', chave: '35260206547890000100570010000022411000022410', emitente: 'Transportadora JL',    tomador: 'VerticalParts Matriz', frete: 1850.00, status: 'Autorizado (Mock)', nfesVinculadas: ['NF 000.242','NF 000.243'], erroDetalhe: null },
-  { id: 2, numero: 'CT-002242', chave: '35260206547890000100570010000022421000022420', emitente: 'Rápido Sul Cargas',    tomador: 'Filial BH',            frete: 740.00,  status: 'Vinculado',         nfesVinculadas: ['NF 000.244'],              erroDetalhe: null },
-  { id: 3, numero: 'CT-002243', chave: '35260206547890000100570010000022431000022430', emitente: 'Expresso Norte LTDA', tomador: 'Atacado Norte',         frete: 3200.00, status: 'Aguardando',        nfesVinculadas: [],                         erroDetalhe: null },
-  { id: 4, numero: 'CT-002244', chave: '35260206547890000100570010000022441000022440', emitente: 'Transportadora JL',   tomador: 'Rede Peças SP',         frete: 980.00,  status: 'Sem Vínculo',       nfesVinculadas: [],                         erroDetalhe: null },
-  { id: 5, numero: 'CT-002240', chave: '35260206547890000100570010000022401000022400', emitente: 'Logística Centro',    tomador: 'Grupo Freios Sul',      frete: 5100.00, status: 'Erro XML',          nfesVinculadas: [],                         erroDetalhe: 'Chave de acesso não reconhecida pela SEFAZ (código 539 — emitente inválido). Reenvie o arquivo XML corrigido.' },
-];
-
-const NFE_DISPONIVEIS = [
-  { id: 'nf1', numero: 'NF 000.245', valor: 12500, destinatario: 'Atacado Norte',    data: '22/02/2026', volume: 4 },
-  { id: 'nf2', numero: 'NF 000.246', valor:  8700, destinatario: 'Moto Peças RS',    data: '22/02/2026', volume: 2 },
-  { id: 'nf3', numero: 'NF 000.247', valor: 33000, destinatario: 'Grupo Freios Sul', data: '22/02/2026', volume: 8 },
-  { id: 'nf4', numero: 'NF 000.248', valor:  3200, destinatario: 'Auto Center BH',   data: '21/02/2026', volume: 1 },
-];
+// NFE_DISPONIVEIS: notas expedidas carregadas do DB, passadas como prop
+// INITIAL_CTES: removido — dados vêm do Supabase (notas_saida situacao='expedida')
 
 // ─── Geração de número sequencial seguro (sem colisão por length) ─────────────
 function nextNumero(ctes) {
@@ -215,17 +204,39 @@ function ImportModal({ onClose, onImport }) {
   );
 }
 
+// ─── Modal: Confirmar descarte de vínculos ────────────────────────────────────
+function ConfirmDescartarModal({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 bg-black/75 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+      <div className="bg-white dark:bg-slate-900 rounded-[24px] border-2 border-slate-100 shadow-2xl w-full max-w-sm p-7 space-y-5">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+          <div>
+            <p className="text-sm font-black text-slate-900 dark:text-white">Descartar vínculos?</p>
+            <p className="text-xs text-slate-500 mt-0.5">Há vínculos não confirmados. Ao fechar, eles serão perdidos.</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onCancel}  className="flex-1 py-3 rounded-2xl border-2 border-slate-200 text-sm font-black text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+          <button onClick={onConfirm} className="flex-1 py-3 rounded-2xl bg-red-600 text-white text-sm font-black hover:opacity-90 transition-all">Descartar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Modal: Vincular NF-e (D&D) com proteção anti-duplicidade ───────────────
-function VincularNFeModal({ ctes, onClose, onVincular }) {
-  const [droppedMap,   setDroppedMap]   = useState({});
-  const [draggingNf,   setDraggingNf]   = useState(null);
-  const [draggingOver, setDraggingOver] = useState(null);
-  const [vinculando,   setVinculando]   = useState(false);
-  const [dirty,        setDirty]        = useState(false);
+function VincularNFeModal({ ctes, nfeDisponiveis, onClose, onVincular }) {
+  const [droppedMap,        setDroppedMap]        = useState({});
+  const [draggingNf,        setDraggingNf]        = useState(null);
+  const [draggingOver,      setDraggingOver]      = useState(null);
+  const [vinculando,        setVinculando]        = useState(false);
+  const [dirty,             setDirty]             = useState(false);
+  const [showConfirmFechar, setShowConfirmFechar] = useState(false);
 
   // NFs já vinculadas em qualquer CT-e no droppedMap atual
   const allDropped = useMemo(() => new Set(Object.values(droppedMap).flat()), [droppedMap]);
-  const available  = useMemo(() => NFE_DISPONIVEIS.filter(nf => !allDropped.has(nf.id)), [allDropped]);
+  const available  = useMemo(() => nfeDisponiveis.filter(nf => !allDropped.has(nf.id)), [allDropped, nfeDisponiveis]);
   const totalVinculos = allDropped.size;
 
   const handleDrop = (cteId) => {
@@ -243,7 +254,7 @@ function VincularNFeModal({ ctes, onClose, onVincular }) {
   };
 
   const handleClose = () => {
-    if (dirty && totalVinculos > 0 && !window.confirm('Há vínculos não confirmados. Fechar e descartar?')) return;
+    if (dirty && totalVinculos > 0) { setShowConfirmFechar(true); return; }
     onClose();
   };
 
@@ -332,7 +343,7 @@ function VincularNFeModal({ ctes, onClose, onVincular }) {
                         <p className="text-[9px] text-slate-400 font-bold italic m-auto">{isOver ? '↓ Solte a NF-e aqui' : 'Nenhuma NF-e vinculada'}</p>
                       )}
                       {vinculados.map(nfId => {
-                        const nf = NFE_DISPONIVEIS.find(n => n.id === nfId);
+                        const nf = nfeDisponiveis.find(n => n.id === nfId);
                         return nf ? (
                           <div key={nfId} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 text-white rounded-lg text-[10px] font-black">
                             <FileText className="w-3 h-3" />{nf.numero}
@@ -357,6 +368,12 @@ function VincularNFeModal({ ctes, onClose, onVincular }) {
           </button>
         </div>
       </div>
+      {showConfirmFechar && (
+        <ConfirmDescartarModal
+          onConfirm={() => { setShowConfirmFechar(false); onClose(); }}
+          onCancel={() => setShowConfirmFechar(false)}
+        />
+      )}
     </div>
   );
 }
@@ -452,17 +469,90 @@ function HistoricoDrawer({ log, onClose }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function CTeControl() {
-  const [ctes,          setCtes]          = useState(INITIAL_CTES);
-  const [auditLog,      setAuditLog]      = useState([]); // log dinâmico real
-  const [selectedId,    setSelectedId]    = useState(null);
-  const [showImport,    setShowImport]    = useState(false);
-  const [showVincular,  setShowVincular]  = useState(false);
-  const [showHistorico, setShowHistorico] = useState(false);
-  const [filterTransp,  setFilterTransp]  = useState('');
-  const [filterStatus,  setFilterStatus]  = useState('Todos');
-  const [filterChave,   setFilterChave]   = useState('');
+  const { warehouseId } = useApp();
+
+  const [ctes,           setCtes]           = useState([]);
+  const [nfeDisponiveis, setNfeDisponiveis] = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [toast,          setToast]          = useState(null);
+  const [auditLog,       setAuditLog]       = useState([]); // log dinâmico real
+  const [selectedId,     setSelectedId]     = useState(null);
+  const [showImport,     setShowImport]     = useState(false);
+  const [showVincular,   setShowVincular]   = useState(false);
+  const [showHistorico,  setShowHistorico]  = useState(false);
+  const [filterTransp,   setFilterTransp]   = useState('');
+  const [filterStatus,   setFilterStatus]   = useState('Todos');
+  const [filterChave,    setFilterChave]    = useState('');
   const [showStatusDrop, setShowStatusDrop] = useState(false);
-  const [erroDetalheId, setErroDetalheId] = useState(null); // ID do CT-e com popup de erro aberto
+  const [erroDetalheId,  setErroDetalheId]  = useState(null); // ID do CT-e com popup de erro aberto
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Carrega notas_saida expedidas como base de CT-es (NFs que precisam de CT-e)
+  useEffect(() => {
+    if (!warehouseId) return;
+
+    async function loadData() {
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('notas_saida')
+        .select('*')
+        .eq('warehouse_id', warehouseId)
+        .eq('situacao', 'expedida')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        setToast({ message: 'Erro ao carregar dados: ' + error.message, color: 'bg-red-500 text-white' });
+        setLoading(false);
+        return;
+      }
+
+      const rows = data ?? [];
+
+      // Mapeia notas expedidas para estrutura de CT-e (sem CT-e ainda = 'Sem Vínculo')
+      const ctesFromDB = rows.map(n => ({
+        id:             n.id,
+        numero:         n.nf ? `NF-${n.nf}` : `ID-${n.id.slice(0, 8)}`,
+        chave:          n.id, // placeholder — CT-e real vem de XML
+        emitente:       '—',   // não disponível sem tabela CT-e real
+        tomador:        n.cliente ?? '—',
+        frete:          0,
+        status:         'Sem Vínculo',
+        nfesVinculadas: [],
+        erroDetalhe:    null,
+        // dados extras para exibição
+        _nf:            n.nf,
+        _serie:         n.serie,
+        _valor:         n.valor,
+        _cliente:       n.cliente,
+      }));
+
+      setCtes(ctesFromDB);
+
+      // NFs disponíveis para vincular = notas expedidas deste armazém
+      const nfeDisp = rows.map(n => ({
+        id:           n.id,
+        numero:       n.nf ? `NF ${n.nf}` : `—`,
+        valor:        Number(n.valor ?? 0),
+        destinatario: n.cliente ?? '—',
+        data:         n.data_referencia
+          ? new Date(n.data_referencia).toLocaleDateString('pt-BR')
+          : '—',
+        volume:       n.total_itens ?? 0,
+      }));
+      setNfeDisponiveis(nfeDisp);
+
+      setLoading(false);
+    }
+
+    loadData();
+  }, [warehouseId]);
 
   // Fecha dropdown ao clicar fora
   const dropRef = useRef(null);
@@ -511,7 +601,7 @@ export default function CTeControl() {
     setCtes(prev => prev.map(c => {
       const novosIds = (mapVinculos[c.id] || []);
       if (!novosIds.length) return c;
-      const novosNums = novosIds.map(id => NFE_DISPONIVEIS.find(n => n.id === id)?.numero).filter(Boolean);
+      const novosNums = novosIds.map(id => nfeDisponiveis.find(n => n.id === id)?.numero).filter(Boolean);
       return { ...c, nfesVinculadas: [...c.nfesVinculadas, ...novosNums], status: 'Vinculado' };
     }));
     const totalVinc = Object.values(mapVinculos).flat().length;
@@ -523,6 +613,14 @@ export default function CTeControl() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 space-y-5 pb-20">
+
+      {/* Toast */}
+      {toast && (
+        <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-white dark:bg-slate-900 rounded-[32px] border-2 border-slate-100 dark:border-slate-800 p-6 shadow-sm relative overflow-hidden">
@@ -619,8 +717,13 @@ export default function CTeControl() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">Nenhum CT-e encontrado.</td></tr>
+            {loading && (
+              <tr><td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">Carregando...</td></tr>
+            )}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">
+                {ctes.length === 0 ? 'Nenhuma NF expedida encontrada para este armazém.' : 'Nenhum CT-e encontrado com os filtros aplicados.'}
+              </td></tr>
             )}
             {filtered.map(cte => {
               const isSel = cte.id === selectedId;
@@ -677,7 +780,7 @@ export default function CTeControl() {
       </div>
 
       {showImport    && <ImportModal    onClose={() => setShowImport(false)} onImport={handleImport} />}
-      {showVincular  && <VincularNFeModal ctes={ctes} onClose={() => setShowVincular(false)} onVincular={handleVincular} />}
+      {showVincular  && <VincularNFeModal ctes={ctes} nfeDisponiveis={nfeDisponiveis} onClose={() => setShowVincular(false)} onVincular={handleVincular} />}
       {showHistorico && <HistoricoDrawer log={auditLog} onClose={() => setShowHistorico(false)} />}
     </div>
   );

@@ -1,25 +1,72 @@
-import React, { useState } from 'react';
-import { Bell, Download, Search, Filter, FileText, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, Download, Search, Filter, FileText, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-const MOCK_ALERTS = [
-  { id: 'AL-001', date: '26/02/2026 08:15', type: 'XML NF-e',    depositor: 'VerticalParts Matriz', file: 'NFE_14529_VP.xml',  desc: 'Falha na validação de schema: campo vUnCom ausente.',         severity: 'critical' },
-  { id: 'AL-002', date: '26/02/2026 09:30', type: 'TXT Pedido',  depositor: 'VerticalParts Matriz', file: 'PED_9982_OUT.txt', desc: 'SKU VPER-ESS-NY-27MM não encontrado no cadastro do WMS.',     severity: 'warning'  },
-  { id: 'AL-003', date: '26/02/2026 10:05', type: 'CT-e',        depositor: 'VerticalParts Matriz', file: 'CTE_881_VP.xml',   desc: 'Nova versão do layout da SEFAZ detectada.',                   severity: 'info'     },
-  { id: 'AL-004', date: '26/02/2026 11:20', type: 'TXT Pedido',  depositor: 'VerticalParts Matriz', file: 'PED_9983_OUT.txt', desc: 'Quantidade solicitada maior que o estoque físico.',            severity: 'warning'  },
-];
+// Mapeamento de action → severity visual
+function getSeverity(action) {
+  if (!action) return 'info';
+  const a = action.toLowerCase();
+  if (a.includes('erro') || a.includes('falha') || a.includes('error') || a.includes('fail')) return 'critical';
+  if (a.includes('aviso') || a.includes('warn')) return 'warning';
+  return 'info';
+}
 
 export default function IntegrationAlerts() {
-  const [activeTab,     setActiveTab]     = useState('alerts');
-  const [saveFeedback,  setSaveFeedback]  = useState(false);
+  const { warehouseId } = useApp();
+  const [activeTab,    setActiveTab]    = useState('alerts');
+  const [saveFeedback, setSaveFeedback] = useState(false);
+  const [alerts,       setAlerts]       = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [searchTerm,   setSearchTerm]   = useState('');
+
+  // Busca alertas de integração da tabela activity_logs
+  const fetchAlerts = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('resource_type', 'integration')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (!error && data) {
+        setAlerts(data.map(row => ({
+          id:        row.id,
+          date:      new Date(row.created_at).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+          type:      row.resource_name || row.action || '—',
+          depositor: row.user_name || row.user_email || '—',
+          file:      row.resource_id || '—',
+          desc:      typeof row.details === 'object' && row.details?.message
+                       ? row.details.message
+                       : row.action || '—',
+          severity:  getSeverity(row.action),
+        })));
+      }
+    } catch (_) {
+      // silencioso — tabela pode não existir
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchAlerts(); }, [warehouseId]);
 
   const handleSaveConfig = () => {
-    // ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/alerts/config
     setSaveFeedback(true);
     setTimeout(() => setSaveFeedback(false), 3000);
   };
+
+  const filtered = alerts.filter(a =>
+    !searchTerm ||
+    a.file.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.desc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.type.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -63,69 +110,76 @@ export default function IntegrationAlerts() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-              {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: filtro por arquivo/descrição */}
               <input
                 type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar por arquivo ou descrição..."
                 aria-label="Buscar alertas por arquivo ou descrição"
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-[2rem] border-none text-sm font-bold focus:ring-2 focus:ring-primary outline-none"
               />
             </div>
             <button
-              aria-label="Filtrar alertas"
+              onClick={fetchAlerts}
+              aria-label="Recarregar alertas"
               className="flex items-center gap-2 px-6 py-3 bg-slate-50 text-slate-700 rounded-[2rem] font-bold text-sm hover:bg-slate-100 transition-colors"
             >
-              <Filter className="w-4 h-4" aria-hidden="true" /> Filtrar
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" /> Atualizar
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Data/Hora</th>
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Tipo</th>
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Depositante</th>
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Arquivo</th>
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Descrição do Erro</th>
-                  <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Status/Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MOCK_ALERTS.map(alert => (
-                  <tr key={alert.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors group">
-                    <td className="py-4 px-4 text-sm font-bold text-slate-600">
-                      <span className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-slate-400" aria-hidden="true" /> {alert.date}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-900">{alert.type}</td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-500">{alert.depositor}</td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-900">
-                      <span className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-blue-500" aria-hidden="true" /> {alert.file}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-600 max-w-xs truncate" title={alert.desc}>{alert.desc}</td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        {alert.severity === 'critical' && <span className="px-3 py-1 bg-red-100    text-red-700    rounded-full text-[10px] font-black uppercase tracking-widest">Crítico</span>}
-                        {alert.severity === 'warning'  && <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-black uppercase tracking-widest">Aviso</span>}
-                        {alert.severity === 'info'     && <span className="px-3 py-1 bg-blue-100   text-blue-700   rounded-full text-[10px] font-black uppercase tracking-widest">Info</span>}
-                        {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: GET /api/alerts/${alert.id}/download */}
-                        <button
-                          aria-label={`Baixar arquivo ${alert.file}`}
-                          title="Baixar Arquivo"
-                          className="p-2 text-slate-400 hover:text-primary hover:bg-yellow-50 rounded-full transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Download className="w-4 h-4" aria-hidden="true" />
-                        </button>
-                      </div>
-                    </td>
+            {loading ? (
+              <div className="py-16 flex items-center justify-center gap-3 text-slate-400">
+                <RefreshCw className="w-5 h-5 animate-spin" aria-hidden="true" />
+                <span className="text-sm font-bold">Carregando alertas...</span>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center gap-2 text-slate-400">
+                <AlertCircle className="w-8 h-8" aria-hidden="true" />
+                <p className="text-sm font-bold">Nenhum alerta de integração encontrado.</p>
+                <p className="text-xs text-slate-400">Os registros aparecem quando a tabela activity_logs contém entradas com resource_type = 'integration'.</p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Data/Hora</th>
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Tipo</th>
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Usuário</th>
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Recurso</th>
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Descrição</th>
+                    <th scope="col" className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Status/Ação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.map(alert => (
+                    <tr key={alert.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors group">
+                      <td className="py-4 px-4 text-sm font-bold text-slate-600">
+                        <span className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-slate-400" aria-hidden="true" /> {alert.date}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-900">{alert.type}</td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-500">{alert.depositor}</td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-900">
+                        <span className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-500" aria-hidden="true" /> {alert.file}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-600 max-w-xs truncate" title={alert.desc}>{alert.desc}</td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          {alert.severity === 'critical' && <span className="px-3 py-1 bg-red-100    text-red-700    rounded-full text-[10px] font-black uppercase tracking-widest">Crítico</span>}
+                          {alert.severity === 'warning'  && <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-black uppercase tracking-widest">Aviso</span>}
+                          {alert.severity === 'info'     && <span className="px-3 py-1 bg-blue-100   text-blue-700   rounded-full text-[10px] font-black uppercase tracking-widest">Info</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       ) : (

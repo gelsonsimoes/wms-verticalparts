@@ -205,13 +205,14 @@ export const updateStockAllocation = async (locationId, productId, quantity) => 
 };
 
 // Inventory Movements (Movimentações)
+// Tabela correta: 'movimento_estoque' (não 'inventory_movements')
 export const recordMovement = async (movementData) => {
-  return supabase.from('inventory_movements').insert([movementData]).select();
+  return supabase.from('movimento_estoque').insert([movementData]).select();
 };
 
 export const getMovements = async (warehouseId, limit = 100) => {
   return supabase
-    .from('inventory_movements')
+    .from('movimento_estoque')
     .select('*')
     .eq('warehouse_id', warehouseId)
     .order('created_at', { ascending: false })

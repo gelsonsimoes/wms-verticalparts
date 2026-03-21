@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Settings2, 
-  Database, 
-  Share2, 
-  FolderTree, 
-  Cpu, 
-  Search, 
-  Check, 
+import {
+  Settings2,
+  Database,
+  Share2,
+  FolderTree,
+  Cpu,
+  Search,
+  Check,
   CheckCircle2,
-  X, 
-  Save, 
-  Printer, 
-  Globe, 
+  X,
+  Save,
+  Printer,
+  Globe,
   Zap,
   Info,
   Building2,
@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -65,9 +67,11 @@ const Field = ({ label, children, description }) => (
 // ====== COMPONENTE PRINCIPAL ======
 
 export default function GeneralSettings() {
+  const { warehouseId } = useApp();
   const [activeTab, setActiveTab] = useState('geral');
   const [showConnectorModal, setShowConnectorModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
 
   // Form State
   const [config, setConfig] = useState({
@@ -86,14 +90,42 @@ export default function GeneralSettings() {
 
   const [saveFeedback, setSaveFeedback] = useState(null); // { type: 'ok'|'err', msg }
 
-  const handleSave = () => {
+  // Carrega configurações salvas do Supabase ao montar
+  useEffect(() => {
+    const load = async () => {
+      setLoadingSettings(true);
+      try {
+        const { data, error } = await supabase
+          .from('wms_settings')
+          .select('*')
+          .eq('warehouse_id', warehouseId)
+          .maybeSingle();
+        if (!error && data?.config) {
+          setConfig(prev => ({ ...prev, ...data.config }));
+        }
+      } catch (_) {
+        // tabela pode não existir ainda — usa defaults
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    load();
+  }, [warehouseId]);
+
+  const handleSave = async () => {
     setSaving(true);
-    // ⚠️ INTEGRAÇãO NECESSÁRIA: PUT /api/settings — sem persistência real no momento.
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const { error } = await supabase
+        .from('wms_settings')
+        .upsert({ warehouse_id: warehouseId, config }, { onConflict: 'warehouse_id' });
+      if (error) throw error;
       setSaveFeedback({ type: 'ok', msg: 'Configurações salvas com sucesso!' });
+    } catch (e) {
+      setSaveFeedback({ type: 'err', msg: 'Erro ao salvar configurações.' });
+    } finally {
+      setSaving(false);
       setTimeout(() => setSaveFeedback(null), 3500);
-    }, 1200);
+    }
   };
 
   // Fechar modal com Escape

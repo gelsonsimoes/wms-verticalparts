@@ -9,6 +9,8 @@ import {
     Server,
     Link2,
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 
 // ─── Mapa de classes estáticas por cor — Tailwind não processa template strings ─────
@@ -43,11 +45,21 @@ function Toggle({ id, checked, onChange, label, description }) {
 }
 
 export default function OmieIntegration() {
+    const { warehouseId } = useApp();
     const [isSyncing, setIsSyncing] = useState(false);
 
     // Estado individual para cada toggle de conectividade
     const [reservaEstoque, setReservaEstoque] = useState(true);
     const [webhooks,       setWebhooks]       = useState(true);
+
+    const [toast, setToast] = useState(null);
+    const [confirmModal, setConfirmModal] = useState(null);
+
+    useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(null), 4000);
+        return () => clearTimeout(t);
+    }, [toast]);
 
     // Timeout ref para limpeza e prevenção de memory leak
     const syncTimeoutRef = useRef(null);
@@ -62,9 +74,13 @@ export default function OmieIntegration() {
     };
 
     const handleRegerarChaves = () => {
-        if (window.confirm('Tem certeza que deseja regenerar as chaves de acesso API? As chaves atuais serão invalidadas imediatamente.')) {
-            alert('Chaves de acesso API regeneradas com sucesso. Atualize as integrações dependentes.');
-        }
+        setConfirmModal({
+            message: 'Tem certeza que deseja regenerar as chaves de acesso API? As chaves atuais serão invalidadas imediatamente.',
+            onConfirm: () => {
+                setConfirmModal(null);
+                setToast({ message: 'Chaves de acesso API regeneradas com sucesso. Atualize as integrações dependentes.', color: 'bg-green-600 text-white' });
+            },
+        });
     };
 
     const stats = [
@@ -78,6 +94,27 @@ export default function OmieIntegration() {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+            {/* Toast */}
+            {toast && (
+                <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+                    <span>{toast.message}</span>
+                    <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+                </div>
+            )}
+
+            {/* Confirm Modal */}
+            {confirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div role="dialog" aria-modal="true" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm shadow-2xl p-6 space-y-4">
+                        <p className="text-sm font-bold text-slate-800 dark:text-white">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConfirmModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-black text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+                            <button onClick={confirmModal.onConfirm} className="flex-1 py-2.5 bg-primary text-white rounded-xl text-xs font-black hover:opacity-90 transition-all">Confirmar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Cabeçalho */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

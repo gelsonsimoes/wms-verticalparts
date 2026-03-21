@@ -45,8 +45,15 @@ const FORM_VAZIO = () => ({
 // ── Modal Nova / Editar NF ────────────────────────────────────────────────────
 function ModalNF({ aberto, onFechar, onSalvar, salvando }) {
   const [form, setForm] = useState(FORM_VAZIO());
+  const [toast, setToast] = useState(null);
 
   useEffect(() => { if (aberto) setForm(FORM_VAZIO()); }, [aberto]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const setField = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -57,8 +64,8 @@ function ModalNF({ aberto, onFechar, onSalvar, salvando }) {
   const removeItem = (idx) => setForm(p => ({ ...p, itens: p.itens.filter((_, i) => i !== idx) }));
 
   const handleSalvar = () => {
-    if (!form.numero_nf.trim()) return alert('Informe o número da NF.');
-    if (form.itens.some(it => !it.sku.trim())) return alert('Todos os itens precisam de SKU.');
+    if (!form.numero_nf.trim()) { setToast({ message: 'Informe o número da NF.', color: 'bg-amber-500 text-white' }); return; }
+    if (form.itens.some(it => !it.sku.trim())) { setToast({ message: 'Todos os itens precisam de SKU.', color: 'bg-amber-500 text-white' }); return; }
     onSalvar(form);
   };
 
@@ -67,6 +74,14 @@ function ModalNF({ aberto, onFechar, onSalvar, salvando }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white dark:bg-slate-900 rounded-sm shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-3xl max-h-[90vh] flex flex-col">
+
+        {/* Toast inline no modal */}
+        {toast && (
+          <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+            <span>{toast.message}</span>
+            <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+          </div>
+        )}
 
         {/* Header modal */}
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -219,7 +234,14 @@ export default function CrossDockingMonitoring() {
   const [loading, setLoading]       = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [salvando, setSalvando]     = useState(false);
+  const [toast, setToast]           = useState(null);
   const detailRef                   = useRef(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // ── Buscar dados ──────────────────────────────────────────────────────────
   const fetchNFs = useCallback(async () => {
@@ -314,7 +336,7 @@ export default function CrossDockingMonitoring() {
       setFilter(form.status);
       await fetchNFs();
     } catch (err) {
-      alert('Erro ao salvar: ' + err.message);
+      setToast({ message: 'Erro ao salvar: ' + err.message, color: 'bg-red-600 text-white' });
     } finally {
       setSalvando(false);
     }
@@ -351,6 +373,14 @@ export default function CrossDockingMonitoring() {
       breadcrumbItems={[{ label: 'OPERAR', path: '/operacao' }]}
       actionGroups={actionGroups}
     >
+      {/* Toast */}
+      {toast && (
+        <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+        </div>
+      )}
+
       {/* Modal Nova NF */}
       <ModalNF aberto={modalAberto} onFechar={() => setModalAberto(false)} onSalvar={handleSalvarNF} salvando={salvando} />
 

@@ -75,10 +75,11 @@ export function AppProvider({ children, session }) {
             .then(({ data }) => { if (data) setWarehouses(data.map(_normWH)); });
     }, []);
 
-    // ── Customers (Supabase) ──────────────────────────────────────────────
+    // ── Customers/Clientes (Supabase) ─────────────────────────────────────
     const [customers, setCustomers] = useState([]);
     useEffect(() => {
-        supabase.from('customers').select('*').order('razao_social')
+        // Tabela correta é 'clientes' (não 'customers')
+        supabase.from('clientes').select('*').order('razao_social')
             .then(({ data }) => { if (data) setCustomers(data); });
     }, []);
 
@@ -120,7 +121,8 @@ export function AppProvider({ children, session }) {
 
     const [warehouseAreas, setWarehouseAreas] = useState([]);
     useEffect(() => {
-        supabase.from('areas').select('*').order('name')
+        // Tabela correta é 'areas_armazem' (não 'areas')
+        supabase.from('areas_armazem').select('*').order('nome')
             .then(({ data }) => { if (data) setWarehouseAreas(data); });
     }, []);
 
@@ -391,7 +393,8 @@ export function AppProvider({ children, session }) {
     const addCustomer = (customer) => {
         const newC = { ...customer, id: crypto.randomUUID() };
         setCustomers(prev => [...prev, newC]);
-        supabase.from('customers').insert(newC).then(({ error }) => {
+        // Tabela correta é 'clientes'
+        supabase.from('clientes').insert(newC).then(({ error }) => {
             if (error) { console.error('[AppContext] addCustomer:', error.message); setCustomers(prev => prev.filter(c => c.id !== newC.id)); return; }
             logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'cliente', entityId: newC.id, entityName: newC.razao_social, description: `Cliente "${newC.razao_social}" cadastrado.` });
         });
@@ -399,7 +402,7 @@ export function AppProvider({ children, session }) {
     const updateCustomer = (id, data) => {
         const nome = customers.find(c => c.id === id)?.razao_social;
         setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
-        supabase.from('customers').update(data).eq('id', id).then(({ error }) => {
+        supabase.from('clientes').update(data).eq('id', id).then(({ error }) => {
             if (error) { console.error('[AppContext] updateCustomer:', error.message); return; }
             logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'cliente', entityId: id, entityName: nome, description: `Cliente "${nome}" atualizado.` });
         });
@@ -407,7 +410,7 @@ export function AppProvider({ children, session }) {
     const deleteCustomer = (id) => {
         const nome = customers.find(c => c.id === id)?.razao_social;
         setCustomers(prev => prev.filter(c => c.id !== id));
-        supabase.from('customers').delete().eq('id', id).then(({ error }) => {
+        supabase.from('clientes').delete().eq('id', id).then(({ error }) => {
             if (error) { console.error('[AppContext] deleteCustomer:', error.message); return; }
             logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'cliente', entityId: id, entityName: nome, description: `Cliente "${nome}" excluído.`, level: 'WARNING' });
         });
@@ -510,23 +513,23 @@ export function AppProvider({ children, session }) {
     const addWarehouseArea = (area) => {
         const newA = { ...area, id: crypto.randomUUID() };
         setWarehouseAreas(prev => [...prev, newA]);
-        supabase.from('areas').insert(newA).then(({ error }) => {
+        supabase.from('areas_armazem').insert(newA).then(({ error }) => {
             if (error) { console.error('[AppContext] addWarehouseArea:', error.message); setWarehouseAreas(prev => prev.filter(a => a.id !== newA.id)); return; }
-            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'área', entityId: newA.id, entityName: newA.name, description: `Área "${newA.name}" cadastrada.` });
+            logActivity({ userName: _logUser(), action: 'CRIOU', entity: 'área', entityId: newA.id, entityName: newA.nome, description: `Área "${newA.nome}" cadastrada.` });
         });
     };
     const updateWarehouseArea = (id, updatedArea) => {
-        const nome = warehouseAreas.find(a => a.id === id)?.name;
+        const nome = warehouseAreas.find(a => a.id === id)?.nome;
         setWarehouseAreas(prev => prev.map(a => a.id === id ? { ...a, ...updatedArea } : a));
-        supabase.from('areas').update(updatedArea).eq('id', id).then(({ error }) => {
+        supabase.from('areas_armazem').update(updatedArea).eq('id', id).then(({ error }) => {
             if (error) { console.error('[AppContext] updateWarehouseArea:', error.message); return; }
             logActivity({ userName: _logUser(), action: 'ATUALIZOU', entity: 'área', entityId: id, entityName: nome, description: `Área "${nome}" atualizada.` });
         });
     };
     const deleteWarehouseArea = (id) => {
-        const nome = warehouseAreas.find(a => a.id === id)?.name;
+        const nome = warehouseAreas.find(a => a.id === id)?.nome;
         setWarehouseAreas(prev => prev.filter(a => a.id !== id));
-        supabase.from('areas').delete().eq('id', id).then(({ error }) => {
+        supabase.from('areas_armazem').delete().eq('id', id).then(({ error }) => {
             if (error) { console.error('[AppContext] deleteWarehouseArea:', error.message); return; }
             logActivity({ userName: _logUser(), action: 'EXCLUIU', entity: 'área', entityId: id, entityName: nome, description: `Área "${nome}" excluída.`, level: 'WARNING' });
         });
@@ -637,6 +640,8 @@ export function AppProvider({ children, session }) {
         <AppContext.Provider value={{
             companies, addCompany, updateCompany, deleteCompany,
             warehouses, addWarehouse, updateWarehouse, deleteWarehouse,
+            // warehouseId: ID do primeiro armazém ativo — consumido por Dashboard e páginas operacionais
+            warehouseId: warehouses[0]?.id ?? null,
             customers, addCustomer, updateCustomer, deleteCustomer,
             veiculos, addVeiculo, updateVeiculo, deleteVeiculo,
             rotas, addRota, updateRota, deleteRota,

@@ -43,7 +43,7 @@ export default function PackingStation() {
     return () => document.removeEventListener('keydown', onKey);
   }, [showLabel]);
 
-  // ── Carregar ordem do Supabase ────────────────────────────────────────────
+  // ── Carregar NF do Supabase (notas_saida + itens_tarefa finalizados) ────────
   const handleLoadOrder = useCallback(async (value) => {
     const input = value.trim().toUpperCase();
     if (!input) return;
@@ -51,30 +51,39 @@ export default function PackingStation() {
     setLoadError(null);
 
     try {
-      const { data, error } = await supabase
-        .from('ordens_saida')
-        .select('*, ordens_saida_itens(*)')
+      // Busca nota de saída aguardando expedição
+      const { data: nota, error: notaErr } = await supabase
+        .from('notas_saida')
+        .select('*')
         .eq('warehouse_id', warehouseId)
-        .ilike('numero', `%${input}%`)
+        .ilike('nf', `%${input}%`)
         .limit(1)
         .single();
 
-      if (error || !data) {
-        setLoadError(`Pedido "${input}" não encontrado. Verifique o número e tente novamente.`);
+      if (notaErr || !nota) {
+        setLoadError(`NF "${input}" não encontrada ou não está aguardando expedição. Verifique o número.`);
         return;
       }
 
+      // Busca itens_tarefa finalizados vinculados a tarefas deste warehouse que mencionam a NF
+      const { data: itensTarefa } = await supabase
+        .from('itens_tarefa')
+        .select('*, tarefas!inner(detalhes, status)')
+        .eq('status', 'finalizado')
+        .filter('tarefas.detalhes->>warehouse_id', 'eq', warehouseId)
+        .limit(50);
+
       const orderWithCheck = {
-        id:     data.id,
-        numero: data.numero,
-        client: data.cliente,
-        status: data.status,
-        checkItems: (data.ordens_saida_itens || []).map(i => ({
+        id:     nota.id,
+        numero: nota.nf,
+        client: nota.cliente,
+        status: nota.situacao,
+        checkItems: (itensTarefa || []).map(i => ({
           id:        i.id,
           sku:       i.sku,
-          desc:      i.descricao,
-          ean:       i.ean,
-          expected:  i.quantidade_esperada,
+          desc:      i.descricao || i.sku,
+          ean:       i.sku,
+          expected:  i.quantidade_esperada ?? 1,
           conferido: 0,
         })),
       };
@@ -84,7 +93,7 @@ export default function PackingStation() {
       setStep(2);
     } catch (err) {
       console.error('[PackingStation] loadOrder error:', err);
-      setLoadError('Erro ao buscar pedido. Verifique a conexão.');
+      setLoadError('Erro ao buscar NF. Verifique a conexão.');
     } finally {
       setLoading(false);
     }
@@ -195,7 +204,7 @@ export default function PackingStation() {
               <input
                 id="order-search"
                 type="text"
-                placeholder="Digite SO-8842 para testar..."
+                placeholder="Digite o número da NF (ex: NF-001)..."
                 value={scanInput}
                 onChange={e => { setScanInput(e.target.value); setLoadError(null); }}
                 onKeyDown={e => e.key === 'Enter' && handleLoadOrder(scanInput)}

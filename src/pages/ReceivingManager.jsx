@@ -109,6 +109,7 @@ function ModalNovaOR({ onClose, onSalvar, salvando }) {
     depositante: '', tipo: 'Compra Nacional', nf: '',
     total_itens: 1, data_entrada: new Date().toISOString().slice(0,10),
   });
+  const [toast, setToast] = useState(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   useEffect(() => {
@@ -116,6 +117,12 @@ function ModalNovaOR({ onClose, onSalvar, salvando }) {
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
@@ -130,6 +137,12 @@ function ModalNovaOR({ onClose, onSalvar, salvando }) {
             </div>
             <p className="text-sm font-black">Nova Ordem de Recebimento</p>
           </div>
+          {toast && (
+            <div role="alert" className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold ${toast.color} animate-in fade-in duration-300`}>
+              <span>{toast.message}</span>
+              <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-auto opacity-70 hover:opacity-100 transition-opacity">✕</button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Depositante *</label>
@@ -167,7 +180,7 @@ function ModalNovaOR({ onClose, onSalvar, salvando }) {
               Cancelar
             </button>
             <button onClick={() => {
-              if (!form.depositante) { alert('Informe o depositante.'); return; }
+              if (!form.depositante) { setToast({ message: 'Informe o depositante.', color: 'bg-amber-100 text-amber-700 border border-amber-300' }); return; }
               onSalvar(form);
             }} disabled={salvando}
               className="flex-1 py-2.5 bg-secondary text-primary rounded-xl text-xs font-black hover:bg-secondary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">

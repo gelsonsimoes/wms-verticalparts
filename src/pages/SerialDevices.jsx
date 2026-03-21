@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useId } from 'react';
 import { useApp } from '../hooks/useApp';
+import { supabase } from '../lib/supabaseClient';
 import {
     Cpu, Plus, Edit2, Trash2, Search, ChevronLeft, ChevronRight,
     X, Save, Scale, ScanBarcode, Wifi, WifiOff, CheckSquare, Square,
@@ -258,6 +259,9 @@ export default function SerialDevices() {
     const [editDevice, setEditDevice] = useState(null);
     const itemsPerPage = 8;
 
+    // Confirm Modal para exclusão
+    const [confirmModal, setConfirmModal] = useState(null); // { message, onConfirm }
+
     // Toast System
     const [toast, setToast] = useState(null);
     const toastTimeoutRef = useRef(null);
@@ -302,11 +306,15 @@ export default function SerialDevices() {
 
     const handleDelete = () => {
         if (!selectedId) return;
-        if (window.confirm('Deseja realmente excluir este dispositivo?')) {
-            serialDevicesCrud.remove(selectedId);
-            setSelectedId(null);
-            showToast('Dispositivo excluído com sucesso!', 'info');
-        }
+        setConfirmModal({
+            message: 'Deseja realmente excluir este dispositivo?',
+            onConfirm: () => {
+                serialDevicesCrud.remove(selectedId);
+                setSelectedId(null);
+                showToast('Dispositivo excluído com sucesso!', 'info');
+                setConfirmModal(null);
+            },
+        });
     };
 
     const openNew = (tipo) => {
@@ -317,6 +325,20 @@ export default function SerialDevices() {
 
     return (
         <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+            {/* Confirm Modal */}
+            {confirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div role="dialog" aria-modal="true" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm shadow-2xl p-6 space-y-4">
+                        <p className="text-sm font-bold text-slate-800 dark:text-white">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setConfirmModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-black text-slate-500 hover:bg-slate-50 transition-all">Cancelar</button>
+                            <button onClick={confirmModal.onConfirm} className="flex-1 py-2.5 bg-danger text-white rounded-xl text-xs font-black hover:opacity-90 transition-all">Excluir</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal */}
             {showModal && (
                 <DeviceModal

@@ -1,27 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-    Settings, 
-    Globe, 
-    Folder, 
-    Key, 
-    Copy, 
-    Check, 
-    Server, 
-    Database, 
-    ShieldCheck, 
+import {
+    Settings,
+    Globe,
+    Folder,
+    Key,
+    Copy,
+    Check,
+    Server,
+    Database,
+    ShieldCheck,
     Zap,
     AlertCircle,
     Save
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 export default function RestConfig() {
+    const { warehouseId } = useApp();
     const [isRestEnabled, setIsRestEnabled] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [copyFeedback, setCopyFeedback] = useState(false);
     const copyTimeoutRef = useRef(null);
+    const [toast, setToast] = useState(null);
 
     // Cleanup do timeout de feedback de cópia ao desmontar
     useEffect(() => () => { if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current); }, []);
+
+    useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(null), 4000);
+        return () => clearTimeout(t);
+    }, [toast]);
+
     const [config, setConfig] = useState({
         inputDir: 'C:\\WMS\\Integracoes\\Entrada',
         outputDir: 'C:\\WMS\\Integracoes\\Saida',
@@ -49,11 +60,20 @@ export default function RestConfig() {
     };
 
     const handleSave = () => {
-        alert('Configurações de integração salvas com sucesso!');
+        setToast({ message: 'Configurações de integração salvas com sucesso!', color: 'bg-green-600 text-white' });
     };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+
+            {/* Toast */}
+            {toast && (
+                <div role="alert" className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-full shadow-xl text-sm font-bold ${toast.color} animate-in fade-in slide-in-from-bottom-4 duration-300`}>
+                    <span>{toast.message}</span>
+                    <button onClick={() => setToast(null)} aria-label="Fechar notificação" className="ml-1 opacity-70 hover:opacity-100 transition-opacity">✕</button>
+                </div>
+            )}
+
             {/* ====== CABEÇALHO ====== */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -62,7 +82,7 @@ export default function RestConfig() {
                     </h1>
                     <p className="text-sm text-slate-500 font-medium italic">Setup de comunicação REST e diretórios de intercâmbio</p>
                 </div>
-                <button 
+                <button
                     onClick={handleSave}
                     className="bg-secondary text-primary px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-black/10 flex items-center gap-2 hover:scale-105 transition-all"
                 >
@@ -77,7 +97,7 @@ export default function RestConfig() {
                         <h3 className="text-xl font-black text-white italic">Modo de Conectividade</h3>
                         <p className="text-white/50 font-bold text-xs uppercase tracking-widest">Escolha entre integração via pastas locais ou serviço REST API</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-6 bg-white/5 p-6 rounded-3xl border border-white/10">
                         <div className="flex items-center gap-3">
                             <span

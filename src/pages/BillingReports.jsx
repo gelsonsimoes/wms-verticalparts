@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   BarChart3,
@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -60,32 +62,14 @@ function formatCell(col, value) {
   return value.toLocaleString('pt-BR');
 }
 
-// ─── Dados Mock ───────────────────────────────────────────────────────────────
-// isoDate para filtros corretos; campos de exibição separados
-// Estrutura separada de configs + dados — fácil substituir por fetch() sem refator
-
+// ─── Dados (sem mock — real data via Supabase) ────────────────────────────────
+// Para rotas sem fetch implementado, retornam array vazio aguardando dados reais
 const REPORT_DATA = {
-  '/faturamento/embalagem': [
-    { id: 'emb-1', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Danilo (Supervisor)',  Setor: 'Segurança',    Local: 'A-10-01', 'Descrição do Produto': 'Barreira de Proteção Infravermelha', 'Qtd Unidade': 450 },
-    { id: 'emb-2', isoDate: '2026-02-22', Armazém: 'CD-01', Data: '22/02/2026', Depositante: 'Matheus (Expedição)', Setor: 'Peças',        Local: 'A-10-02', 'Descrição do Produto': 'Escova de Segurança Nylon 27mm',      'Qtd Unidade': 120 },
-    { id: 'emb-3', isoDate: '2026-02-22', Armazém: 'CD-02', Data: '22/02/2026', Depositante: 'Thiago (Logística)', Setor: 'Almoxarifado', Local: 'B-05-01', 'Descrição do Produto': 'Pallet de Aço Inox 1000mm',           'Qtd Unidade': 85  },
-  ],
-  '/faturamento/palete': [
-    { id: 'pal-1', isoDate: '2026-02-21', Armazém: 'CD-01', Depositante: 'Nestlé SA',  'Tipo Palete': 'PBR',  'Posições Ocupadas': 124, 'Setor de Alocação': 'Pulmão Secos', Vencimento: '30/06/2026' },
-    { id: 'pal-2', isoDate: '2026-02-20', Armazém: 'CD-01', Depositante: 'Coca-Cola',  'Tipo Palete': 'CHEP', 'Posições Ocupadas': 88,  'Setor de Alocação': 'Picking Frios', Vencimento: '15/05/2026' },
-  ],
-  '/faturamento/peso': [
-    { id: 'pes-1', isoDate: '2026-02-22', Armazém: 'CD-02', Depositante: 'Vale Metais', 'Peso Total (Kg)': 12500, 'Peso Médio/Palete': 850,  'Status Carga': 'Alocado',      Local: 'PÁTIO-A'   },
-    { id: 'pes-2', isoDate: '2026-02-21', Armazém: 'CD-02', Depositante: 'Gerdau',      'Peso Total (Kg)': 8400,  'Peso Médio/Palete': 1200, 'Status Carga': 'Processando',  Local: 'ENTRADA-1' },
-  ],
-  '/faturamento/endereco': [
-    { id: 'end-1', isoDate: '2026-02-22', Localização: 'A-10-01-01', 'Status Ocupação': '100%', 'Tempo Permanente': '12 Dias', 'Custo por Dia': 12.50, Identificador: 'LOC-552' },
-    { id: 'end-2', isoDate: '2026-02-22', Localização: 'A-10-01-02', 'Status Ocupação': '80%',  'Tempo Permanente': '4 Dias',  'Custo por Dia': 10.00, Identificador: 'LOC-553' },
-  ],
-  '/financeiro/calcular-diarias': [
-    { id: 'bil-1', isoDate: '2026-02-22', Depositante: 'VerticalParts Oficial', 'Saldo Palete': 450,  'Saldo Peso (Kg)': 1200,  'Saldo Unidade': 12500, 'Vencimento Ciclo': '05/03/2026', 'Valor Acumulado': 45850.22 },
-    { id: 'bil-2', isoDate: '2026-02-21', Depositante: 'Danilo (Logística)',     'Saldo Palete': 1240, 'Saldo Peso (Kg)': 15000, 'Saldo Unidade': 48000, 'Vencimento Ciclo': '10/03/2026', 'Valor Acumulado': 92300.50 },
-  ],
+  '/faturamento/embalagem':       [],
+  '/faturamento/palete':          [],
+  '/faturamento/peso':            [],
+  '/faturamento/endereco':        [],
+  '/financeiro/calcular-diarias': [],
 };
 
 // Config de metadados apenas (sem mockData acoplado)
@@ -113,16 +97,15 @@ function Cell({ col, value }) {
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function BillingReports() {
   const location = useLocation();
+  const { warehouseId } = useApp();
 
   // Lookup seguro — sem fallback silencioso para rota errada
   const routeKey = Object.keys(REPORT_CONFIGS).find(k => location.pathname.startsWith(k)) ?? FALLBACK_ROUTE;
   const config   = REPORT_CONFIGS[routeKey];
-  const rawData  = REPORT_DATA[routeKey] ?? [];
 
   // ── Estado de parâmetros — persiste por rota (não reseta ao renavegar) ────
-  // usamos um map para guardar params por rota, sem perder dados ao voltar
   const [paramsMap, setParamsMap] = useState(() =>
-    Object.fromEntries(Object.keys(REPORT_CONFIGS).map(k => [k, { start: '2026-02-01', end: '2026-02-28' }]))
+    Object.fromEntries(Object.keys(REPORT_CONFIGS).map(k => [k, { start: '', end: '' }]))
   );
   const params = paramsMap[routeKey];
   const setParams = useCallback((newParams) => {
@@ -131,13 +114,14 @@ export default function BillingReports() {
 
   const [showParams,   setShowParams]   = useState(true);
   const [dataLoaded,   setDataLoaded]   = useState(false);
+  const [fetchedData,  setFetchedData]  = useState([]);
+  const [fetching,     setFetching]     = useState(false);
   const [exporting,    setExporting]    = useState(false);
   const [groupColumn,  setGroupColumn]  = useState(null);
   const [sortCol,      setSortCol]      = useState(null);
-  const [sortDir,      setSortDir]      = useState('asc'); // 'asc' | 'desc'
+  const [sortDir,      setSortDir]      = useState('asc');
 
   // ── Abre modal ao trocar de rota APENAS se dados ainda não foram carregados
-  // (não perde dados do usuário ao navegar)
   const [loadedRoutes, setLoadedRoutes] = useState(new Set());
   const [prevRoute, setPrevRoute] = useState(routeKey);
   if (prevRoute !== routeKey) {
@@ -145,8 +129,49 @@ export default function BillingReports() {
     if (!loadedRoutes.has(routeKey)) {
       setShowParams(true);
       setDataLoaded(false);
+      setFetchedData([]);
     }
   }
+
+  // ── Fetch real notas_saida para a rota de billing ─────────────────────────
+  const fetchBillingData = useCallback(async () => {
+    if (routeKey !== '/financeiro/calcular-diarias' || !params.start || !params.end) return;
+    setFetching(true);
+    const { data, error } = await supabase
+      .from('notas_saida')
+      .select('id, numero, depositante, valor, situacao, created_at, warehouse_id')
+      .eq('warehouse_id', warehouseId)
+      .gte('created_at', params.start + 'T00:00:00')
+      .lte('created_at', params.end + 'T23:59:59')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[BillingReports] fetch:', error.message);
+      setFetchedData([]);
+    } else {
+      // Transforma em formato compatível com as colunas do relatório
+      const rows = (data || []).map((r, i) => ({
+        id: r.id,
+        isoDate: r.created_at ? r.created_at.slice(0, 10) : '',
+        Depositante: r.depositante || '—',
+        'Saldo Palete': 0,
+        'Saldo Peso (Kg)': 0,
+        'Saldo Unidade': 0,
+        'Vencimento Ciclo': '—',
+        'Valor Acumulado': r.valor ?? 0,
+        'NF': r.numero || '—',
+        'Situação': r.situacao || '—',
+      }));
+      setFetchedData(rows);
+    }
+    setFetching(false);
+  }, [routeKey, params.start, params.end, warehouseId]);
+
+  // A rawData é: dados do Supabase para billing, ou array vazio para demais
+  const rawData = useMemo(() => {
+    if (routeKey === '/financeiro/calcular-diarias') return fetchedData;
+    return REPORT_DATA[routeKey] ?? [];
+  }, [routeKey, fetchedData]);
 
   // ── Filtro por data (ISO) ─────────────────────────────────────────────────
   const filteredData = useMemo(() => {
@@ -186,12 +211,13 @@ export default function BillingReports() {
   }, [sortedData, groupColumn]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleApply = () => {
+  const handleApply = async () => {
     setShowParams(false);
     setDataLoaded(true);
     setLoadedRoutes(s => new Set([...s, routeKey]));
     setGroupColumn(null);
     setSortCol(null);
+    await fetchBillingData();
   };
 
   const handleExport = () => {
@@ -479,10 +505,12 @@ export default function BillingReports() {
               )}
 
               <button onClick={handleApply}
-                disabled={!params.start || !params.end || params.start > params.end}
+                disabled={!params.start || !params.end || params.start > params.end || fetching}
                 className="w-full py-4 bg-slate-900 hover:bg-slate-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed">
-                <Play className="w-4 h-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />
-                Carregar Relatório
+                {fetching
+                  ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  : <Play className="w-4 h-4 fill-yellow-400 text-yellow-400" aria-hidden="true" />}
+                {fetching ? 'Carregando...' : 'Carregar Relatório'}
               </button>
 
               <p className="text-[9px] text-center font-medium text-slate-400 italic">

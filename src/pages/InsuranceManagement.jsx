@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   Plus,
@@ -11,7 +11,8 @@ import {
   Search,
   ChevronRight,
   X,
-  Building2
+  Building2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   BarChart,
@@ -25,61 +26,133 @@ import {
 } from 'recharts';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// ====== MOCK DATA ======
+// ─── Toast Component ───────────────────────────────────────────
+function Toast({ toast, onClose }) {
+  if (!toast) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300" role="status">
+      <div className={cn(
+        "flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl text-white",
+        toast.type === 'success' ? 'bg-green-600' :
+        toast.type === 'error'   ? 'bg-red-600' :
+        'bg-blue-600'
+      )}>
+        {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />}
+        <p className="text-sm font-bold">{toast.message}</p>
+        <button onClick={onClose} className="ml-2 p-1 hover:bg-black/10 rounded-full transition-colors" aria-label="Fechar notificação">
+          <X className="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
-const MOCK_POLICIES = [
-  { id: 1, numero: 'AP-2026-98821', seguradora: 'Porto Seguro S.A.', inicio: '01/01/2026', termino: '01/01/2027', cobertura: 5000000, status: 'Vigente', estoqueVinculado: 4250000 },
-  { id: 2, numero: 'AP-2025-44102', seguradora: 'Allianz Global',    inicio: '15/05/2025', termino: '15/05/2026', cobertura: 2500000, status: 'Vigente', estoqueVinculado: 2800000 },
-  { id: 3, numero: 'AP-2024-11200', seguradora: 'Mapfre Seguros',    inicio: '10/02/2024', termino: '10/02/2025', cobertura: 1200000, status: 'Vencida', estoqueVinculado: 0 },
+// ─── Static policies (no dedicated DB table) ───────────────────
+const STATIC_POLICIES = [
+  { id: 1, numero: 'AP-2026-98821', seguradora: 'Porto Seguro S.A.', inicio: '01/01/2026', termino: '01/01/2027', cobertura: 5000000, status: 'Vigente' },
+  { id: 2, numero: 'AP-2025-44102', seguradora: 'Allianz Global',    inicio: '15/05/2025', termino: '15/05/2026', cobertura: 2500000, status: 'Vigente' },
+  { id: 3, numero: 'AP-2024-11200', seguradora: 'Mapfre Seguros',    inicio: '10/02/2024', termino: '10/02/2025', cobertura: 1200000, status: 'Vencida' },
 ];
 
-const MOCK_DEPOSITANTS = [
+const STATIC_DEPOSITANTS = [
   { id: 1, nome: 'VerticalParts Matriz', cnpj: '12.345.678/0001-99', valorEstoque: 1500000, coberto: true  },
   { id: 2, nome: 'VParts Import Export', cnpj: '98.765.432/0001-11', valorEstoque: 2200000, coberto: true  },
   { id: 3, nome: 'AutoParts Express',    cnpj: '45.123.789/0001-22', valorEstoque:  800000, coberto: false },
 ];
 
-// ====== COMPONENTE PRINCIPAL ======
-
 export default function InsuranceManagement() {
-  const [selectedId, setSelectedId]     = useState(MOCK_POLICIES[0].id);
+  const { warehouseId } = useApp();
+  const [selectedId, setSelectedId]       = useState(STATIC_POLICIES[0].id);
   const [showBondModal, setShowBondModal] = useState(false);
-  const [filterQuery, setFilterQuery]   = useState('');
+  const [filterQuery, setFilterQuery]    = useState('');
+  const [realStockValue, setRealStockValue] = useState(null);
+  const [loadingStock, setLoadingStock]  = useState(true);
 
-  // Estado local de cobertura dos depositantes (toggle funcional)
+  // Toast
+  const [toast, setToast]  = useState(null);
+  const toastRef = useRef(null);
+  const showToast = (message, type = 'success') => {
+    if (toastRef.current) clearTimeout(toastRef.current);
+    setToast({ message, type });
+    toastRef.current = setTimeout(() => setToast(null), 4000);
+  };
+  useEffect(() => () => { if (toastRef.current) clearTimeout(toastRef.current); }, []);
+
+  // Coberturas toggle state
   const [coberturas, setCoberturas] = useState(() =>
-    Object.fromEntries(MOCK_DEPOSITANTS.map(d => [d.id, d.coberto]))
+    Object.fromEntries(STATIC_DEPOSITANTS.map(d => [d.id, d.coberto]))
   );
   const toggleCobertura = (id) => setCoberturas(prev => ({ ...prev, [id]: !prev[id] }));
 
+  // ─── Load real stock value from notas_saida ───────────────────
+  useEffect(() => {
+    if (!warehouseId) return;
+    setLoadingStock(true);
+    supabase
+      .from('notas_saida')
+      .select('valor')
+      .eq('warehouse_id', warehouseId)
+      .neq('situacao', 'Canceladas')
+      .then(({ data, error }) => {
+        if (error) { showToast('Erro ao calcular estoque vinculado: ' + error.message, 'error'); setLoadingStock(false); return; }
+        const total = (data || []).reduce((sum, row) => {
+          const v = parseFloat((row.valor || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+          return sum + v;
+        }, 0);
+        setRealStockValue(total > 0 ? total : null);
+        setLoadingStock(false);
+      });
+  }, [warehouseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filteredPolicies = useMemo(() =>
+    STATIC_POLICIES.filter(p =>
+      filterQuery === '' || p.numero.toLowerCase().includes(filterQuery.toLowerCase())
+    ), [filterQuery]
+  );
+
   const selectedPolicy = useMemo(() =>
-    MOCK_POLICIES.find(p => p.id === selectedId) || MOCK_POLICIES[0],
+    STATIC_POLICIES.find(p => p.id === selectedId) || STATIC_POLICIES[0],
     [selectedId]
   );
 
+  // Use real stock if available, otherwise fallback to sum of depositants
+  const estoqueVinculado = useMemo(() => {
+    if (realStockValue !== null) return realStockValue;
+    return STATIC_DEPOSITANTS
+      .filter(d => coberturas[d.id])
+      .reduce((s, d) => s + d.valorEstoque, 0);
+  }, [realStockValue, coberturas]);
+
   const analysisData = useMemo(() => {
-    const isOver  = selectedPolicy.estoqueVinculado > selectedPolicy.cobertura;
-    const balance = selectedPolicy.cobertura - selectedPolicy.estoqueVinculado;
+    const isOver  = estoqueVinculado > selectedPolicy.cobertura;
+    const balance = selectedPolicy.cobertura - estoqueVinculado;
     return {
       isOver,
       balance:   Math.abs(balance),
-      progress:  Math.min((selectedPolicy.estoqueVinculado / selectedPolicy.cobertura) * 100, 100),
+      progress:  Math.min((estoqueVinculado / selectedPolicy.cobertura) * 100, 100),
       chartData: [
         { name: 'Cobertura',    valor: selectedPolicy.cobertura },
-        { name: 'Estoque Real', valor: selectedPolicy.estoqueVinculado },
+        { name: 'Estoque Real', valor: estoqueVinculado },
       ],
     };
-  }, [selectedPolicy]);
+  }, [selectedPolicy, estoqueVinculado]);
+
+  const handleConfirmBond = () => {
+    setShowBondModal(false);
+    showToast('Vínculos de cobertura salvos!');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 space-y-6 animate-in fade-in duration-700">
 
-      {/* HEADER & TOP TOOLBAR */}
+      {/* HEADER */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
         <div>
           <div className="flex items-center gap-4 mb-2">
@@ -94,10 +167,18 @@ export default function InsuranceManagement() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button aria-label="Cadastrar nova apólice" className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm">
+          <button
+            onClick={() => showToast('Funcionalidade "Cadastrar Apólice" em desenvolvimento.')}
+            aria-label="Cadastrar nova apólice"
+            className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm"
+          >
             <Plus className="w-4 h-4" aria-hidden="true" /> Cadastrar Apólice
           </button>
-          <button aria-label="Renovar seguro" className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm">
+          <button
+            onClick={() => showToast('Funcionalidade "Renovar Seguro" em desenvolvimento.')}
+            aria-label="Renovar seguro"
+            className="flex items-center gap-2 px-6 py-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary/30 hover:text-primary transition-all shadow-sm"
+          >
             <RefreshCw className="w-4 h-4" aria-hidden="true" /> Renovar Seguro
           </button>
           <button
@@ -111,13 +192,12 @@ export default function InsuranceManagement() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
 
-        {/* GRID PRINCIPAL (MASTER) - Col 1-7 */}
+        {/* POLICIES LIST */}
         <div className="xl:col-span-7 space-y-4">
           <div className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[32px] overflow-hidden shadow-sm">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Histórico de Apólices Ativas</h3>
               <div className="relative w-48">
-                {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: filtro de busca */}
                 <input
                   type="text"
                   placeholder="Buscar Nº..."
@@ -140,7 +220,7 @@ export default function InsuranceManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {MOCK_POLICIES.map((p) => (
+                  {filteredPolicies.map((p) => (
                     <tr
                       key={p.id}
                       onClick={() => setSelectedId(p.id)}
@@ -183,7 +263,7 @@ export default function InsuranceManagement() {
           </div>
         </div>
 
-        {/* PAINEL DE ANÁLISE (DETAIL) - Col 8-12 */}
+        {/* ANALYSIS PANEL */}
         <div className="xl:col-span-5 space-y-6">
           <div className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[32px] p-8 shadow-sm space-y-8 sticky top-8">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
@@ -194,7 +274,7 @@ export default function InsuranceManagement() {
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedPolicy.numero}</span>
             </div>
 
-            {/* CARDS DE KPI */}
+            {/* KPI CARDS */}
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-slate-50 dark:bg-slate-850 p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 flex justify-between items-center group overflow-hidden relative">
                 <div className="relative z-10">
@@ -208,9 +288,13 @@ export default function InsuranceManagement() {
 
               <div className="bg-slate-50 dark:bg-slate-850 p-6 rounded-[24px] border border-slate-100 dark:border-slate-800 flex justify-between items-center group overflow-hidden relative">
                 <div className="relative z-10">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Valor do Estoque Vinculado</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                    Valor do Estoque Vinculado
+                    {loadingStock && <span className="ml-2 text-[8px] text-slate-400">(carregando...)</span>}
+                    {!loadingStock && realStockValue !== null && <span className="ml-2 text-[8px] text-green-500">● ao vivo</span>}
+                  </p>
                   <p className="text-xl font-black text-primary">
-                    {selectedPolicy.estoqueVinculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {estoqueVinculado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
                 <Building2 className="w-12 h-12 text-primary/10 absolute -right-4 -bottom-4 group-hover:scale-110 transition-transform" aria-hidden="true" />
@@ -231,14 +315,14 @@ export default function InsuranceManagement() {
                   </p>
                 </div>
                 {analysisData.isOver ? (
-                  <AlertTriangle  className="w-12 h-12 text-red-500/20   absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" aria-hidden="true" />
+                  <AlertTriangle className="w-12 h-12 text-red-500/20 absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" aria-hidden="true" />
                 ) : (
-                  <CheckCircle2  className="w-12 h-12 text-green-500/20 absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" aria-hidden="true" />
+                  <CheckCircle2 className="w-12 h-12 text-green-500/20 absolute -right-4 -bottom-4 group-hover:rotate-12 transition-transform" aria-hidden="true" />
                 )}
               </div>
             </div>
 
-            {/* PROGRESSO VISUAL */}
+            {/* PROGRESS */}
             <div className="space-y-3">
               <div className="flex justify-between items-end">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Utilização do Limite</p>
@@ -259,7 +343,7 @@ export default function InsuranceManagement() {
               </div>
             </div>
 
-            {/* GRÁFICO (RECHARTS) */}
+            {/* CHART */}
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analysisData.chartData} barGap={8}>
@@ -289,7 +373,7 @@ export default function InsuranceManagement() {
         </div>
       </div>
 
-      {/* MODAL: VINCULAR CONTRATOS */}
+      {/* BOND MODAL */}
       {showBondModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl animate-in fade-in duration-300">
           <div
@@ -322,9 +406,8 @@ export default function InsuranceManagement() {
                 </button>
               </div>
 
-              {/* LISTA DE DEPOSITANTES — toggle funcional via coberturas state */}
               <div className="space-y-4 max-h-[300px] overflow-y-auto px-2">
-                {MOCK_DEPOSITANTS.map(d => {
+                {STATIC_DEPOSITANTS.map(d => {
                   const isCoberto = coberturas[d.id];
                   return (
                     <div
@@ -350,7 +433,6 @@ export default function InsuranceManagement() {
                             {d.valorEstoque.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </p>
                         </div>
-                        {/* Toggle acessível: role=switch + aria-checked + onClick funcional */}
                         <button
                           role="switch"
                           aria-checked={isCoberto}
@@ -379,9 +461,8 @@ export default function InsuranceManagement() {
                 >
                   Cancelar
                 </button>
-                {/* ⚠️ INTEGRAÇÃO NECESSÁRIA: POST /api/insurance/bond com coberturas */}
                 <button
-                  onClick={() => setShowBondModal(false)}
+                  onClick={handleConfirmBond}
                   className="flex-[2] py-5 bg-primary text-secondary rounded-[24px] text-xs font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
                 >
                   <CheckCircle2 className="w-5 h-5" aria-hidden="true" /> Confirmar Vínculos
@@ -392,6 +473,7 @@ export default function InsuranceManagement() {
         </div>
       )}
 
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

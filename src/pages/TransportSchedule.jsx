@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect, useId, useRef } from 'react';
 import { useApp } from '../hooks/useApp';
+import { supabase } from '../lib/supabaseClient';
 import {
     CalendarDays, ChevronLeft, ChevronRight, RefreshCw, Clock,
     Plus, X, Save, Truck, ArrowDownLeft, ArrowUpRight,
-    MapPin, User, FileText, Package, Building2, CheckCircle2
+    MapPin, User, FileText, Package, Building2, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 // ========== STATUS CONFIG ==========
@@ -34,6 +35,56 @@ const isSameDay = (d1, d2) => fmt(d1) === fmt(d2);
 const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
 const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
 const getStartOfWeek = (d) => { const r = new Date(d); const day = r.getDay(); r.setDate(r.getDate() - day); return r; };
+
+// ========== DB ↔ APP MAPPING ==========
+function dbRowToSchedule(row) {
+    return {
+        id:             row.id,
+        tipo:           row.tipo ?? 'Recebimento',
+        depositante:    row.depositante    ?? '',
+        doca:           row.doca           ?? 'DOCA 01',
+        transportadora: row.transportadora ?? '',
+        motorista:      row.motorista      ?? '',
+        veiculo:        row.placa          ?? '',
+        dataInicio:     row.data_inicio    ?? row.created_at ?? new Date().toISOString(),
+        dataFim:        row.data_fim       ?? row.created_at ?? new Date().toISOString(),
+        turno:          row.turno          ?? 'Manhã',
+        qtdVolume:      row.total_notas    ?? 0,
+        notasFiscais:   row.notas_fiscais  ?? '',
+        status:         row.status_agenda  ?? row.status ?? 'agendado',
+        historico:      row.historico      ?? [{ status: 'agendado', data: row.created_at ?? new Date().toISOString(), usuario: 'sistema' }],
+    };
+}
+
+function scheduleToDb(form, warehouseId) {
+    return {
+        warehouse_id:   warehouseId,
+        tipo:           form.tipo,
+        depositante:    form.depositante,
+        doca:           form.doca,
+        transportadora: form.transportadora,
+        motorista:      form.motorista,
+        placa:          form.veiculo,
+        data_inicio:    form.dataInicio ? new Date(form.dataInicio).toISOString() : null,
+        data_fim:       form.dataFim    ? new Date(form.dataFim).toISOString()    : null,
+        turno:          form.turno,
+        total_notas:    parseInt(form.qtdVolume) || 0,
+        notas_fiscais:  form.notasFiscais,
+        status_agenda:  form.status ?? 'agendado',
+        historico:      form.historico ?? [],
+    };
+}
+
+function buildSeedSchedules(warehouseId) {
+    const base = new Date();
+    base.setHours(8, 0, 0, 0);
+    const t = (h) => { const d = new Date(base); d.setHours(h); return d.toISOString(); };
+    return [
+        { warehouse_id: warehouseId, tipo: 'Recebimento', depositante: 'VerticalParts Matriz',  doca: 'DOCA 01', transportadora: 'Transvip Logística', motorista: 'Danilo', placa: 'ABC-1234', data_inicio: t(8),  data_fim: t(10), turno: 'Manhã', total_notas: 45, notas_fiscais: 'NF-001234', status_agenda: 'agendado',  historico: [{ status: 'agendado', data: new Date().toISOString(), usuario: 'sistema' }] },
+        { warehouse_id: warehouseId, tipo: 'Expedição',   depositante: 'VerticalParts Matriz',  doca: 'DOCA 03', transportadora: 'RodoExpress',         motorista: 'Matheus', placa: 'DEF-5678', data_inicio: t(10), data_fim: t(12), turno: 'Manhã', total_notas: 120, notas_fiscais: 'NF-005500', status_agenda: 'veiculo_recepcionado', historico: [{ status: 'agendado', data: new Date().toISOString(), usuario: 'sistema' }] },
+        { warehouse_id: warehouseId, tipo: 'Recebimento', depositante: 'VerticalParts Matriz',  doca: 'DOCA 02', transportadora: 'Patrus Transportes',   motorista: 'Thiago', placa: 'GHI-9012', data_inicio: t(14), data_fim: t(16), turno: 'Tarde', total_notas: 80,  notas_fiscais: 'NF-007788', status_agenda: 'veiculo_patio', historico: [{ status: 'agendado', data: new Date().toISOString(), usuario: 'sistema' }] },
+    ];
+}
 
 // ========== MINI CALENDÁRIO ==========
 function MiniCalendar({ selectedDate, onSelect }) {
@@ -72,7 +123,7 @@ function MiniCalendar({ selectedDate, onSelect }) {
 }
 
 // ========== MODAL DE AGENDAMENTO ==========
-function AgendamentoModal({ tipo, initial, onSave, onClose }) {
+function AgendamentoModal({ tipo, initial, onSave, onClose, toast, setToast }) {
     const [form, setForm] = useState({
         tipo: initial?.tipo || tipo,
         depositante: initial?.depositante || '',
@@ -86,6 +137,7 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
         qtdVolume: initial?.qtdVolume || 0,
         notasFiscais: initial?.notasFiscais || '',
     });
+    const [dateError, setDateError] = useState('');
 
     const firstInputRef = useRef(null);
     const modalId = useId();
@@ -100,14 +152,14 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.depositante || !form.transportadora || !form.dataInicio || !form.dataFim) return;
-        
-        // Validação de data fim
+
         const ini = new Date(form.dataInicio);
         const fim = new Date(form.dataFim);
         if (fim <= ini) {
-            alert('A data de término deve ser posterior à data de início.');
+            setDateError('A data de término deve ser posterior à data de início.');
             return;
         }
+        setDateError('');
 
         onSave({
             ...form,
@@ -119,11 +171,11 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-            <div 
-                role="dialog" 
-                aria-modal="true" 
+            <div
+                role="dialog"
+                aria-modal="true"
                 aria-labelledby={`${modalId}-title`}
-                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" 
+                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-800 z-10 rounded-t-3xl">
@@ -139,6 +191,12 @@ function AgendamentoModal({ tipo, initial, onSave, onClose }) {
                     <button onClick={onClose} aria-label="Fechar modal" className="p-2 text-slate-400 hover:text-danger transition-colors"><X className="w-5 h-5" aria-hidden="true" /></button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {dateError && (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 text-red-700 rounded-xl border border-red-200 text-sm font-bold">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            {dateError}
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                         <Field id={`${modalId}-dep`} label="Depositante" required><input id={`${modalId}-dep`} ref={firstInputRef} required value={form.depositante} onChange={e => setForm({...form, depositante: e.target.value})} className="field" placeholder="VerticalParts Matriz" /></Field>
                         <Field id={`${modalId}-doca`} label="Doca"><select id={`${modalId}-doca`} value={form.doca} onChange={e => setForm({...form, doca: e.target.value})} className="field">{DOCAS.map(d => <option key={d}>{d}</option>)}</select></Field>
@@ -171,9 +229,9 @@ function Field({ id, label, required, children }) {
     return (
         <div className="space-y-1.5">
             <label htmlFor={id} className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">{label}{required && ' *'}</label>
-            {React.cloneElement(children, { 
+            {React.cloneElement(children, {
                 id,
-                className: 'w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all' 
+                className: 'w-full bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all'
             })}
         </div>
     );
@@ -194,11 +252,11 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
-            <div 
-                role="dialog" 
-                aria-modal="true" 
+            <div
+                role="dialog"
+                aria-modal="true"
                 aria-labelledby={`${modalId}-title`}
-                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" 
+                className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -225,7 +283,6 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
                         <InfoCard icon={FileText} label="NFs" value={agenda.notasFiscais || '—'} />
                     </div>
 
-                    {/* Histórico de transições */}
                     <div className="space-y-2">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Histórico de Transições</p>
                         <div className="space-y-1.5 max-h-40 overflow-y-auto">
@@ -244,7 +301,6 @@ function DetalhesModal({ agenda, onTransition, onClose }) {
                         </div>
                     </div>
 
-                    {/* Botão de transição */}
                     {trans && (
                         <button onClick={() => onTransition(agenda.id, trans.next)} className="w-full py-3.5 font-black rounded-xl text-[10px] tracking-widest uppercase transition-all shadow-lg flex items-center justify-center gap-2 text-white focus:ring-4 focus:ring-slate-900/10 outline-none" style={{ backgroundColor: STATUS_CFG[trans.next]?.color || '#3B82F6' }}>
                             <trans.icon className="w-4 h-4" aria-hidden="true" /> {trans.label}
@@ -284,24 +340,24 @@ function TipoPopup({ x, y, onSelect, onClose }) {
 
     return (
         <div className="fixed inset-0 z-[85]" onClick={onClose}>
-            <div 
+            <div
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={`${popupId}-title`}
-                className="absolute bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-200 min-w-[220px]" 
-                style={{ top: y, left: x }} 
+                className="absolute bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-200 min-w-[220px]"
+                style={{ top: y, left: x }}
                 onClick={e => e.stopPropagation()}
             >
                 <p id={`${popupId}-title`} className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Qual o tipo de agendamento?</p>
-                <button 
+                <button
                     ref={firstBtnRef}
-                    onClick={() => onSelect('Recebimento')} 
+                    onClick={() => onSelect('Recebimento')}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all bg-blue-50/50 border border-blue-100 focus:ring-4 focus:ring-blue-500/10 outline-none"
                 >
                     <ArrowDownLeft className="w-4 h-4 text-blue-500" aria-hidden="true" /> Recebimento
                 </button>
-                <button 
-                    onClick={() => onSelect('Expedição')} 
+                <button
+                    onClick={() => onSelect('Expedição')}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black hover:bg-green-50 hover:text-green-600 transition-all bg-green-50/50 border border-green-100 focus:ring-4 focus:ring-green-500/10 outline-none"
                 >
                     <ArrowUpRight className="w-4 h-4 text-green-500" aria-hidden="true" /> Expedição
@@ -313,14 +369,73 @@ function TipoPopup({ x, y, onSelect, onClose }) {
 
 // ========== COMPONENTE PRINCIPAL ==========
 export default function TransportSchedule() {
-    const { transportSchedules, transportSchedulesCrud } = useApp();
+    const { warehouseId } = useApp();
 
-    const [view, setView] = useState('semanal');
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [showAgendamento, setShowAgendamento] = useState(null); // { tipo }
-    const [showDetalhes, setShowDetalhes] = useState(null);
-    const [tipoPopup, setTipoPopup] = useState(null);
-    const [newSlotTime, setNewSlotTime] = useState(null);
+    const [transportSchedules, setTransportSchedules] = useState([]);
+    const [loading,    setLoading]    = useState(true);
+    const [toast,      setToast]      = useState(null);
+
+    const [view,             setView]             = useState('semanal');
+    const [selectedDate,     setSelectedDate]     = useState(new Date());
+    const [showAgendamento,  setShowAgendamento]  = useState(null);
+    const [showDetalhes,     setShowDetalhes]     = useState(null);
+    const [tipoPopup,        setTipoPopup]        = useState(null);
+    const [newSlotTime,      setNewSlotTime]      = useState(null);
+
+    const showToast = useCallback((msg, type = 'info') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4000);
+    }, []);
+
+    // ========== Fetch from Supabase ==========
+    const fetchSchedules = useCallback(async () => {
+        if (!warehouseId) return;
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('cargas')
+            .select('*')
+            .eq('warehouse_id', warehouseId)
+            .order('data_inicio', { ascending: true });
+
+        if (error) {
+            console.error('Erro ao buscar cargas:', error);
+            showToast('Erro ao carregar agendamentos.', 'error');
+            setLoading(false);
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            const seeds = buildSeedSchedules(warehouseId);
+            const { data: inserted, error: seedErr } = await supabase
+                .from('cargas')
+                .insert(seeds)
+                .select();
+            if (seedErr) {
+                console.error('Erro ao inserir seeds cargas:', seedErr);
+            } else if (inserted) {
+                setTransportSchedules(inserted.map(dbRowToSchedule));
+            }
+        } else {
+            setTransportSchedules(data.map(dbRowToSchedule));
+        }
+        setLoading(false);
+    }, [warehouseId, showToast]);
+
+    useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
+
+    // Realtime subscription
+    useEffect(() => {
+        if (!warehouseId) return;
+        const channel = supabase
+            .channel('cargas_schedule_rt')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'cargas', filter: `warehouse_id=eq.${warehouseId}` },
+                () => fetchSchedules()
+            )
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    }, [warehouseId, fetchSchedules]);
 
     // ========== Navegação de datas ==========
     const navigateDate = (dir) => {
@@ -333,7 +448,7 @@ export default function TransportSchedule() {
         if (view === 'dia') return [new Date(selectedDate)];
         if (view === 'quatroDias') return Array.from({ length: 4 }, (_, i) => addDays(selectedDate, i));
         if (view === 'semanal') { const start = getStartOfWeek(selectedDate); return Array.from({ length: 7 }, (_, i) => addDays(start, i)); }
-        return []; // mensal usa outro layout
+        return [];
     }, [view, selectedDate]);
 
     // ========== Agendamentos do período ==========
@@ -366,16 +481,44 @@ export default function TransportSchedule() {
         });
     };
 
-    const handleSaveAgendamento = (data) => {
-        transportSchedulesCrud.add(data);
+    const handleSaveAgendamento = async (formData) => {
+        const dbRow = scheduleToDb(formData, warehouseId);
+        const { data, error } = await supabase
+            .from('cargas')
+            .insert([dbRow])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Erro ao salvar agendamento:', error);
+            showToast('Erro ao salvar agendamento.', 'error');
+            return;
+        }
+        if (data) {
+            setTransportSchedules(prev => [...prev, dbRowToSchedule(data)]);
+            showToast('Agendamento salvo com sucesso!', 'success');
+        }
         setShowAgendamento(null);
     };
 
-    const handleTransition = (id, nextStatus) => {
+    const handleTransition = async (id, nextStatus) => {
         const agenda = transportSchedules.find(a => a.id === id);
         if (!agenda) return;
         const updatedHistorico = [...(agenda.historico || []), { status: nextStatus, data: new Date().toISOString(), usuario: 'danilo.supervisor' }];
-        transportSchedulesCrud.update(id, { status: nextStatus, historico: updatedHistorico });
+
+        const { error } = await supabase
+            .from('cargas')
+            .update({ status_agenda: nextStatus, historico: updatedHistorico })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Erro ao atualizar status:', error);
+            showToast('Erro ao atualizar status.', 'error');
+            return;
+        }
+        setTransportSchedules(prev => prev.map(a =>
+            a.id === id ? { ...a, status: nextStatus, historico: updatedHistorico } : a
+        ));
         setShowDetalhes(null);
     };
 
@@ -405,7 +548,7 @@ export default function TransportSchedule() {
                                     {dayAgendas.slice(0, 3).map(a => {
                                         const cfg = STATUS_CFG[a.status];
                                         return (
-                                            <div key={a.id} onClick={(e) => { e.stopPropagation(); setShowDetalhes(a); }} className="px-1.5 py-1 rounded-lg text-[7px] font-black truncate cursor-pointer hover:opacity-80 transition-all" style={{ backgroundColor: cfg.bg, color: cfg.color, borderLeft: `3px solid ${cfg.color}` }}>
+                                            <div key={a.id} onClick={(e) => { e.stopPropagation(); setShowDetalhes(a); }} className="px-1.5 py-1 rounded-lg text-[7px] font-black truncate cursor-pointer hover:opacity-80 transition-all" style={{ backgroundColor: cfg?.bg ?? '#f1f5f9', color: cfg?.color ?? '#64748b', borderLeft: `3px solid ${cfg?.color ?? '#64748b'}` }}>
                                                 {fmtHora(a.dataInicio)} {a.transportadora}
                                             </div>
                                         );
@@ -448,7 +591,7 @@ export default function TransportSchedule() {
                                     return (
                                         <td key={di} className={`p-1 border-r border-slate-50 dark:border-slate-800/50 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all align-top min-w-[120px] ${isToday ? 'bg-primary/[0.02]' : ''}`} onClick={(e) => agendas.length === 0 && handleSlotClick(e, day, hour)}>
                                             {agendas.map(a => {
-                                                const cfg = STATUS_CFG[a.status];
+                                                const cfg = STATUS_CFG[a.status] ?? STATUS_CFG['agendado'];
                                                 return (
                                                     <div key={a.id} onClick={(e) => { e.stopPropagation(); setShowDetalhes(a); }} className="p-2 rounded-xl mb-1 cursor-pointer hover:shadow-md transition-all border-l-4" style={{ backgroundColor: cfg.bg, borderColor: cfg.color }}>
                                                         <p className="text-[8px] font-black truncate" style={{ color: cfg.color }}>{a.tipo === 'Recebimento' ? '📥' : '📤'} {a.transportadora}</p>
@@ -477,6 +620,14 @@ export default function TransportSchedule() {
             {showDetalhes && <DetalhesModal agenda={showDetalhes} onTransition={handleTransition} onClose={() => setShowDetalhes(null)} />}
             {tipoPopup && <TipoPopup x={tipoPopup.x} y={tipoPopup.y} onSelect={handleTipoSelect} onClose={() => setTipoPopup(null)} />}
 
+            {/* Toast inline */}
+            {toast && (
+                <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-sm font-bold shadow-lg border ${toast.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : toast.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                    {toast.msg}
+                    <button onClick={() => setToast(null)} className="ml-auto opacity-70 hover:opacity-100"><X className="w-4 h-4" /></button>
+                </div>
+            )}
+
             {/* Cabeçalho */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -504,44 +655,53 @@ export default function TransportSchedule() {
                 </div>
             </div>
 
-            {/* Layout: Sidebar + Calendário */}
-            <div className="flex gap-4">
-                {/* Painel Lateral */}
-                <div className="hidden lg:flex flex-col gap-4 w-64 shrink-0">
-                    <MiniCalendar selectedDate={selectedDate} onSelect={(d) => setSelectedDate(d)} />
+            {loading ? (
+                <div className="flex items-center justify-center py-24">
+                    <div className="w-10 h-10 border-4 border-slate-200 border-t-primary rounded-full animate-spin" />
+                </div>
+            ) : (
+                /* Layout: Sidebar + Calendário */
+                <div className="flex gap-4">
+                    {/* Painel Lateral */}
+                    <div className="hidden lg:flex flex-col gap-4 w-64 shrink-0">
+                        <MiniCalendar selectedDate={selectedDate} onSelect={(d) => setSelectedDate(d)} />
 
-                    {/* Legenda */}
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Legenda de Status</p>
-                        {Object.entries(STATUS_CFG).map(([key, cfg]) => (
-                            <div key={key} className="flex items-center gap-2.5">
-                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cfg.color }} />
-                                <span className="text-[9px] font-bold text-slate-600">{cfg.label}</span>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Resumo do dia */}
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-2">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Resumo de Hoje</p>
-                        {Object.entries(STATUS_CFG).map(([key, cfg]) => {
-                            const count = transportSchedules.filter(a => a.status === key && isSameDay(new Date(a.dataInicio), new Date())).length;
-                            if (count === 0) return null;
-                            return (
-                                <div key={key} className="flex items-center justify-between">
-                                    <span className="text-[9px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
-                                    <span className="text-xs font-black font-mono" style={{ color: cfg.color }}>{count}</span>
+                        {/* Legenda */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Legenda de Status</p>
+                            {Object.entries(STATUS_CFG).map(([key, cfg]) => (
+                                <div key={key} className="flex items-center gap-2.5">
+                                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cfg.color }} />
+                                    <span className="text-[9px] font-bold text-slate-600">{cfg.label}</span>
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
+
+                        {/* Resumo do dia */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 space-y-2">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Resumo de Hoje</p>
+                            {Object.entries(STATUS_CFG).map(([key, cfg]) => {
+                                const count = transportSchedules.filter(a => a.status === key && isSameDay(new Date(a.dataInicio), new Date())).length;
+                                if (count === 0) return null;
+                                return (
+                                    <div key={key} className="flex items-center justify-between">
+                                        <span className="text-[9px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
+                                        <span className="text-xs font-black font-mono" style={{ color: cfg.color }}>{count}</span>
+                                    </div>
+                                );
+                            })}
+                            {transportSchedules.filter(a => isSameDay(new Date(a.dataInicio), new Date())).length === 0 && (
+                                <p className="text-[9px] text-slate-400">Nenhum agendamento hoje</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Calendário */}
+                    <div className="flex-1 min-w-0">
+                        {view === 'mensal' ? renderMonthView() : renderGridView()}
                     </div>
                 </div>
-
-                {/* Calendário */}
-                <div className="flex-1 min-w-0">
-                    {view === 'mensal' ? renderMonthView() : renderGridView()}
-                </div>
-            </div>
+            )}
         </div>
     );
 }
