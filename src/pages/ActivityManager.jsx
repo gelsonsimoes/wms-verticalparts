@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Activity,
   Users,
@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
@@ -42,6 +44,52 @@ const STATUS_CFG = {
 /** Lista canônica de status — única fonte de verdade para KPIs e filtros. */
 const STATUS_LIST = ['Pendente', 'Em Execução', 'Pausada', 'Finalizada'];
 
+// ─── DB STATUS MAP ──────────────────────────────────────────────────
+const DB_STATUS_MAP = {
+  'pendente':    'Pendente',
+  'em_execucao': 'Em Execução',
+  'pausada':     'Pausada',
+  'concluida':   'Finalizada',
+  'cancelada':   'Finalizada',
+};
+
+// ─── TIPO MAP (DB → UI label) ────────────────────────────────────────
+const TIPO_MAP = {
+  'separacao':   'Separação',
+  'inventario':  'Inventário',
+  'recebimento': 'Recebimento',
+  'expedicao':   'Expedição',
+  'packing':     'Packing',
+  'remanejamento': 'Remanejamento',
+};
+
+function mapTarefa(row) {
+  return {
+    id:          row.id,
+    tipo:        TIPO_MAP[row.tipo] || row.tipo || 'Tarefa',
+    regiao:      row.detalhes?.regiao || TIPO_MAP[row.tipo] || row.tipo || '—',
+    status:      DB_STATUS_MAP[row.status] || row.status || 'Pendente',
+    progresso:   0,
+    operadores:  row.detalhes?.operadores || [],
+    inicio:      row.created_at ? new Date(row.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + new Date(row.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : null,
+    prevTermino: null,
+    _raw:        row,
+  };
+}
+
+function mapOperador(row) {
+  const parts = (row.nome || row.email || 'OP').split(' ');
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : (row.nome || row.email || 'OP').slice(0, 2).toUpperCase();
+  return {
+    id:            row.id,
+    nome:          row.nome || row.email || row.id,
+    foto:          initials,
+    atividadeAtual: null,
+  };
+}
+
 function StatusBadge({ status }) {
   const cfg = STATUS_CFG[status] || {};
   return (
@@ -51,48 +99,6 @@ function StatusBadge({ status }) {
     </span>
   );
 }
-
-// ─── MOCK DATA ─────────────────────────────────────────────────────
-const INITIAL_ATIVIDADES = [
-  { id: 'AT-2241', tipo: 'Separação',       regiao: 'Setor A — Zona Picking', status: 'Em Execução', operadores: ['joao.silva', 'carla.matos'],       progresso: 68, inicio: '22/02 08:10', prevTermino: '22/02 10:30' },
-  { id: 'AT-2242', tipo: 'Remanejamento',   regiao: 'Setor B — Pulmão N4',    status: 'Pendente',    operadores: [],                                    progresso: 0,  inicio: null,          prevTermino: null },
-  { id: 'AT-2243', tipo: 'Inventário',      regiao: 'Setor C — Área Total',   status: 'Em Execução', operadores: ['pedro.ferreira'],                    progresso: 34, inicio: '22/02 07:00', prevTermino: '22/02 12:00' },
-  { id: 'AT-2244', tipo: 'Recebimento',     regiao: 'Doca 3 — Entrada',       status: 'Pausada',     operadores: ['ana.lucia', 'marcos.paulo'],          progresso: 51, inicio: '22/02 09:00', prevTermino: '22/02 11:00' },
-  { id: 'AT-2245', tipo: 'Packing',         regiao: 'Estação de Embalagem 2', status: 'Finalizada',  operadores: ['fernanda.reis'],                     progresso: 100,inicio: '22/02 06:30', prevTermino: '22/02 09:00' },
-  { id: 'AT-2246', tipo: 'Cross-docking',   regiao: 'Doca 1 — Transferência', status: 'Pendente',    operadores: [],                                    progresso: 0,  inicio: null,          prevTermino: null },
-];
-
-const TODOS_OPERADORES = [
-  { id: 'joao.silva',     nome: 'João Silva',      foto: 'JS', atividadeAtual: 'AT-2241' },
-  { id: 'carla.matos',    nome: 'Carla Matos',     foto: 'CM', atividadeAtual: 'AT-2241' },
-  { id: 'pedro.ferreira', nome: 'Pedro Ferreira',  foto: 'PF', atividadeAtual: 'AT-2243' },
-  { id: 'ana.lucia',      nome: 'Ana Lúcia',       foto: 'AL', atividadeAtual: 'AT-2244' },
-  { id: 'marcos.paulo',   nome: 'Marcos Paulo',    foto: 'MP', atividadeAtual: 'AT-2244' },
-  { id: 'fernanda.reis',  nome: 'Fernanda Reis',   foto: 'FR', atividadeAtual: null },
-  { id: 'roberto.lins',   nome: 'Roberto Lins',    foto: 'RL', atividadeAtual: null },
-  { id: 'silvia.cunha',   nome: 'Sílvia Cunha',    foto: 'SC', atividadeAtual: null },
-];
-
-const HISTORICO = {
-  'AT-2241': [
-    { operador: 'João Silva',     acao: 'Iniciou', hora: '22/02/2026 08:10', obs: 'Item pego do pool de atividades' },
-    { operador: 'Carla Matos',   acao: 'Vinculada', hora: '22/02/2026 08:25', obs: 'Alocada pelo supervisor danilo.supervisor' },
-    { operador: 'Sistema',       acao: 'Progresso 50%', hora: '22/02/2026 09:15', obs: '42 de 62 ondas concluídas' },
-  ],
-  'AT-2243': [
-    { operador: 'Pedro Ferreira', acao: 'Iniciou', hora: '22/02/2026 07:00', obs: 'Item pego do pool de atividades' },
-    { operador: 'Sistema',        acao: 'Progresso 34%', hora: '22/02/2026 08:40', obs: 'Seções A1–A5 inventariadas' },
-  ],
-  'AT-2244': [
-    { operador: 'Ana Lúcia',     acao: 'Iniciou', hora: '22/02/2026 09:00', obs: 'Início do recebimento NF 000.541' },
-    { operador: 'Marcos Paulo',  acao: 'Vinculado', hora: '22/02/2026 09:10', obs: 'Reforço alocado pelo supervisor' },
-    { operador: 'Sistema',       acao: 'Pausada', hora: '22/02/2026 10:00', obs: 'Aguardando empilhadeira Doca 3' },
-  ],
-  'AT-2245': [
-    { operador: 'Fernanda Reis', acao: 'Iniciou', hora: '22/02/2026 06:30', obs: '' },
-    { operador: 'Fernanda Reis', acao: 'Finalizou', hora: '22/02/2026 08:58', obs: '28 pedidos embalados. Tempo: 2h28m.' },
-  ],
-};
 
 // ─── AVATAR ────────────────────────────────────────────────────────
 const COLORS = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-rose-500', 'bg-amber-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-teal-500'];
@@ -106,12 +112,12 @@ function Avatar({ initials, size = 'sm', idx = 0 }) {
 }
 
 // ─── MODAL VINCULAR USUÁRIOS (DUAL LISTBOX) ─────────────────────────
-function VincularModal({ atividade, onClose, onSave }) {
+function VincularModal({ atividade, todosOperadores, onClose, onSave }) {
   const [esquerda, setEsquerda] = useState(
-    TODOS_OPERADORES.filter(o => !atividade.operadores.includes(o.id))
+    todosOperadores.filter(o => !atividade.operadores.includes(o.id))
   );
   const [direita, setDireita] = useState(
-    TODOS_OPERADORES.filter(o => atividade.operadores.includes(o.id))
+    todosOperadores.filter(o => atividade.operadores.includes(o.id))
   );
   const [selEsq, setSelEsq] = useState([]);
   const [selDir, setSelDir] = useState([]);
@@ -142,6 +148,7 @@ function VincularModal({ atividade, onClose, onSave }) {
 
   const OperadorItem = ({ op, side, selected }) => {
     const outroAtivo = op.atividadeAtual && op.atividadeAtual !== atividade.id;
+    const opIdx = todosOperadores.findIndex(o => o.id === op.id);
     return (
       <div onClick={() => toggleSel(op.id, side)}
         className={cn('flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all select-none border-2',
@@ -149,7 +156,7 @@ function VincularModal({ atividade, onClose, onSave }) {
             ? 'border-secondary bg-secondary/5 dark:bg-secondary/10'
             : 'border-transparent hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
         )}>
-        <Avatar initials={op.foto} idx={TODOS_OPERADORES.indexOf(op)} size={selected ? 'md' : 'sm'} />
+        <Avatar initials={op.foto} idx={opIdx >= 0 ? opIdx : 0} size={selected ? 'md' : 'sm'} />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-black text-slate-700 dark:text-slate-300 truncate">{op.nome}</p>
           {outroAtivo && (
@@ -303,28 +310,18 @@ function PausarRetomarModal({ atividade, acao, onClose, onConfirm }) {
 }
 
 // ─── GAVETA: HISTÓRICO DE EXECUÇÃO ─────────────────────────────────
-function HistoricoDrawer({ atividade, onClose, now }) {
-  const hist = HISTORICO[atividade.id] || [];
-
-  // Duração real: diferença entre agora e o horário de início (sem magic number 142)
+function HistoricoDrawer({ atividade, operadoresMap, onClose, now }) {
+  // Duration from inicio
   const durMin = useMemo(() => {
-    if (!atividade.inicio) return 0;
-    // Formato dos dados mock: 'DD/MM HH:mm' ex: '22/02 08:10'
-    // Parseamos para comparar com o horário atual do sistema
+    if (!atividade._raw?.created_at) return 0;
     try {
-      const [datePart, timePart] = atividade.inicio.split(' ');
-      const [day, month] = datePart.split('/').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
-      const year = new Date().getFullYear();
-      const start = new Date(year, month - 1, day, hours, minutes);
-      const diffMs = now - start.getTime();
-      // Se a diferença for negativa ou irreal (>48h), retorna 0
+      const diffMs = now - new Date(atividade._raw.created_at).getTime();
       if (diffMs < 0 || diffMs > 172800000) return 0;
       return Math.floor(diffMs / 60000);
     } catch {
       return 0;
     }
-  }, [atividade.inicio, now]);
+  }, [atividade._raw?.created_at, now]);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -378,7 +375,7 @@ function HistoricoDrawer({ atividade, onClose, now }) {
             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Operadores Atuais</p>
             <div className="flex flex-wrap gap-2">
               {atividade.operadores.map((opId, i) => {
-                const op = TODOS_OPERADORES.find(o => o.id === opId);
+                const op = operadoresMap.get(opId);
                 return op ? (
                   <div key={opId} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl">
                     <Avatar initials={op.foto} idx={i} size="sm" />
@@ -393,32 +390,7 @@ function HistoricoDrawer({ atividade, onClose, now }) {
         {/* Timeline de eventos */}
         <div className="flex-1 overflow-y-auto p-5">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Timeline de Eventos</p>
-          {hist.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-8">Nenhum evento registrado.</p>
-          ) : (
-            <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-100 dark:bg-slate-800" />
-              <div className="space-y-6">
-                {hist.map((ev, i) => (
-                  <div key={i} className="flex gap-4 relative">
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center shrink-0 border-2 border-white dark:border-slate-900 shadow-sm z-10">
-                      <User className="w-3.5 h-3.5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-xs font-black text-slate-800 dark:text-white">{ev.operador}</p>
-                        <span className="text-[10px] font-bold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">{ev.acao}</span>
-                      </div>
-                      {ev.obs && <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-relaxed">{ev.obs}</p>}
-                      <p className="text-[9px] text-slate-400 mt-1.5 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />{ev.hora}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-slate-400 text-center py-8">Nenhum evento registrado.</p>
         </div>
       </div>
     </div>
@@ -427,29 +399,119 @@ function HistoricoDrawer({ atividade, onClose, now }) {
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────
 export default function ActivityManager() {
-  const [atividades, setAtividades]   = useState(INITIAL_ATIVIDADES);
-  const [selectedId, setSelectedId]   = useState(null);
+  const { warehouseId } = useApp();
+  const [atividades, setAtividades]     = useState([]);
+  const [operadores, setOperadores]     = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [selectedId, setSelectedId]     = useState(null);
   const [filterStatus, setFilterStatus] = useState('Todas');
   const [filterSearch, setFilterSearch] = useState('');
-  const [modal, setModal]             = useState(null);
-  const [acao, setAcao]               = useState(null);
-  const [now, setNow]                 = useState(() => Date.now()); // força re-render p/ relógio vivo
-
-  // Map O(1) para lookup de operador por id — evita O(n²) no map da tabela
-  const operadoresMap = useMemo(
-    () => new Map(TODOS_OPERADORES.map(o => [o.id, o])),
-    [] // TODOS_OPERADORES é constante de módulo
-  );
+  const [modal, setModal]               = useState(null);
+  const [acao, setAcao]                 = useState(null);
+  const [now, setNow]                   = useState(() => Date.now());
 
   // Relógio para atividades em execução
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
+
+  // ── Fetch ─────────────────────────────────────────────────────────
+  const fetchData = useCallback(async () => {
+    if (!warehouseId) { setLoading(false); return; }
+    setLoading(true);
+
+    // Fetch tarefas
+    const { data: tarefasData, error: tarefasErr } = await supabase
+      .from('tarefas')
+      .select('id, tipo, status, created_at, detalhes, config')
+      .eq('detalhes->>warehouse_id', warehouseId)
+      .order('created_at', { ascending: false });
+
+    if (tarefasErr) console.error('[ActivityManager] tarefas:', tarefasErr);
+
+    // Fetch operadores
+    const { data: opData, error: opErr } = await supabase
+      .from('operadores')
+      .select('id, nome, email, warehouse_id')
+      .eq('warehouse_id', warehouseId);
+
+    if (opErr) console.error('[ActivityManager] operadores:', opErr);
+
+    const tarefas = tarefasData || [];
+    const ops     = opData || [];
+
+    // Seed pattern — insert demo records if none found
+    if (tarefas.length === 0) {
+      const seedTarefas = [
+        { tipo: 'separacao',   status: 'em_execucao', detalhes: { warehouse_id: warehouseId, regiao: 'Setor A — Zona Picking' } },
+        { tipo: 'inventario',  status: 'pendente',    detalhes: { warehouse_id: warehouseId, regiao: 'Setor C — Área Total'   } },
+        { tipo: 'recebimento', status: 'pendente',    detalhes: { warehouse_id: warehouseId, regiao: 'Doca 3 — Entrada'       } },
+      ];
+      const { error: seedErr } = await supabase.from('tarefas').insert(seedTarefas);
+      if (seedErr) {
+        console.warn('[ActivityManager] seed tarefas error:', seedErr);
+      } else {
+        // Re-fetch after seed
+        const { data: seeded } = await supabase
+          .from('tarefas')
+          .select('id, tipo, status, created_at, detalhes, config')
+          .eq('detalhes->>warehouse_id', warehouseId)
+          .order('created_at', { ascending: false });
+        setAtividades((seeded || []).map(mapTarefa));
+        setLoading(false);
+        return;
+      }
+    } else {
+      setAtividades(tarefas.map(mapTarefa));
+    }
+
+    if (ops.length === 0) {
+      const seedOps = [
+        { nome: 'Operador Demo 1', email: 'op1@demo.local', warehouse_id: warehouseId, role: 'operador' },
+        { nome: 'Operador Demo 2', email: 'op2@demo.local', warehouse_id: warehouseId, role: 'operador' },
+      ];
+      const { data: seededOps, error: seedOpErr } = await supabase
+        .from('operadores')
+        .insert(seedOps)
+        .select('id, nome, email, warehouse_id');
+      if (!seedOpErr && seededOps) {
+        setOperadores(seededOps.map(mapOperador));
+      } else {
+        setOperadores([]);
+      }
+    } else {
+      setOperadores(ops.map(mapOperador));
+    }
+
+    setLoading(false);
+  }, [warehouseId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ── Realtime ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!warehouseId) return;
+    const channel = supabase
+      .channel('activity-manager-tarefas')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tarefas' },
+        () => { fetchData(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [warehouseId, fetchData]);
+
+  // Map O(1) para lookup de operador por id
+  const operadoresMap = useMemo(
+    () => new Map(operadores.map(o => [o.id, o])),
+    [operadores]
+  );
 
   const selected = atividades.find(a => a.id === selectedId);
 
   const filtered = atividades.filter(a => {
     if (filterStatus !== 'Todas' && a.status !== filterStatus) return false;
     const q = filterSearch.toLowerCase();
-    if (q && !a.id.toLowerCase().includes(q) && !a.tipo.toLowerCase().includes(q) && !a.regiao.toLowerCase().includes(q)) return false;
+    if (q && !String(a.id).toLowerCase().includes(q) && !a.tipo.toLowerCase().includes(q) && !a.regiao.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -492,19 +554,26 @@ export default function ActivityManager() {
 
           {/* KPI strips */}
           <div className="flex flex-wrap gap-2 md:ml-auto">
-            {Object.entries(kpis).map(([key, count]) => {
-              const cfg = STATUS_CFG[key];
-              return count > 0 && (
-                <button key={key}
-                  onClick={() => setFilterStatus(filterStatus === key ? 'Todas' : key)}
-                  className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border-2 transition-all',
-                    filterStatus === key ? cfg.color + ' border-current/30 scale-105 shadow-md' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:scale-105'
-                  )}>
-                  <div className={cn('w-2 h-2 rounded-full', cfg.dot)} />
-                  {count} {key}
-                </button>
-              );
-            })}
+            {loading ? (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+                <span className="text-[10px] font-black text-slate-400 uppercase">Carregando...</span>
+              </div>
+            ) : (
+              Object.entries(kpis).map(([key, count]) => {
+                const cfg = STATUS_CFG[key];
+                return count > 0 && (
+                  <button key={key}
+                    onClick={() => setFilterStatus(filterStatus === key ? 'Todas' : key)}
+                    className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border-2 transition-all',
+                      filterStatus === key ? cfg.color + ' border-current/30 scale-105 shadow-md' : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:scale-105'
+                    )}>
+                    <div className={cn('w-2 h-2 rounded-full', cfg.dot)} />
+                    {count} {key}
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
@@ -578,12 +647,19 @@ export default function ActivityManager() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 && (
+            {loading && (
+              <tr>
+                <td colSpan={8} className="p-12 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-secondary mx-auto mb-2" />
+                  <p className="text-slate-400 text-sm">Carregando atividades...</p>
+                </td>
+              </tr>
+            )}
+            {!loading && filtered.length === 0 && (
               <tr><td colSpan={8} className="p-12 text-center text-slate-400 text-sm font-medium">Nenhuma atividade encontrada com os filtros aplicados.</td></tr>
             )}
-            {filtered.map(at => {
+            {!loading && filtered.map(at => {
               const isSel = at.id === selectedId;
-              // O(1) via Map — sem find() linear por linha
               const ops = at.operadores.map(id => operadoresMap.get(id)).filter(Boolean);
               return (
                 <tr key={at.id}
@@ -607,8 +683,7 @@ export default function ActivityManager() {
                     <div className={cn('w-2 h-2 rounded-full mx-auto', isSel ? 'bg-secondary scale-150' : 'bg-transparent')} />
                   </td>
                   <td className="p-4">
-                    {/* span com font-mono em vez de code — sem significado semântico aqui */}
-                    <span className="text-sm font-black text-blue-600 font-mono">{at.id}</span>
+                    <span className="text-sm font-black text-blue-600 font-mono">{String(at.id).slice(0, 8).toUpperCase()}</span>
                   </td>
                   <td className="p-4">
                     <span className="text-xs font-black text-slate-700 dark:text-slate-300">{at.tipo}</span>
@@ -658,9 +733,23 @@ export default function ActivityManager() {
       </div>
 
       {/* MODAIS & GAVETA */}
-      {modal === 'vincular'  && selected && <VincularModal atividade={selected} onClose={() => setModal(null)} onSave={handleVincular} />}
+      {modal === 'vincular'  && selected && (
+        <VincularModal
+          atividade={selected}
+          todosOperadores={operadores}
+          onClose={() => setModal(null)}
+          onSave={handleVincular}
+        />
+      )}
       {modal === 'pausa'     && selected && <PausarRetomarModal atividade={selected} acao={acao} onClose={() => setModal(null)} onConfirm={handlePausarRetomar} />}
-      {modal === 'historico' && selected && <HistoricoDrawer atividade={selected} onClose={() => setModal(null)} now={now} />}
+      {modal === 'historico' && selected && (
+        <HistoricoDrawer
+          atividade={selected}
+          operadoresMap={operadoresMap}
+          onClose={() => setModal(null)}
+          now={now}
+        />
+      )}
     </div>
   );
 }

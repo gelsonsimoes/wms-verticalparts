@@ -1,93 +1,149 @@
-import React, { useState } from 'react';
-import { 
-  Waves, 
-  Filter, 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Waves,
+  Filter,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
   ChevronRight,
   TrendingUp,
   Activity,
   Zap,
   ShoppingCart,
   Monitor,
-  Tv
+  Tv,
+  Loader2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-// ====== MOCK DATA: ONDAS COM SLAs ======
-const MOCK_WAVES = [
-  { 
-    id: 'WAVE-2024-001', 
-    titulo: 'Expedição SP - Rota Norte', 
-    status: 'Em Execução',
-    reabastecimento: true, // true = Pendente (X pulsante)
-    etapas: {
-      gerada: { time: '00:05:12', status: 'verde' },
-      liberada: { time: '00:12:45', status: 'verde' },
-      separacao: { time: '01:45:00', status: 'vermelho' }, // Atrasado
-      conferencia: { time: '00:30:22', status: 'amarelo' }, // Atenção
-      pesagem: { time: '--:--:--', status: 'cinza' },
-      coleta: { time: '--:--:--', status: 'cinza' }
-    }
-  },
-  { 
-    id: 'WAVE-2024-002', 
-    titulo: 'E-commerce - Prioritário', 
-    status: 'Em Execução',
-    reabastecimento: false, // false = OK (Check verde)
-    etapas: {
-      gerada: { time: '00:02:10', status: 'verde' },
-      liberada: { time: '00:05:00', status: 'verde' },
-      separacao: { time: '00:20:15', status: 'verde' },
-      conferencia: { time: '00:05:30', status: 'verde' },
-      pesagem: { time: '00:02:45', status: 'verde' },
-      coleta: { time: '00:00:15', status: 'verde' }
-    }
-  },
-  { 
-    id: 'WAVE-2024-003', 
-    titulo: 'Abastecimento Filial RJ', 
-    status: 'Em Execução',
-    reabastecimento: true,
-    etapas: {
-      gerada: { time: '00:08:40', status: 'verde' },
-      liberada: { time: '00:45:12', status: 'vermelho' },
-      separacao: { time: '--:--:--', status: 'cinza' },
-      conferencia: { time: '--:--:--', status: 'cinza' },
-      pesagem: { time: '--:--:--', status: 'cinza' },
-      coleta: { time: '--:--:--', status: 'cinza' }
-    }
-  },
-  { 
-    id: 'WAVE-2023-998', 
-    titulo: 'Carga Fechada - MG', 
-    status: 'Processada',
-    reabastecimento: false,
-    etapas: {
-      gerada: { time: '00:04:00', status: 'verde' },
-      liberada: { time: '00:10:00', status: 'verde' },
-      separacao: { time: '01:10:00', status: 'verde' },
-      conferencia: { time: '00:45:00', status: 'verde' },
-      pesagem: { time: '00:15:00', status: 'verde' },
-      coleta: { time: '00:30:00', status: 'verde' }
-    }
-  }
-];
+// ── Status mapping DB → UI ──────────────────────────────────────────
+const DB_STATUS_MAP = {
+  'pendente':     'Pendente',
+  'em_execucao':  'Em Execução',
+  'concluida':    'Finalizada',
+  'cancelada':    'Cancelada',
+};
 
 const SLA_COLORS = {
-  verde: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
-  amarelo: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
+  verde:    'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800',
+  amarelo:  'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800',
   vermelho: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800',
-  cinza: 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-600 dark:border-slate-700'
+  cinza:    'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-600 dark:border-slate-700'
 };
+
+// Compute elapsed time from created_at in HH:MM:SS format
+function elapsedFrom(createdAt) {
+  if (!createdAt) return '--:--:--';
+  const diffMs = Date.now() - new Date(createdAt).getTime();
+  if (diffMs < 0) return '--:--:--';
+  const totalSec = Math.floor(diffMs / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// Compute SLA color based on elapsed minutes
+function slaColor(createdAt) {
+  if (!createdAt) return 'cinza';
+  const minutos = (Date.now() - new Date(createdAt).getTime()) / 60000;
+  if (minutos < 30) return 'verde';
+  if (minutos < 90) return 'amarelo';
+  return 'vermelho';
+}
+
+// Build SLA etapas from DB row
+function buildEtapas(row) {
+  const status = DB_STATUS_MAP[row.status] || row.status;
+  const isActive    = status === 'Em Execução';
+  const isFinalizada = status === 'Finalizada' || status === 'Cancelada';
+  const baseTime = elapsedFrom(row.created_at);
+  const baseColor = slaColor(row.created_at);
+
+  // For active waves, show real elapsed on early stages; gray for future stages
+  // For finished waves, all stages show the same elapsed time as green
+  if (isFinalizada) {
+    return {
+      gerada:      { time: baseTime, status: 'verde' },
+      liberada:    { time: baseTime, status: 'verde' },
+      separacao:   { time: baseTime, status: 'verde' },
+      conferencia: { time: baseTime, status: 'verde' },
+      pesagem:     { time: baseTime, status: 'verde' },
+      coleta:      { time: baseTime, status: 'verde' },
+    };
+  }
+  if (isActive) {
+    return {
+      gerada:      { time: baseTime, status: baseColor },
+      liberada:    { time: baseTime, status: baseColor },
+      separacao:   { time: baseTime, status: baseColor },
+      conferencia: { time: '--:--:--', status: 'cinza' },
+      pesagem:     { time: '--:--:--', status: 'cinza' },
+      coleta:      { time: '--:--:--', status: 'cinza' },
+    };
+  }
+  // Pendente
+  return {
+    gerada:      { time: '--:--:--', status: 'cinza' },
+    liberada:    { time: '--:--:--', status: 'cinza' },
+    separacao:   { time: '--:--:--', status: 'cinza' },
+    conferencia: { time: '--:--:--', status: 'cinza' },
+    pesagem:     { time: '--:--:--', status: 'cinza' },
+    coleta:      { time: '--:--:--', status: 'cinza' },
+  };
+}
+
+// Map a DB row from `tarefas` → wave UI format
+function dbRowToWave(row) {
+  const statusUi = DB_STATUS_MAP[row.status] || row.status || 'Pendente';
+  return {
+    id:             row.id,
+    titulo:         row.titulo_onda || row.titulo || `Onda ${String(row.id).slice(0, 8).toUpperCase()}`,
+    status:         statusUi,
+    reabastecimento: !!(row.config?.reabastecimento_pendente),
+    etapas:         buildEtapas(row),
+    _raw:           row,
+  };
+}
+
+// Seed data — inserted when no tarefas exist for the warehouse
+const SEED_TAREFAS = (warehouseId) => [
+  {
+    tipo: 'separacao',
+    titulo_onda: 'Expedição SP — Rota Norte',
+    status: 'em_execucao',
+    detalhes: { warehouse_id: warehouseId, regiao: 'Setor A' },
+    config: { reabastecimento_pendente: true },
+    total_itens: 62,
+    total_pedidos: 8,
+  },
+  {
+    tipo: 'separacao',
+    titulo_onda: 'E-commerce — Prioritário',
+    status: 'em_execucao',
+    detalhes: { warehouse_id: warehouseId, regiao: 'Setor B' },
+    config: { reabastecimento_pendente: false },
+    total_itens: 28,
+    total_pedidos: 14,
+  },
+  {
+    tipo: 'separacao',
+    titulo_onda: 'Abastecimento Filial RJ',
+    status: 'pendente',
+    detalhes: { warehouse_id: warehouseId, regiao: 'Doca 2' },
+    config: { reabastecimento_pendente: true },
+    total_itens: 45,
+    total_pedidos: 5,
+  },
+];
 
 const SLALabel = ({ label, data }) => (
   <div className="flex flex-col items-center gap-1.5 min-w-[100px]">
@@ -102,10 +158,80 @@ const SLALabel = ({ label, data }) => (
 );
 
 export default function WaveSLADashboard() {
-  const [filter, setFilter] = useState('Todas');
-  const [waves] = useState(MOCK_WAVES);
-  const { isTvMode, setIsTvMode } = useApp();
+  const [filter, setFilter]   = useState('Todas');
+  const [waves, setWaves]     = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { isTvMode, setIsTvMode, warehouseId } = useApp();
 
+  // ── Fetch tarefas ────────────────────────────────────────────────
+  const fetchWaves = useCallback(async () => {
+    if (!warehouseId) { setLoading(false); return; }
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('tarefas')
+      .select('id, tipo, titulo_onda, status, doca, config, cor_colmeia, total_itens, total_pedidos, created_at, detalhes')
+      .eq('tipo', 'separacao')
+      .eq('detalhes->>warehouse_id', warehouseId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[WaveSLADashboard] fetch tarefas:', error);
+      setLoading(false);
+      return;
+    }
+
+    // Seed pattern
+    if (!data || data.length === 0) {
+      const seeds = SEED_TAREFAS(warehouseId);
+      const { error: seedErr } = await supabase.from('tarefas').insert(seeds);
+      if (seedErr) {
+        console.warn('[WaveSLADashboard] seed error:', seedErr);
+        setWaves([]);
+        setLoading(false);
+        return;
+      }
+      // Re-fetch after seed
+      const { data: seeded } = await supabase
+        .from('tarefas')
+        .select('id, tipo, titulo_onda, status, doca, config, cor_colmeia, total_itens, total_pedidos, created_at, detalhes')
+        .eq('tipo', 'separacao')
+        .eq('detalhes->>warehouse_id', warehouseId)
+        .order('created_at', { ascending: false });
+      setWaves((seeded || []).map(dbRowToWave));
+      setLoading(false);
+      return;
+    }
+
+    setWaves(data.map(dbRowToWave));
+    setLoading(false);
+  }, [warehouseId]);
+
+  useEffect(() => { fetchWaves(); }, [fetchWaves]);
+
+  // ── Realtime subscription ────────────────────────────────────────
+  useEffect(() => {
+    if (!warehouseId) return;
+    const channel = supabase
+      .channel('wave-sla-tarefas')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tarefas' },
+        () => { fetchWaves(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [warehouseId, fetchWaves]);
+
+  // ── KPI counts ────────────────────────────────────────────────────
+  const emSeparacao = waves.filter(w => w.status === 'Em Execução').length;
+  const emAlerta    = waves.filter(w =>
+    w.reabastecimento ||
+    Object.values(w.etapas).some(e => e.status === 'vermelho' || e.status === 'amarelo')
+  ).length;
+  const reabastPendentes = waves.filter(w => w.reabastecimento).length;
+
+  // ── Filtered list ─────────────────────────────────────────────────
   const filteredWaves = waves.filter(w => {
     if (filter === 'Todas') return true;
     if (filter === 'Em Alerta') {
@@ -136,7 +262,7 @@ export default function WaveSLADashboard() {
         <div className="flex items-center gap-3">
           <div className="relative group">
             <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-secondary transition-colors" aria-hidden="true" />
-            <select 
+            <select
               className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 py-3 pl-11 pr-8 rounded-2xl text-xs font-black uppercase tracking-widest outline-none focus:border-secondary transition-all appearance-none cursor-pointer shadow-sm"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -145,13 +271,13 @@ export default function WaveSLADashboard() {
               <option value="Em Alerta">Em Alerta (SLA/Reabast.)</option>
             </select>
           </div>
-          
+
           <button
             onClick={() => setIsTvMode(!isTvMode)}
             className={cn(
               "flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl",
-              isTvMode 
-                ? "bg-danger text-white hover:bg-red-600 animate-pulse" 
+              isTvMode
+                ? "bg-danger text-white hover:bg-red-600 animate-pulse"
                 : "bg-primary text-white hover:bg-primary/90"
             )}
           >
@@ -174,14 +300,18 @@ export default function WaveSLADashboard() {
            <div className="bg-danger p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
               <AlertTriangle className="w-24 h-24 text-white animate-bounce" aria-hidden="true" />
               <div>
-                <p className="text-white text-5xl font-black italic uppercase leading-tight">3 Ondas Críticas</p>
+                <p className="text-white text-5xl font-black italic uppercase leading-tight">
+                  {emAlerta > 0 ? `${emAlerta} Onda${emAlerta !== 1 ? 's' : ''} Crítica${emAlerta !== 1 ? 's' : ''}` : 'Sem Alertas'}
+                </p>
                 <p className="text-white/80 text-2xl font-bold uppercase tracking-widest">Atraso na Separação</p>
               </div>
            </div>
            <div className="bg-warning p-10 rounded-[40px] shadow-2xl flex items-center gap-8 border-8 border-white">
               <Zap className="w-24 h-24 text-primary animate-pulse" aria-hidden="true" />
               <div>
-                <p className="text-primary text-5xl font-black italic uppercase leading-tight">5 Reabastecimentos</p>
+                <p className="text-primary text-5xl font-black italic uppercase leading-tight">
+                  {reabastPendentes > 0 ? `${reabastPendentes} Reabastecimento${reabastPendentes !== 1 ? 's' : ''}` : 'Nenhum Reabast.'}
+                </p>
                 <p className="text-primary/60 text-2xl font-bold uppercase tracking-widest">Pendentes no Chão</p>
               </div>
            </div>
@@ -191,24 +321,24 @@ export default function WaveSLADashboard() {
       {/* ====== ANALYTICS CARDS ====== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Ondas em Separação', value: '12', icon: ShoppingCart, color: 'primary' },
-          { label: 'Média de SLA (Etapas)', value: '18m', icon: Clock, color: 'secondary' },
-          { label: 'Ondas em Alerta', value: '03', icon: AlertTriangle, color: 'danger' },
-          { label: 'Reabast. Pendentes', value: '05', icon: Zap, color: 'warning' },
+          { label: 'Ondas em Separação', value: loading ? '—' : String(emSeparacao).padStart(2, '0'), icon: ShoppingCart, color: 'primary' },
+          { label: 'Média de SLA (Etapas)', value: '—',      icon: Clock,          color: 'secondary' },
+          { label: 'Ondas em Alerta',       value: loading ? '—' : String(emAlerta).padStart(2, '0'),   icon: AlertTriangle,  color: 'danger' },
+          { label: 'Reabast. Pendentes',    value: loading ? '—' : String(reabastPendentes).padStart(2, '0'), icon: Zap, color: 'warning' },
         ].map((card, i) => {
           const colorMap = {
-            primary: 'bg-primary/10 border-primary/20 text-primary',
+            primary:   'bg-primary/10 border-primary/20 text-primary',
             secondary: 'bg-secondary/10 border-secondary/20 text-secondary',
-            danger: 'bg-red-500/10 border-red-500/20 text-red-600',
-            warning: 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+            danger:    'bg-red-500/10 border-red-500/20 text-red-600',
+            warning:   'bg-amber-500/10 border-amber-500/20 text-amber-600'
           };
           const iconColorMap = {
-            primary: 'text-primary',
+            primary:   'text-primary',
             secondary: 'text-secondary',
-            danger: 'text-red-500',
-            warning: 'text-amber-500'
+            danger:    'text-red-500',
+            warning:   'text-amber-500'
           };
-          
+
           return (
             <div key={i} className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
               <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center border", colorMap[card.color])}>
@@ -236,15 +366,34 @@ export default function WaveSLADashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-              {filteredWaves.map((wave) => (
+              {loading && (
+                <tr>
+                  <td colSpan={4} className="p-12 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-secondary mx-auto" />
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredWaves.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-12 text-center text-slate-400 text-sm font-medium italic">
+                    Nenhuma onda ativa
+                  </td>
+                </tr>
+              )}
+              {!loading && filteredWaves.map((wave) => (
                 <tr key={wave.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-all">
                   <td className="p-6">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-black text-primary font-mono tracking-tight">{wave.id}</span>
+                      <span className="text-xs font-black text-primary font-mono tracking-tight">
+                        {String(wave.id).slice(0, 13).toUpperCase()}
+                      </span>
                       <span className="text-[11px] font-bold text-slate-900 dark:text-slate-200 truncate max-w-[150px]">{wave.titulo}</span>
                       <span className={cn(
                         "text-[9px] font-black uppercase px-2 py-0.5 rounded-full inline-block w-fit mt-1",
-                        wave.status === 'Em Execução' ? 'bg-secondary/10 text-secondary' : 'bg-green-100 text-green-700'
+                        wave.status === 'Em Execução' ? 'bg-secondary/10 text-secondary' :
+                        wave.status === 'Finalizada'  ? 'bg-green-100 text-green-700' :
+                        wave.status === 'Cancelada'   ? 'bg-red-100 text-red-700' :
+                        'bg-slate-100 text-slate-500'
                       )}>
                         {wave.status}
                       </span>
@@ -273,22 +422,22 @@ export default function WaveSLADashboard() {
 
                   <td className="p-6">
                     <div className="flex items-center gap-4 py-2">
-                      <SLALabel label="Gerada" data={wave.etapas.gerada} />
+                      <SLALabel label="Gerada"      data={wave.etapas.gerada} />
                       <div className="w-4 h-px bg-slate-200 dark:bg-slate-800" />
-                      <SLALabel label="Liberada" data={wave.etapas.liberada} />
+                      <SLALabel label="Liberada"    data={wave.etapas.liberada} />
                       <div className="w-4 h-px bg-slate-200 dark:bg-slate-800" />
-                      <SLALabel label="Separação" data={wave.etapas.separacao} />
+                      <SLALabel label="Separação"   data={wave.etapas.separacao} />
                       <div className="w-4 h-px bg-slate-200 dark:bg-slate-800" />
                       <SLALabel label="Conferência" data={wave.etapas.conferencia} />
                       <div className="w-4 h-px bg-slate-200 dark:bg-slate-800" />
-                      <SLALabel label="Pesagem" data={wave.etapas.pesagem} />
+                      <SLALabel label="Pesagem"     data={wave.etapas.pesagem} />
                       <div className="w-4 h-px bg-slate-200 dark:bg-slate-800" />
-                      <SLALabel label="Coleta" data={wave.etapas.coleta} />
+                      <SLALabel label="Coleta"      data={wave.etapas.coleta} />
                     </div>
                   </td>
 
                   <td className="p-6 text-right">
-                    <button 
+                    <button
                       aria-label="Detalhes da onda"
                       className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-secondary hover:border-secondary transition-all shadow-sm"
                     >

@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 import {
   Users,
   Search,
@@ -14,13 +16,13 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   FileText,
   RefreshCw,
   X
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -74,8 +76,11 @@ export default function CustomerCatalog() {
   const showToast = (message, type = 'success') => {
     if (toastRef.current) clearTimeout(toastRef.current);
     setToast({ message, type });
-    toastRef.current = setTimeout(() => setToast(null), 3000);
+    toastRef.current = setTimeout(() => setToast(null), 4000);
   };
+
+  // Confirm Delete Modal
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const filtered = useMemo(() =>
     customers.filter(c =>
@@ -121,13 +126,17 @@ export default function CustomerCatalog() {
     setSelectedId(c.id);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.razao_social.trim()) { showToast('Razão Social é obrigatória.', 'error'); return; }
     if (isNew) {
-      addCustomer(formData);
+      const { data: inserted, error } = await supabase.from('customers').insert(formData).select().single();
+      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
+      addCustomer(inserted ?? formData);
       setIsNew(false);
       showToast('Cliente cadastrado com sucesso!');
     } else if (selectedId) {
+      const { error } = await supabase.from('customers').update(formData).eq('id', selectedId);
+      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       updateCustomer(selectedId, formData);
       showToast('Alterações salvas com sucesso!');
     }
@@ -135,19 +144,53 @@ export default function CustomerCatalog() {
 
   const handleDelete = () => {
     if (!selectedId) return;
-    const nome = selected?.razao_social || 'este cliente';
-    if (window.confirm(`Deseja realmente excluir "${nome}"?`)) {
-      deleteCustomer(selectedId);
-      setSelectedId(null);
-      setFormData(emptyForm());
-      showToast('Cliente excluído.', 'info');
-    }
+    setConfirmDelete(true);
+  };
+
+  const confirmarDelete = async () => {
+    const { error } = await supabase.from('customers').delete().eq('id', selectedId);
+    if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
+    deleteCustomer(selectedId);
+    setSelectedId(null);
+    setFormData(emptyForm());
+    showToast('Cliente excluído.', 'info');
+    setConfirmDelete(false);
   };
 
   const showDetail = isNew || !!selectedId;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col animate-in fade-in duration-700">
+
+      {/* Modal de confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full shadow-2xl border border-red-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-black text-slate-800 dark:text-white">Confirmar Exclusão</p>
+                <p className="text-xs text-slate-500">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
+              Deseja excluir o cliente <strong>"{selected?.razao_social || '—'}"</strong>?
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-500 hover:border-slate-400 transition-all">
+                Cancelar
+              </button>
+              <button onClick={confirmarDelete}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 active:scale-95 transition-all">
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HEADER */}
       <div className="bg-white dark:bg-slate-900 border-b-2 border-slate-100 dark:border-slate-800 px-6 py-5 relative overflow-hidden shrink-0">

@@ -1,16 +1,32 @@
 import React, { useState, useId, useEffect } from 'react';
-import { 
-  Waves, Settings2, Filter, LayoutGrid, CheckCircle2, 
-  ArrowLeft, FileText, Truck, Navigation, Warehouse, 
-  Box, Package, ChevronRight, Check, Play
+import {
+  Waves, Settings2, Filter, LayoutGrid, CheckCircle2,
+  ArrowLeft, FileText, Truck, Navigation, Warehouse,
+  Box, Package, ChevronRight, Check, Play, X, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
+import Tooltip from '../components/ui/Tooltip';
 
 export default function WavePickingWizard() {
-  const wizardId = useId();
+  const wizardId  = useId();
+  const { warehouseId } = useApp();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [filterAvailable, setFilterAvailable] = useState(false);
+
+  // ── Toast inline (substitui alert) ──
+  const [toast, setToast] = useState(null); // { msg, type: 'success'|'error'|'warning' }
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const showToast = (msg, type = 'warning') => setToast({ msg, type });
+
+  // ── Modal de confirmação (substitui window.confirm) ──
+  const [confirmModal, setConfirmModal] = useState(null); // { msg, onConfirm }
 
   // Armazenam os dados reais retornados do banco (ou mock inteligente em memória)
   const [, setAllProducts] = useState([]);
@@ -131,67 +147,82 @@ export default function WavePickingWizard() {
   };
 
   const handleCreateWave = async () => {
-    // VALIDAÇÕES
     if (!formData.tituloOnda.trim()) {
-      alert('Por favor, informe um título para a onda antes de criar.');
-      return;
+      showToast('Informe um título para a onda antes de criar.', 'warning'); return;
     }
     if (counters.pedidosSelecionados === 0) {
-      alert('Nenhum pedido foi selecionado. Aplique filtros ou selecione manualmente.');
-      return;
+      showToast('Nenhum pedido selecionado. Aplique filtros ou selecione manualmente.', 'warning'); return;
     }
     if (!formData.doca || formData.doca === 'Selecione a Doca...') {
-      alert('Selecione uma doca de saída.');
-      return;
+      showToast('Selecione uma doca de saída.', 'warning'); return;
     }
-    
-    // Quando escolhe colmeia, valida no mínimo
     if (formData.config === 'Fluxo de Colmeia' && formData.colmeiasSelecionadas.length === 0) {
-       alert('No fluxo de colmeia é obrigatório selecionar ao menos uma colmeia no passo 2.');
-       return;
+      showToast('Fluxo de Colmeia: selecione ao menos uma colmeia no passo 2.', 'warning'); return;
     }
 
     setLoading(true);
-
     try {
-      // Cria a tarefa "Pai" (como se fosse a Onda gerando TAREFAS de picking baseadas nos itens)
-      const { data: t, error: tErr } = await supabase.from('tarefas').insert({ 
-        tipo: 'separacao', 
-        prioridade: 'Alta', 
-        status: 'pendente' 
-      }).select().single();
+      const numOnda = formData.tituloOnda.trim();
 
+      // Busca endereços reais por SKU na alocação de estoque
+      const skus = [...new Set(dynamicOrders.filter(o => o.selected).flatMap(o => o.items.map(i => i.sku)))];
+      let enderecoMap = {};
+      if (skus.length > 0) {
+        const { data: alocs } = await supabase
+          .from('alocacao_estoque')
+          .select('produto_id, endereco_id')
+          .in('produto_id', skus);
+        (alocs || []).forEach(a => { enderecoMap[a.produto_id] = a.endereco_id; });
+      }
+
+      // Cria a tarefa (onda) com todos os metadados
+      const { data: t, error: tErr } = await supabase.from('tarefas').insert({
+        tipo:        'separacao',
+        prioridade:  'Alta',
+        status:      'pendente',
+        titulo_onda: numOnda,
+        doca:        formData.doca,
+        config:      formData.config,
+        cor_colmeia: formData.colmeiasSelecionadas[0] || null,
+        colmeias_selecionadas: formData.colmeiasSelecionadas,
+        total_itens:   counters.pecasSelecionadas,
+        total_pedidos: counters.pedidosSelecionados,
+        detalhes: {
+          warehouse_id:     warehouseId,
+          numero_onda:      numOnda,
+          transportadora:   formData.transportadora,
+          rota:             formData.rota,
+          depositante:      formData.depositante,
+        },
+      }).select().single();
       if (tErr) throw tErr;
 
-      // Montar todos os ITENS em bulk
+      // Monta itens em bulk com endereços reais
       const selecoes = dynamicOrders.filter(o => o.selected);
       const insertItensPayload = [];
-      
-      let sequenciaGlobal = 1;
+      let seq = 1;
       for (const ped of selecoes) {
         for (const item of ped.items) {
-           insertItensPayload.push({
-             tarefa_id: t.id,
-             produto_id: item.id,
-             sku: item.sku,
-             descricao: `[${ped.id}] ${item.descricao}`, 
-             sequencia: sequenciaGlobal++,
-             quantidade_esperada: item.qtd,
-             endereco_id: 'R1_PP1_A01' // Mock. Na vida real leria da alocação de estoque.
-           });
+          insertItensPayload.push({
+            tarefa_id:          t.id,
+            produto_id:         item.id,
+            sku:                item.sku,
+            descricao:          `[${ped.id}] ${item.descricao}`,
+            sequencia:          seq++,
+            quantidade_esperada: item.qtd,
+            endereco_id:        enderecoMap[item.id] || null,
+          });
         }
       }
 
       const { error: iErr } = await supabase.from('itens_tarefa').insert(insertItensPayload);
-
       if (iErr) throw iErr;
 
-      alert(`✅ Sucesso! Onda "${formData.tituloOnda}" gerada na doca "${formData.doca}"!\nForam gerados ${counters.pecasSelecionadas} itens na tarefa #${t.id} vinculados a ${counters.pedidosSelecionados} pedidos! A separação (Picking) via APK já pode processar nesta doca!`);
-      
-      handleCancel(); // Reseta para nova onda
+      showToast(`Onda "${numOnda}" criada! ${counters.pecasSelecionadas} itens de ${counters.pedidosSelecionados} pedidos enviados para separação na ${formData.doca}.`, 'success');
+      handleCancel();
     } catch (e) {
-      console.error('Erro geral ao criar onda:', e);
-      alert('Erro ao persistir onda no banco de dados Supabase.');
+      console.error('Erro ao criar onda:', e);
+      showToast('Erro ao salvar onda no banco de dados. Verifique o console.', 'error');
     } finally {
       setLoading(false);
     }
@@ -200,12 +231,10 @@ export default function WavePickingWizard() {
   const nextStep = () => {
     if (step === 2) {
       if (counters.pedidosSelecionados === 0) {
-        alert('Você não tem nenhum pedido na Onda... Volte ao passo 1 e aplique um grupo válido de pedidos.');
-        return;
+        showToast('Nenhum pedido na onda. Volte ao passo 1 e aplique filtros.', 'warning'); return;
       }
       if (!formData.tituloOnda.trim()) {
-        alert('Dê um título para essa Onda!');
-        return;
+        showToast('Informe um título para esta onda.', 'warning'); return;
       }
     }
     setStep(prev => Math.min(prev + 1, 3));
@@ -227,17 +256,15 @@ export default function WavePickingWizard() {
   };
 
   const handleCancel = () => {
-    if (window.confirm('Deseja cancelar o progresso desse Wizard de Onda?')) {
-       setStep(1);
-       setFormData(prev => ({
-         ...prev,
-         tituloOnda: '',
-         doca: '',
-         colmeiasSelecionadas: []
-       }));
-       // Desmarcar todos os pedidos
-       setDynamicOrders(prev => prev.map(o => ({ ...o, selected: false })));
-    }
+    setConfirmModal({
+      msg: 'Deseja cancelar o progresso desse Wizard de Onda?',
+      onConfirm: () => {
+        setStep(1);
+        setFormData(prev => ({ ...prev, tituloOnda: '', doca: '', colmeiasSelecionadas: [] }));
+        setDynamicOrders(prev => prev.map(o => ({ ...o, selected: false })));
+        setConfirmModal(null);
+      },
+    });
   };
 
   const renderStepIndicators = () => (
@@ -287,8 +314,40 @@ export default function WavePickingWizard() {
     </div>
   );
 
+  const TOAST_COLORS = {
+    success: 'bg-green-500 text-white',
+    error:   'bg-red-500 text-white',
+    warning: 'bg-amber-500 text-white',
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
+    <EnterprisePageBase
+      title="3.1 Assistente de Formação de Onda"
+      breadcrumbItems={[{ label: 'PLANEJAMENTO', path: '/planejamento' }]}
+    >
+      {/* Toast inline */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${TOAST_COLORS[toast.type]}`}>
+          <span className="text-sm font-bold">{toast.msg}</span>
+          <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+      {/* Modal confirm */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setConfirmModal(null)}>
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{confirmModal.msg}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setConfirmModal(null)} className="py-3 bg-slate-100 text-slate-600 font-black rounded-xl text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+              <button onClick={confirmModal.onConfirm} className="py-3 bg-red-500 text-white font-black rounded-xl text-[10px] uppercase tracking-widest hover:bg-red-600 transition-all">Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
       {/* HEADER */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -589,5 +648,6 @@ export default function WavePickingWizard() {
         </div>
       </div>
     </div>
+    </EnterprisePageBase>
   );
 }

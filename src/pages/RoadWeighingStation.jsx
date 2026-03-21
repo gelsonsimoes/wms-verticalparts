@@ -16,38 +16,57 @@ import {
   Zap,
   ArrowRight,
   Radio,
+  AlertCircle,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
+// ─── Toast Component ───────────────────────────────────────────
+function Toast({ toast, onClose }) {
+  if (!toast) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 duration-300" role="status">
+      <div className={cn(
+        "flex items-center gap-3 px-6 py-4 rounded-full shadow-2xl text-white",
+        toast.type === 'success' ? 'bg-green-600' :
+        toast.type === 'error'   ? 'bg-red-600' :
+        'bg-blue-600'
+      )}>
+        {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />}
+        <p className="text-sm font-bold">{toast.message}</p>
+        <button onClick={onClose} className="ml-2 p-1 hover:bg-black/10 rounded-full transition-colors" aria-label="Fechar notificação">
+          <X className="w-4 h-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ===== CONSTANTES =====
-const DIVERGENCE_TOLERANCE = 500; // kg — extraído para facilitar ajustes futuros
+const DIVERGENCE_TOLERANCE = 500; // kg
 const SCALES = ['Balança Rodoviária Primária — Toledo 60T', 'Balança Rodoviária Secundária — Toledo 30T', 'Plataforma de Eixo — Doca 01'];
-const MOCK_VEHICLES = [
+
+const SEED_VEHICLES = [
   { placa: 'ABC-1D23', transportadora: 'TBM Logística',    tipo: 'Recebimento', pesoNota: 28500 },
   { placa: 'DEF-4E56', transportadora: 'Rápido São Paulo', tipo: 'Expedição',   pesoNota: 14200 },
   { placa: 'GHI-7F89', transportadora: 'VPC Express',      tipo: 'Recebimento', pesoNota: 33000 },
 ];
-const HIST_MOCK = [
-  { id: 1, data: '22/02/2026 07:12', placa: 'MNO-5H67', tara: 10200, bruto: 32800, liquido: 22600, op: 'Recebimento', status: 'Aprovado' },
-  { id: 2, data: '22/02/2026 08:45', placa: 'PQR-1K34', tara:  9800, bruto: 28100, liquido: 18300, op: 'Expedição',   status: 'Com Divergência' },
-  { id: 3, data: '21/02/2026 14:30', placa: 'STU-5L67', tara: 11000, bruto: 39500, liquido: 28500, op: 'Recebimento', status: 'Aprovado' },
-];
 
 // ===== MODAL SUPERVISOR =====
-function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm }) {
-  const [user, setUser] = useState('');
-  const [pass, setPass] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [error, setError] = useState('');
+function SupervisorModal({ pesoNota, pesoBruto, onClose, onConfirm }) {
+  const [user, setUser]       = useState('');
+  const [pass, setPass]       = useState('');
+  const [motivo, setMotivo]   = useState('');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
-  const supervisorTimeoutRef = useRef(null);
+  const supervisorTimeoutRef  = useRef(null);
 
-  // Escape fecha o modal
   useEffect(() => {
     const fn = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', fn);
@@ -75,7 +94,7 @@ function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm
     }, 900);
   };
 
-  const diffKg = Math.abs(pesoBruto - pesoNota).toFixed(0);
+  const diffKg  = Math.abs(pesoBruto - pesoNota).toFixed(0);
   const diffPct = pesoNota > 0 ? ((Math.abs(pesoBruto - pesoNota) / pesoNota) * 100).toFixed(1) : '—';
 
   return (
@@ -86,7 +105,6 @@ function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm
         aria-labelledby="supervisor-modal-title"
         className="bg-slate-950 rounded-[32px] border-2 border-red-900/60 shadow-2xl w-full max-w-lg overflow-hidden"
       >
-        {/* Header vermelho de alerta */}
         <div className="bg-danger px-8 py-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center" aria-hidden="true">
             <ShieldAlert className="w-7 h-7 text-white" />
@@ -98,11 +116,10 @@ function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm
         </div>
 
         <div className="p-8 space-y-5 bg-slate-950">
-          {/* Alerta de divergência */}
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Peso da Nota (Kg)', value: pesoNota.toLocaleString('pt-BR'), color: 'text-slate-300' },
-              { label: 'Peso Capturado (Kg)', value: (pesoBruto).toLocaleString('pt-BR'), color: 'text-primary' },
+              { label: 'Peso Capturado (Kg)', value: pesoBruto.toLocaleString('pt-BR'), color: 'text-primary' },
               { label: 'Divergência', value: `${diffKg} Kg (${diffPct}%)`, color: 'text-danger' },
             ].map(f => (
               <div key={f.label} className="bg-slate-900 rounded-2xl p-3 text-center border border-slate-800">
@@ -170,7 +187,7 @@ function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm
             </button>
           </div>
           <p className="text-center text-[10px] text-slate-600 font-medium">
-            💡 Demo: usuário <strong className="text-slate-500">danilo.supervisor</strong> senha <strong className="text-slate-500">1234</strong>
+            Demo: usuário <strong className="text-slate-500">danilo.supervisor</strong> senha <strong className="text-slate-500">1234</strong>
           </p>
         </div>
       </div>
@@ -179,12 +196,35 @@ function SupervisorModal({ _divergencia, pesoNota, pesoBruto, onClose, onConfirm
 }
 
 // ===== MODAL HISTÓRICO =====
-function HistoryModal({ onClose }) {
+function HistoryModal({ onClose, warehouseId }) {
+  const [history, setHistory]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+
   useEffect(() => {
     const fn = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', fn);
     return () => document.removeEventListener('keydown', fn);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!warehouseId) { setLoading(false); return; }
+    supabase
+      .from('pesagens')
+      .select('*')
+      .eq('warehouse_id', warehouseId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        setHistory(data || []);
+        setLoading(false);
+      });
+  }, [warehouseId]);
+
+  const formatDateTime = (ts) => {
+    if (!ts) return '—';
+    const d = new Date(ts);
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -202,39 +242,40 @@ function HistoryModal({ onClose }) {
               <h2 id="history-modal-title" className="text-base font-black text-primary uppercase">Histórico de Pesagens</h2>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Fechar histórico de pesagens"
-            className="text-primary/50 hover:text-primary"
-          >
+          <button onClick={onClose} aria-label="Fechar histórico de pesagens" className="text-primary/50 hover:text-primary">
             <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="bg-slate-900 border-b border-slate-800">
-              {['Data/Hora', 'Placa', 'Op.', 'Tara (Kg)', 'Bruto (Kg)', 'Líquido (Kg)', 'Status'].map(h => (
-                <th key={h} scope="col" className="p-4 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>
-              {HIST_MOCK.map(r => (
-                <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-900/50 transition-colors">
-                  <td className="p-4 text-[10px] font-bold text-slate-400 whitespace-nowrap">{r.data}</td>
-                  <td className="p-4"><code className="text-xs font-black text-primary px-2 py-0.5 bg-primary/10 rounded-lg">{r.placa}</code></td>
-                  <td className="p-4 text-[10px] font-bold text-slate-400">{r.op}</td>
-                  <td className="p-4 text-xs font-black text-slate-300 tabular-nums">{r.tara.toLocaleString('pt-BR')}</td>
-                  <td className="p-4 text-xs font-black text-slate-300 tabular-nums">{r.bruto.toLocaleString('pt-BR')}</td>
-                  <td className="p-4 text-xs font-black text-primary tabular-nums">{r.liquido.toLocaleString('pt-BR')}</td>
-                  <td className="p-4">
-                    <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
-                      r.status === 'Aprovado' ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/40 text-amber-400'
-                    )}>{r.status}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+          {loading ? (
+            <div className="p-8 text-center text-slate-500 text-sm font-bold">Carregando...</div>
+          ) : history.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm font-bold">Nenhuma pesagem registrada ainda.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-900 border-b border-slate-800">
+                {['Data/Hora', 'SKU / Placa', 'Op.', 'Balança', 'Peso (Kg)', 'Status'].map(h => (
+                  <th key={h} scope="col" className="p-4 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {history.map(r => (
+                  <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-900/50 transition-colors">
+                    <td className="p-4 text-[10px] font-bold text-slate-400 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
+                    <td className="p-4"><code className="text-xs font-black text-primary px-2 py-0.5 bg-primary/10 rounded-lg">{r.sku}</code></td>
+                    <td className="p-4 text-[10px] font-bold text-slate-400">{r.modo}</td>
+                    <td className="p-4 text-[10px] font-bold text-slate-400 truncate max-w-[120px]">{r.balanca || '—'}</td>
+                    <td className="p-4 text-xs font-black text-primary tabular-nums">{Number(r.peso_capturado).toLocaleString('pt-BR')}</td>
+                    <td className="p-4">
+                      <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
+                        r.validado ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/40 text-amber-400'
+                      )}>{r.validado ? 'Aprovado' : 'Com Divergência'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
         <div className="p-5 border-t border-slate-800">
           <button onClick={onClose} className="w-full py-3 rounded-2xl border-2 border-slate-800 text-sm font-black text-slate-500 hover:bg-slate-900 transition-all uppercase tracking-wider">Fechar</button>
@@ -246,32 +287,39 @@ function HistoryModal({ onClose }) {
 
 // ===== COMPONENTE PRINCIPAL =====
 export default function RoadWeighingStation() {
-  const [selectedVehicle, setSelectedVehicle] = useState(MOCK_VEHICLES[0]);
-  const [activeScale, setActiveScale] = useState(SCALES[0]);
-  const [showScaleDropdown, setShowScaleDropdown] = useState(false);
+  const { warehouseId } = useApp();
+  const [selectedVehicle, setSelectedVehicle]       = useState(SEED_VEHICLES[0]);
+  const [activeScale, setActiveScale]               = useState(SCALES[0]);
+  const [showScaleDropdown, setShowScaleDropdown]   = useState(false);
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
-  const [tara, setTara] = useState(null);
-  const [currentWeight, setCurrentWeight] = useState(8420);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [bruto, setBruto] = useState(null);
+  const [tara, setTara]                             = useState(null);
+  const [currentWeight, setCurrentWeight]           = useState(8420);
+  const [isCapturing, setIsCapturing]               = useState(false);
+  const [bruto, setBruto]                           = useState(null);
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [liberado, setLiberado] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [showHistoryModal, setShowHistoryModal]     = useState(false);
+  const [liberado, setLiberado]                     = useState(false);
+  const [saved, setSaved]                           = useState(false);
+  const [saving, setSaving]                         = useState(false);
 
-  // Refs para cleanup de timeouts
-  const captureTimeoutRef  = useRef(null);
-  const saveTimeoutRef     = useRef(null);
+  // Toast
+  const [toast, setToast]  = useState(null);
+  const toastRef = useRef(null);
+  const showToast = (message, type = 'success') => {
+    if (toastRef.current) clearTimeout(toastRef.current);
+    setToast({ message, type });
+    toastRef.current = setTimeout(() => setToast(null), 4000);
+  };
 
-  // Cleanup global ao desmontar
+  const captureTimeoutRef = useRef(null);
+
   useEffect(() => () => {
-    if (captureTimeoutRef.current)  clearTimeout(captureTimeoutRef.current);
-    if (saveTimeoutRef.current)     clearTimeout(saveTimeoutRef.current);
+    if (captureTimeoutRef.current) clearTimeout(captureTimeoutRef.current);
+    if (toastRef.current)          clearTimeout(toastRef.current);
   }, []);
 
   // Simula oscilação da balança
   useEffect(() => {
-    const _base = isCapturing ? 0 : (tara === null ? 800 : 31200);
     const interval = setInterval(() => {
       if (!isCapturing) {
         setCurrentWeight(prev => {
@@ -281,9 +329,7 @@ export default function RoadWeighingStation() {
       }
     }, 600);
     return () => clearInterval(interval);
-  }, [isCapturing, tara]);
-
-
+  }, [isCapturing]);
 
   const handleCapture = () => {
     setIsCapturing(true);
@@ -307,28 +353,40 @@ export default function RoadWeighingStation() {
     setCurrentWeight(8420);
   };
 
-  const liquido = bruto !== null && tara !== null ? bruto - tara : null;
+  const liquido      = bruto !== null && tara !== null ? bruto - tara : null;
   const hasDivergence = liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota) > DIVERGENCE_TOLERANCE;
-  const canSave = bruto !== null && tara !== null && (liberado || !hasDivergence);
+  const canSave      = bruto !== null && tara !== null && (liberado || !hasDivergence);
 
-  const handleSave = () => {
+  // ─── Save to Supabase (pesagens table) ─────────────────────────
+  const handleSave = async () => {
+    if (!canSave || saving) return;
+    setSaving(true);
+    const payload = {
+      warehouse_id:   warehouseId,
+      sku:            selectedVehicle.placa,
+      descricao:      `${selectedVehicle.transportadora} — ${selectedVehicle.tipo}`,
+      peso_capturado: liquido,
+      peso_master:    selectedVehicle.pesoNota,
+      variacao:       liquido - selectedVehicle.pesoNota,
+      modo:           selectedVehicle.tipo === 'Recebimento' ? 'INBOUND' : 'OUTBOUND',
+      balanca:        activeScale,
+      validado:       !hasDivergence || liberado,
+    };
+    const { error } = await supabase.from('pesagens').insert([payload]);
+    setSaving(false);
+    if (error) { showToast('Erro ao salvar pesagem: ' + error.message, 'error'); return; }
     setSaved(true);
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      handleReset();
-      setSaved(false);
-    }, 2500);
+    showToast('Pesagem salva com sucesso!');
+    setTimeout(() => { handleReset(); setSaved(false); }, 2500);
   };
 
-  // Status da operação
   const step = tara === null ? 0 : bruto === null ? 1 : 2;
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-6 space-y-5 animate-in fade-in duration-700">
 
-      {/* ===== HEADER — IDENTIDADE DO VEÍCULO ===== */}
+      {/* HEADER */}
       <div className="bg-slate-900 rounded-[28px] border-2 border-slate-800 p-5 flex flex-col md:flex-row items-start md:items-center gap-5 shadow-xl relative overflow-hidden">
-        {/* Linha de acento superior */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary" />
 
         <div className="flex items-center gap-4">
@@ -342,9 +400,9 @@ export default function RoadWeighingStation() {
           </div>
         </div>
 
-        {/* Dados do Veículo */}
+        {/* Vehicle Data */}
         <div className="flex-1 grid grid-cols-3 gap-3">
-          {/* Seletor de veículo */}
+          {/* Vehicle selector */}
           <div className="relative col-span-1">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Veículo / Placa</p>
             <button
@@ -361,7 +419,7 @@ export default function RoadWeighingStation() {
             </button>
             {showVehicleDropdown && (
               <div className="absolute top-full mt-1 left-0 w-64 bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                {MOCK_VEHICLES.map(v => (
+                {SEED_VEHICLES.map(v => (
                   <button key={v.placa}
                     onClick={() => { setSelectedVehicle(v); setShowVehicleDropdown(false); handleReset(); }}
                     className="w-full flex items-center justify-between px-4 py-3 text-left text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
@@ -391,7 +449,7 @@ export default function RoadWeighingStation() {
           </div>
         </div>
 
-        {/* Seletor de balança */}
+        {/* Scale selector */}
         <div className="relative min-w-[240px]">
           <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Balança Ativa</p>
           <button
@@ -425,14 +483,11 @@ export default function RoadWeighingStation() {
         </div>
       </div>
 
-      {/* ===== DISPLAY LCD CENTRAL ===== */}
+      {/* LCD DISPLAY */}
       <div className="relative">
-        {/* Glow amarelo de fundo */}
         <div className="absolute inset-x-8 inset-y-4 bg-primary/15 blur-3xl rounded-full pointer-events-none" />
         <div className="relative bg-slate-950 border-4 border-slate-800 rounded-[48px] overflow-hidden shadow-2xl shadow-black">
-          {/* Barra de acento topo */}
           <div className="h-2 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
-          {/* Scanlines */}
           <div className="absolute inset-0 opacity-[0.025] pointer-events-none"
             style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, #000 3px, #000 6px)' }} />
 
@@ -441,7 +496,6 @@ export default function RoadWeighingStation() {
               PESO DA BALANÇA — {activeScale.split(' — ')[0]}
             </p>
 
-            {/* PESO PRINCIPAL — LED GIGANTE */}
             <div className={cn(
               "font-black tabular-nums leading-none transition-all duration-500 select-none",
               "text-[clamp(72px,18vw,160px)]",
@@ -462,22 +516,22 @@ export default function RoadWeighingStation() {
               </div>
             </div>
 
-            {/* Steps da pesagem */}
+            {/* Steps */}
             <div className="mt-8 flex items-center gap-3">
               {[
-                { label: '1ª Pesagem (Tara)',    done: step > 0, active: step === 0 },
+                { label: '1ª Pesagem (Tara)',  done: step > 0, active: step === 0 },
                 { label: '→' },
-                { label: '2ª Pesagem (Bruto)',   done: step > 1, active: step === 1 },
+                { label: '2ª Pesagem (Bruto)', done: step > 1, active: step === 1 },
                 { label: '→' },
-                { label: 'Peso Líquido',          done: step > 1, active: false },
+                { label: 'Peso Líquido',       done: step > 1, active: false },
               ].map((s, i) => s.label === '→' ? (
                 <span key={i} className="text-slate-700 font-black text-sm">→</span>
               ) : (
                 <span key={i} className={cn(
                   "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider border",
-                  s.done ? "bg-green-900/30 text-green-400 border-green-800" :
+                  s.done   ? "bg-green-900/30 text-green-400 border-green-800" :
                   s.active ? "bg-primary/20 text-primary border-primary/40 shadow-md shadow-primary/20" :
-                  "bg-slate-900 text-slate-600 border-slate-800"
+                             "bg-slate-900 text-slate-600 border-slate-800"
                 )}>
                   {s.label}
                 </span>
@@ -485,14 +539,12 @@ export default function RoadWeighingStation() {
             </div>
           </div>
 
-          {/* Barra de acento base */}
           <div className="h-1.5 bg-gradient-to-r from-primary/30 via-primary/60 to-primary/30" />
         </div>
       </div>
 
-      {/* ===== CARDS DE RESUMO ===== */}
+      {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* 1ª Pesagem - Tara */}
         <div className={cn("bg-slate-900 rounded-[24px] border-2 p-5 transition-all duration-300",
           tara !== null ? "border-green-800/60 shadow-lg shadow-green-900/20" : "border-slate-800"
         )}>
@@ -508,7 +560,6 @@ export default function RoadWeighingStation() {
           {tara !== null && <div className="mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /><span className="text-[10px] font-bold text-green-400">Capturado</span></div>}
         </div>
 
-        {/* 2ª Pesagem - Bruto */}
         <div className={cn("bg-slate-900 rounded-[24px] border-2 p-5 transition-all duration-300",
           bruto !== null ? "border-primary/50 shadow-lg shadow-primary/10" : "border-slate-800"
         )}>
@@ -524,7 +575,6 @@ export default function RoadWeighingStation() {
           {bruto !== null && <div className="mt-2 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary/70" /><span className="text-[10px] font-bold text-primary/70">Capturado</span></div>}
         </div>
 
-        {/* Peso Líquido */}
         <div className={cn("bg-slate-900 rounded-[24px] border-2 p-5 transition-all duration-300",
           liquido !== null ? "border-slate-600" : "border-slate-800"
         )}>
@@ -542,7 +592,6 @@ export default function RoadWeighingStation() {
           )}
         </div>
 
-        {/* Divergência */}
         <div className={cn("rounded-[24px] border-2 p-5 transition-all duration-300",
           hasDivergence && !liberado
             ? "bg-red-950 border-red-800 shadow-lg shadow-red-900/40"
@@ -583,9 +632,8 @@ export default function RoadWeighingStation() {
         </div>
       </div>
 
-      {/* ===== AÇÕES ===== */}
+      {/* ACTIONS */}
       <div className="bg-slate-900 rounded-[24px] border-2 border-slate-800 px-5 py-4 flex flex-wrap items-center gap-3">
-        {/* Capturar */}
         <button
           onClick={handleCapture}
           disabled={isCapturing || step >= 2}
@@ -595,7 +643,6 @@ export default function RoadWeighingStation() {
           {step === 0 ? 'Capturar Tara' : 'Capturar Bruto'}
         </button>
 
-        {/* Salvar */}
         {saved ? (
           <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-green-900/40 border border-green-800 text-green-400 text-xs font-black uppercase tracking-wider">
             <CheckCircle2 className="w-4 h-4" /> Pesagem Salva!
@@ -603,14 +650,13 @@ export default function RoadWeighingStation() {
         ) : (
           <button
             onClick={handleSave}
-            disabled={!canSave}
+            disabled={!canSave || saving}
             className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-800 border-2 border-slate-700 text-slate-200 text-xs font-black uppercase tracking-wider hover:bg-slate-700 disabled:opacity-30 transition-all"
           >
-            <Save className="w-4 h-4" /> Salvar
+            <Save className="w-4 h-4" /> {saving ? 'Salvando...' : 'Salvar'}
           </button>
         )}
 
-        {/* Histórico */}
         <button
           onClick={() => setShowHistoryModal(true)}
           className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-800 border-2 border-slate-700 text-slate-300 text-xs font-black uppercase tracking-wider hover:bg-slate-700 transition-all"
@@ -618,7 +664,6 @@ export default function RoadWeighingStation() {
           <History className="w-4 h-4" /> Histórico
         </button>
 
-        {/* Cancelar / Zerar */}
         <button
           onClick={handleReset}
           className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-slate-800 border-2 border-danger/30 text-danger text-xs font-black uppercase tracking-wider hover:bg-red-950/30 transition-all"
@@ -628,7 +673,6 @@ export default function RoadWeighingStation() {
 
         <div className="flex-1" />
 
-        {/* Status do conector */}
         <div className="flex items-center gap-2 px-4 py-2 bg-slate-800 rounded-xl border border-slate-700">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -637,17 +681,18 @@ export default function RoadWeighingStation() {
         </div>
       </div>
 
-      {/* MODAIS */}
+      {/* MODALS */}
       {showSupervisorModal && (
         <SupervisorModal
-          divergencia={liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota)}
           pesoNota={selectedVehicle.pesoNota}
           pesoBruto={bruto || 0}
           onClose={() => setShowSupervisorModal(false)}
-          onConfirm={(_motivo) => { setShowSupervisorModal(false); setLiberado(true); }}
+          onConfirm={(_motivo) => { setShowSupervisorModal(false); setLiberado(true); showToast('Divergência autorizada pelo supervisor.'); }}
         />
       )}
-      {showHistoryModal && <HistoryModal onClose={() => setShowHistoryModal(false)} />}
+      {showHistoryModal && <HistoryModal onClose={() => setShowHistoryModal(false)} warehouseId={warehouseId} />}
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

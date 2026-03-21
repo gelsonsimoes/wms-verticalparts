@@ -17,63 +17,37 @@ const calculateProgress = (orderItems = []) => {
 
 const getStatusStyle = (status) => {
   switch (status) {
-    case 'Concluído':    return 'bg-green-100 text-green-700 border-green-200';
-    case 'Em Separação': return 'bg-amber-100 text-amber-700 border-amber-200';
+    case 'finalizado':   return 'bg-green-100 text-green-700 border-green-200';
+    case 'em_execucao':  return 'bg-amber-100 text-amber-700 border-amber-200';
     default:             return 'bg-blue-50 text-blue-700 border-blue-200';
   }
 };
 
-// ─── Mappers ──────────────────────────────────────────────────────────────────
+// ─── Mapper: itens_tarefa → orderItem ─────────────────────────────────────────
 const mapItem = (it) => ({
-  id:       it.id,
-  sku:      it.sku,
-  desc:     it.descricao,
-  ean:      it.ean,
-  location: it.endereco,
-  expected: it.quantidade_esperada,
-  collected: it.quantidade_coletada,
-  pulado:   it.pulado,
+  id:        it.id,
+  sku:       it.sku,
+  desc:      it.descricao,
+  ean:       it.sku,
+  location:  it.escaninho_numero,
+  expected:  it.quantidade_esperada  ?? 0,
+  collected: it.quantidade_conferida ?? 0,
+  pulado:    false,
+  status:    it.status,
 });
 
-const mapOrdem = (row) => ({
+// ─── Mapper: tarefa row → ordem de separação ─────────────────────────────────
+const mapTarefa = (row) => ({
   id:         row.id,
-  numero:     row.numero,
-  client:     row.cliente,
+  numero:     row.titulo_onda || `TAREFA-${row.id.slice(0, 6).toUpperCase()}`,
+  client:     row.doca || '—',
   status:     row.status,
-  value:      row.valor,
-  date:       row.data_referencia,
-  items:      (row.ordens_saida_itens || []).length,
-  totalQty:   (row.ordens_saida_itens || []).reduce((a, i) => a + i.quantidade_esperada, 0),
-  orderItems: (row.ordens_saida_itens || []).map(mapItem),
+  value:      '—',
+  date:       row.created_at ? row.created_at.slice(0, 10) : '—',
+  items:      (row.itens_tarefa || []).length,
+  totalQty:   (row.itens_tarefa || []).reduce((a, i) => a + (i.quantidade_esperada ?? 0), 0),
+  orderItems: (row.itens_tarefa || []).map(mapItem),
 });
-
-// ─── Dados de semente (mock → Supabase) ───────────────────────────────────────
-const SEED_ORDERS = (warehouseId) => [
-  {
-    warehouse_id: warehouseId, numero: 'SO-8842', cliente: 'VerticalParts Matriz',
-    status: 'Pendente', valor: 'R$ 4.500,00', data_referencia: '2026-02-21',
-    itens: [
-      { sku: 'VEPEL-BPI-174FX',       descricao: 'Barreira de Proteção Infravermelha (174 Feixes)', ean: '789123456001',   endereco: 'R1_PP2_CL012_N001', quantidade_esperada: 5  },
-      { sku: 'VPER-ESS-NY-27MM',      descricao: 'Escova de Segurança (Nylon - Base 27mm)',         ean: '7891149108718', endereco: 'R1_PP2_CL012_N002', quantidade_esperada: 2  },
-      { sku: 'VPER-PAL-INO-1000',     descricao: 'Pallet de Aço Inox (1000mm)',                      ean: '789123456003',   endereco: 'R2_PP1_CL005_N001', quantidade_esperada: 5  },
-    ],
-  },
-  {
-    warehouse_id: warehouseId, numero: 'SO-8845', cliente: 'VerticalParts Matriz',
-    status: 'Em Separação', valor: 'R$ 1.200,00', data_referencia: '2026-02-21',
-    itens: [
-      { sku: 'VEPEL-BTI-JX02-CCS',    descricao: 'Botoeira de Inspeção - Mod. JX02',                ean: '7890000000001', endereco: 'R1_PP1_CL001_N003', quantidade_esperada: 2, quantidade_coletada: 1 },
-      { sku: 'VPER-LUM-LED-VRD-24V',  descricao: 'Luminária em LED Verde 24V',                       ean: '7890000000002', endereco: 'R1_PP1_CL001_N004', quantidade_esperada: 2  },
-    ],
-  },
-  {
-    warehouse_id: warehouseId, numero: 'SO-8849', cliente: 'VerticalParts Matriz',
-    status: 'Concluído', valor: 'R$ 15.800,00', data_referencia: '2026-02-20',
-    itens: [
-      { sku: 'VPER-PNT-AL-22D-202X145-CT', descricao: 'Pente de Alumínio - 22 Dentes (202x145mm)', ean: '7890000000003', endereco: 'R2_PP2_CL001_N001', quantidade_esperada: 22, quantidade_coletada: 22 },
-    ],
-  },
-];
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function PickingManagement() {
@@ -125,56 +99,21 @@ export default function PickingManagement() {
     if (view === 'ACTIVE' && scanInputRef.current) scanInputRef.current.focus();
   }, [view, scanError]);
 
-  // ── Fetch + seed ──────────────────────────────────────────────────────────
+  // ── Fetch tarefas de picking com itens pendentes ──────────────────────────
   const fetchOrdens = useCallback(async () => {
     setLoading(true);
     try {
+      // Busca tarefas de picking cujo warehouse_id bate via detalhes->>'warehouse_id'
       const { data, error } = await supabase
-        .from('ordens_saida')
-        .select('*, ordens_saida_itens(*)')
-        .eq('warehouse_id', warehouseId)
+        .from('tarefas')
+        .select('*, itens_tarefa(*)')
+        .eq('tipo', 'picking')
+        .neq('status', 'cancelado')
+        .filter('detalhes->>warehouse_id', 'eq', warehouseId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      if (data.length === 0) {
-        // Seed inicial com dados demo
-        const seeds = SEED_ORDERS(warehouseId);
-        for (const seed of seeds) {
-          const { data: ordem, error: oErr } = await supabase
-            .from('ordens_saida')
-            .insert({
-              warehouse_id:    seed.warehouse_id,
-              numero:          seed.numero,
-              cliente:         seed.cliente,
-              status:          seed.status,
-              valor:           seed.valor,
-              data_referencia: seed.data_referencia,
-            })
-            .select()
-            .single();
-          if (oErr) { console.error('[Picking] seed ordem', oErr); continue; }
-          const itensToInsert = seed.itens.map(it => ({
-            ordem_id:            ordem.id,
-            sku:                 it.sku,
-            descricao:           it.descricao,
-            ean:                 it.ean,
-            endereco:            it.endereco,
-            quantidade_esperada: it.quantidade_esperada,
-            quantidade_coletada: it.quantidade_coletada || 0,
-          }));
-          await supabase.from('ordens_saida_itens').insert(itensToInsert);
-        }
-        // Re-fetch após seed
-        const { data: seeded } = await supabase
-          .from('ordens_saida')
-          .select('*, ordens_saida_itens(*)')
-          .eq('warehouse_id', warehouseId)
-          .order('created_at', { ascending: false });
-        setOrders((seeded || []).map(mapOrdem));
-      } else {
-        setOrders(data.map(mapOrdem));
-      }
+      setOrders((data || []).map(mapTarefa));
     } catch (err) {
       console.error('[Picking] fetchOrdens error:', err);
     } finally {
@@ -187,8 +126,8 @@ export default function PickingManagement() {
   // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const ch = supabase
-      .channel('ordens_saida_live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordens_saida' }, () => {
+      .channel('tarefas_picking_live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas' }, () => {
         if (view === 'LIST') fetchOrdens();
       })
       .subscribe();
@@ -200,7 +139,7 @@ export default function PickingManagement() {
     const savedId = localStorage.getItem('vparts_active_picking_id');
     if (savedId && orders.length > 0 && view === 'LIST') {
       const order = orders.find(o => o.id === savedId);
-      if (order && order.status !== 'Concluído') {
+      if (order && order.status !== 'finalizado') {
         setSelectedOrder(order);
         setView('ACTIVE');
       }
@@ -210,13 +149,13 @@ export default function PickingManagement() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStartPicking = async (order) => {
-    if (order.status === 'Concluído') return;
+    if (order.status === 'finalizado') return;
     setSelectedOrder(order);
     setView('ACTIVE');
     localStorage.setItem('vparts_active_picking_id', order.id);
-    if (order.status === 'Pendente') {
-      await supabase.from('ordens_saida').update({ status: 'Em Separação' }).eq('id', order.id);
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'Em Separação' } : o));
+    if (order.status === 'pendente') {
+      await supabase.from('tarefas').update({ status: 'em_execucao' }).eq('id', order.id);
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'em_execucao' } : o));
     }
   };
 
@@ -273,15 +212,15 @@ export default function PickingManagement() {
   const confirmarFinalizacao = async () => {
     setSaving(true);
     try {
-      // 1. Persiste quantidade_coletada de cada item
+      // 1. Persiste quantidade_conferida de cada item_tarefa
       for (const item of selectedOrder.orderItems) {
         await supabase
-          .from('ordens_saida_itens')
-          .update({ quantidade_coletada: item.collected, pulado: item.pulado || false })
+          .from('itens_tarefa')
+          .update({ quantidade_conferida: item.collected, status: item.collected >= item.expected ? 'finalizado' : 'pendente' })
           .eq('id', item.id);
       }
-      // 2. Finaliza a ordem
-      await supabase.from('ordens_saida').update({ status: 'Concluído' }).eq('id', selectedOrder.id);
+      // 2. Finaliza a tarefa
+      await supabase.from('tarefas').update({ status: 'finalizado' }).eq('id', selectedOrder.id);
       setShowFinalizeModal(false);
       handleBackToList();
     } catch (err) {
@@ -301,7 +240,7 @@ export default function PickingManagement() {
   // ── KPIs ──────────────────────────────────────────────────────────────────
   const performancePct = orders.length === 0
     ? 0
-    : Math.round((orders.filter(o => o.status === 'Concluído').length / orders.length) * 100);
+    : Math.round((orders.filter(o => o.status === 'finalizado').length / orders.length) * 100);
   const filteredOrders = filter === 'Todos' ? orders : orders.filter(o => o.status === filter);
 
   // ── actionGroups (muda por view) ──────────────────────────────────────────
@@ -494,12 +433,17 @@ export default function PickingManagement() {
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           {/* Filtros + título */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <p className="text-sm text-slate-500 font-medium">Gestão de Ordens de Venda procedentes do Omie</p>
+            <p className="text-sm text-slate-500 font-medium">Tarefas de picking ativas no armazém</p>
             <div className="flex p-1 bg-white border border-slate-200 rounded-sm shadow-sm">
-              {['Todos', 'Pendente', 'Em Separação', 'Concluído'].map(s => (
-                <button key={s} onClick={() => setFilter(s)}
-                  className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-sm transition-all ${filter === s ? 'bg-black text-white shadow-sm' : 'text-slate-400 hover:text-black'}`}>
-                  {s}
+              {[
+                { val: 'Todos',       label: 'Todos' },
+                { val: 'pendente',    label: 'Pendente' },
+                { val: 'em_execucao', label: 'Em Separação' },
+                { val: 'finalizado',  label: 'Concluído' },
+              ].map(({ val, label }) => (
+                <button key={val} onClick={() => setFilter(val)}
+                  className={`px-4 py-1.5 text-[9px] font-black uppercase rounded-sm transition-all ${filter === val ? 'bg-black text-white shadow-sm' : 'text-slate-400 hover:text-black'}`}>
+                  {label}
                 </button>
               ))}
             </div>
@@ -513,11 +457,11 @@ export default function PickingManagement() {
             </div>
             <div className="bg-white rounded-sm border border-slate-200 p-4 shadow-sm border-l-4 border-l-amber-400">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Em Processo</p>
-              <p className="text-xl font-black">{orders.filter(o => o.status === 'Em Separação').length}</p>
+              <p className="text-xl font-black">{orders.filter(o => o.status === 'em_execucao').length}</p>
             </div>
             <div className="bg-white rounded-sm border border-slate-200 p-4 shadow-sm border-l-4 border-l-green-500">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Concluídas Hoje</p>
-              <p className="text-xl font-black">{orders.filter(o => o.status === 'Concluído').length}</p>
+              <p className="text-xl font-black">{orders.filter(o => o.status === 'finalizado').length}</p>
             </div>
             <div className="bg-white rounded-sm border border-slate-200 p-4 shadow-sm border-l-4 border-l-yellow-400">
               <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Performance</p>
@@ -537,7 +481,7 @@ export default function PickingManagement() {
                 return (
                   <div key={order.id}
                     className="bg-white p-5 rounded-sm border border-slate-200 shadow-sm hover:shadow-lg transition-all flex flex-wrap items-center gap-6 relative overflow-hidden">
-                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${order.status === 'Concluído' ? 'bg-green-500' : order.status === 'Em Separação' ? 'bg-amber-400' : 'bg-black'}`} />
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${order.status === 'finalizado' ? 'bg-green-500' : order.status === 'em_execucao' ? 'bg-amber-400' : 'bg-black'}`} />
                     <div className="flex items-center gap-4 flex-1 min-w-[280px]">
                       <div className="w-12 h-12 rounded-sm bg-slate-50 border border-slate-100 flex items-center justify-center">
                         <ClipboardList className="w-5 h-5 text-slate-400" />
@@ -584,16 +528,16 @@ export default function PickingManagement() {
 
                     <button
                       onClick={() => handleStartPicking(order)}
-                      disabled={order.status === 'Concluído'}
+                      disabled={order.status === 'finalizado'}
                       className={`h-11 px-5 rounded-sm font-black text-[10px] tracking-widest uppercase flex items-center gap-2 transition-all active:scale-95 ${
-                        order.status === 'Concluído'
+                        order.status === 'finalizado'
                           ? 'bg-green-100 text-green-700 border border-green-200 cursor-default disabled:opacity-80'
                           : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-sm'
                       }`}
                     >
-                      {order.status === 'Concluído' ? (
+                      {order.status === 'finalizado' ? (
                         <>Concluído <Check className="w-4 h-4" /></>
-                      ) : order.status === 'Em Separação' ? (
+                      ) : order.status === 'em_execucao' ? (
                         <>Continuar <ArrowRight className="w-4 h-4" /></>
                       ) : (
                         <>Iniciar <Play className="w-4 h-4" /></>

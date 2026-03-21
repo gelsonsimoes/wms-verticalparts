@@ -1,4 +1,5 @@
 import React, { useState, useId, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 import { 
   Warehouse, 
@@ -39,6 +40,9 @@ export default function Warehouses() {
   const [toast, setToast] = useState(null);
   const toastTimeoutRef = useRef(null);
 
+  // Confirm Delete Modal
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const showToast = (message, type = 'success') => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToast({ message, type });
@@ -69,10 +73,27 @@ export default function Warehouses() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedWarehouse?.id === 'NOVO') {
-      addWarehouse(formData);
+      const { id: _, ...data } = formData;
+      const { data: inserted, error } = await supabase.from('warehouses').insert({
+        codigo_interno: data.codigoInterno,
+        nome: data.nome,
+        entidade: data.entidade,
+        tipo: data.tipo,
+        is_active: data.ativo,
+      }).select().single();
+      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
+      addWarehouse(inserted ?? data);
     } else {
+      const { error } = await supabase.from('warehouses').update({
+        codigo_interno: formData.codigoInterno,
+        nome: formData.nome,
+        entidade: formData.entidade,
+        tipo: formData.tipo,
+        is_active: formData.ativo,
+      }).eq('id', formData.id);
+      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       updateWarehouse(formData.id, formData);
     }
     showToast('Registro salvo com sucesso!', 'success');
@@ -83,19 +104,17 @@ export default function Warehouses() {
       showToast('Selecione um armazém para excluir.', 'error');
       return;
     }
-    if (window.confirm(`Deseja realmente excluir o armazém ${formData.nome}?`)) {
-      deleteWarehouse(selectedWarehouse.id);
-      setSelectedWarehouse(null);
-      setFormData({
-        id: '',
-        codigoInterno: '',
-        nome: '',
-        entidade: '',
-        tipo: 'Distribuição',
-        ativo: true
-      });
-      showToast('Armazém excluído com sucesso!', 'info');
-    }
+    setConfirmDelete(true);
+  };
+
+  const confirmarDelete = async () => {
+    const { error } = await supabase.from('warehouses').delete().eq('id', selectedWarehouse.id);
+    if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
+    deleteWarehouse(selectedWarehouse.id);
+    setSelectedWarehouse(null);
+    setFormData({ id: '', codigoInterno: '', nome: '', entidade: '', tipo: 'Distribuição', ativo: true });
+    showToast('Armazém excluído com sucesso!', 'info');
+    setConfirmDelete(false);
   };
 
   const breadcrumbItems = [
@@ -136,6 +155,37 @@ export default function Warehouses() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
+
+      {/* Modal de confirmação de exclusão */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl border border-red-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-2xl flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="font-black text-slate-800">Confirmar Exclusão</p>
+                <p className="text-xs text-slate-500">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Deseja excluir o armazém <strong>"{formData.nome}"</strong>?
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-500 hover:border-slate-400 transition-all">
+                Cancelar
+              </button>
+              <button onClick={confirmarDelete}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 active:scale-95 transition-all">
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="px-6 py-4 border-b border-gray-100">
         <Breadcrumbs items={breadcrumbItems} />
         <div className="flex items-center gap-3 mt-2">

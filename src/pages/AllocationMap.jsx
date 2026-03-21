@@ -33,7 +33,7 @@ import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 function cn(...i) { return twMerge(clsx(i)); }
 
 // ─── ENUMS ────────────────────────────────────────────────────────────────────
-const STATUS_OPTS  = ['Todos', 'Pendente', 'Posicionado', 'Finalizado', 'Cancelado'];
+const STATUS_OPTS  = ['Todos', 'Livre', 'Ocupado', 'Bloqueado'];
 const TIPO_LOCAL   = ['Pulmão', 'Picking'];
 const TIPO_RECEB   = ['Compra', 'Transferência', 'Devolução', 'Cross-Docking'];
 const DEPOSITANTES = ['VerticalParts SP', 'Elevadores ABC Ltda', 'Schindler Partes', 'Kone Brasil'];
@@ -45,10 +45,14 @@ const PRODUTOS_LIST = [
 
 // STATUS_COLOR — objeto completo para uso direto (sem split hack)
 const STATUS_COLOR = {
-  Pendente:    { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', filterActive: 'bg-amber-100 text-amber-700 border-amber-400' },
-  Posicionado: { badge: 'bg-blue-100  text-blue-700  dark:bg-blue-900/30  dark:text-blue-400',  filterActive: 'bg-blue-100  text-blue-700  border-blue-400' },
-  Finalizado:  { badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', filterActive: 'bg-green-100 text-green-700 border-green-400' },
-  Cancelado:   { badge: 'bg-red-100   text-red-700   dark:bg-red-900/30   dark:text-red-400',   filterActive: 'bg-red-100   text-red-700   border-red-400' },
+  Livre:     { badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', filterActive: 'bg-green-100 text-green-700 border-green-400' },
+  Ocupado:   { badge: 'bg-blue-100  text-blue-700  dark:bg-blue-900/30  dark:text-blue-400',  filterActive: 'bg-blue-100  text-blue-700  border-blue-400' },
+  Bloqueado: { badge: 'bg-red-100   text-red-700   dark:bg-red-900/30   dark:text-red-400',   filterActive: 'bg-red-100   text-red-700   border-red-400' },
+  // legado para compatibilidade de display
+  Pendente:  { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', filterActive: 'bg-amber-100 text-amber-700 border-amber-400' },
+  Posicionado:{ badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',    filterActive: 'bg-blue-100  text-blue-700  border-blue-400' },
+  Finalizado: { badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',filterActive: 'bg-green-100 text-green-700 border-green-400' },
+  Cancelado:  { badge: 'bg-red-100   text-red-700   dark:bg-red-900/30   dark:text-red-400',  filterActive: 'bg-red-100   text-red-700   border-red-400' },
 };
 
 // ─── GERADOR DE ENDEREÇO ───────────────────────────────────────────────────────
@@ -87,17 +91,22 @@ function gerarLote(ordemId) {
 }
 
 // ─── HELPERS DE ROW ───────────────────────────────────────────────────────────
-function dbRowToRow(r) {
+// Mapeia endereço + alocacao_estoque para row da UI
+function dbRowToRow(end, aloc) {
+  const hasAloc = aloc && aloc.quantidade > 0;
   return {
-    id: r.id, ordemId: r.ordem_id,
-    depositante: r.depositante || '—',
-    tipoRecebimento: r.tipo_recebimento || '—',
-    produto: r.produto || '—',
-    lote: r.lote || null,
-    enderecoSugerido: r.endereco_sugerido || null,
-    tipoLocal: r.tipo_local || null,
-    status: r.status || 'Pendente',
-    selecionado: false,
+    id:              end.id,
+    ordemId:         end.codigo || end.id,
+    depositante:     '—',
+    tipoRecebimento: end.tipo || '—',
+    produto:         aloc?.produtos?.descricao || aloc?.produtos?.sku || '—',
+    lote:            null,
+    enderecoSugerido: end.codigo || end.id,
+    tipoLocal:       end.area || end.tipo || '—',
+    status:          hasAloc ? 'Ocupado' : (end.status === 'bloqueado' ? 'Bloqueado' : 'Livre'),
+    quantidade:      aloc?.quantidade ?? 0,
+    sku:             aloc?.produtos?.sku || '—',
+    selecionado:     false,
   };
 }
 
@@ -105,14 +114,6 @@ function rowToDb(r, warehouseId) {
   return {
     id: r.id,
     warehouse_id: warehouseId,
-    ordem_id: r.ordemId,
-    depositante: r.depositante,
-    tipo_recebimento: r.tipoRecebimento,
-    produto: r.produto,
-    lote: r.lote,
-    endereco_sugerido: r.enderecoSugerido,
-    tipo_local: r.tipoLocal,
-    status: r.status,
   };
 }
 
@@ -410,60 +411,64 @@ export default function AllocationMap() {
   // ── Fetch from Supabase ────────────────────────────────────────────────────
   const fetchRows = useCallback(async () => {
     if (!warehouseId) return;
-    const { data, error } = await supabase
-      .from('alocacoes')
-      .select('*')
-      .eq('warehouse_id', warehouseId)
-      .order('created_at', { ascending: false });
-    if (error) { console.error('alocacoes:', error); setLoading(false); return; }
+    setLoading(true);
 
-    // If no allocations yet, try to seed from ordens_recebimento (Aguardando Alocação)
-    if ((data || []).length === 0) {
-      const { data: ordens } = await supabase
-        .from('ordens_recebimento')
-        .select('id, codigo, depositante, tipo, nf')
-        .eq('warehouse_id', warehouseId)
-        .eq('status', 'Aguardando Alocação');
-      if (ordens && ordens.length > 0) {
-        const toInsert = ordens.map(or => ({
-          warehouse_id: warehouseId,
-          ordem_id: or.codigo,
-          depositante: or.depositante,
-          tipo_recebimento: or.tipo,
-          produto: or.nf || '—',
-          status: 'Pendente',
-        }));
-        const { data: inserted } = await supabase.from('alocacoes').insert(toInsert).select();
-        setRows((inserted || []).map(dbRowToRow));
+    // Fetch enderecos for this warehouse
+    const { data: enderecos, error: endErr } = await supabase
+      .from('enderecos')
+      .select('id, codigo, rua, predio, nivel, vao, tipo, area, status')
+      .eq('warehouse_id', warehouseId)
+      .order('codigo');
+
+    if (endErr) { console.error('enderecos:', endErr); setLoading(false); return; }
+
+    // Fetch alocacao_estoque for this warehouse, join produtos
+    const { data: alocacoes, error: alocErr } = await supabase
+      .from('alocacao_estoque')
+      .select('id, endereco_id, produto_id, quantidade, updated_at, produtos(sku, descricao)')
+      .eq('warehouse_id', warehouseId);
+
+    if (alocErr) { console.error('alocacao_estoque:', alocErr); setLoading(false); return; }
+
+    // Build a map: endereco_id → alocacao
+    const alocMap = {};
+    for (const a of (alocacoes || [])) {
+      if (!alocMap[a.endereco_id] || a.quantidade > 0) {
+        alocMap[a.endereco_id] = a;
       }
-    } else {
-      setRows((data || []).map(dbRowToRow));
     }
+
+    setRows((enderecos || []).map(end => dbRowToRow(end, alocMap[end.id] || null)));
     setLoading(false);
   }, [warehouseId]);
 
   useEffect(() => {
     fetchRows();
     if (!warehouseId) return;
-    const ch = supabase.channel('alocacoes-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'alocacoes', filter: `warehouse_id=eq.${warehouseId}` }, fetchRows)
+    const ch = supabase.channel('enderecos-alocacoes-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enderecos',       filter: `warehouse_id=eq.${warehouseId}` }, fetchRows)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'alocacao_estoque', filter: `warehouse_id=eq.${warehouseId}` }, fetchRows)
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, [warehouseId, fetchRows]);
 
   // ── Filtragem usando KPI do contexto filtrado ─────────────────────────────
   const filtrados = useMemo(() =>
-    rows.filter(r =>
-      (statusFiltro === 'Todos' || r.status === statusFiltro) &&
-      (r.ordemId.toLowerCase().includes(search.toLowerCase()) ||
-       r.produto.toLowerCase().includes(search.toLowerCase()) ||
-       r.depositante.toLowerCase().includes(search.toLowerCase()))
-    ), [rows, statusFiltro, search]);
+    rows.filter(r => {
+      const q = search.toLowerCase();
+      const matchStatus = statusFiltro === 'Todos' || r.status === statusFiltro;
+      const matchSearch = !q ||
+        r.ordemId.toLowerCase().includes(q) ||
+        r.produto.toLowerCase().includes(q) ||
+        r.sku.toLowerCase().includes(q) ||
+        r.tipoLocal.toLowerCase().includes(q);
+      return matchStatus && matchSearch;
+    }), [rows, statusFiltro, search]);
 
   // KPIs refletem o filtro atual, não o total global
-  const kpiPendentes    = filtrados.filter(r => r.status === 'Pendente').length;
-  const kpiPosicionados = filtrados.filter(r => r.status === 'Posicionado').length;
-  const kpiFinalizados  = filtrados.filter(r => r.status === 'Finalizado').length;
+  const kpiPendentes    = filtrados.filter(r => r.status === 'Livre').length;
+  const kpiPosicionados = filtrados.filter(r => r.status === 'Ocupado').length;
+  const kpiFinalizados  = filtrados.filter(r => r.status === 'Bloqueado').length;
 
   const selecionados = filtrados.filter(r => r.selecionado);
   const pendentes    = filtrados.filter(r => r.status === 'Pendente');
@@ -479,104 +484,56 @@ export default function AllocationMap() {
     setRows(rs => rs.map(r => ids.has(r.id) ? { ...r, selecionado: !allSel } : r));
   };
 
-  // ── Gerar Alocação — respeita seleção (se houver) ou pendentes ────────────
-  const handleGenerate = () => {
-    const selPendentes = selecionados.filter(r => r.status === 'Pendente');
-    const targets = selPendentes.length > 0 ? selPendentes : pendentes;
-    if (targets.length === 0) { toast('Nenhum registro Pendente para alocar.', 'warn'); return; }
+  // ── Bloquear endereço selecionado ─────────────────────────────────────────
+  const handleBloquear = async () => {
+    if (selecionados.length === 0) { toast('Selecione ao menos um endereço.', 'warn'); return; }
+    const livres = selecionados.filter(r => r.status === 'Livre');
+    if (livres.length === 0) { toast('Apenas endereços Livres podem ser bloqueados.', 'warn'); return; }
     setGerando(true);
-    setTimeout(async () => {
-      const targetIds = new Set(targets.map(r => r.id));
-      let updatedRows = [];
-      setRows(rs => {
-        const ocupados = rs
-          .filter(r => !targetIds.has(r.id) && r.enderecoSugerido && r.status !== 'Cancelado')
-          .map(r => r.enderecoSugerido);
-        const usados = [...ocupados];
-        const newRs = rs.map(r => {
-          if (!targetIds.has(r.id)) return r;
-          const { endereco, tipoLocal } = gerarEndereco(undefined, usados);
-          if (endereco) usados.push(endereco);
-          if (!endereco) return { ...r, status: 'Pendente' };
-          return { ...r, lote: gerarLote(r.ordemId), enderecoSugerido: endereco, tipoLocal, status: 'Posicionado' };
-        });
-        updatedRows = newRs.filter(r => targetIds.has(r.id));
-        return newRs;
-      });
-      // Persist to Supabase
-      for (const r of updatedRows) {
-        await supabase.from('alocacoes').update({
-          lote: r.lote, endereco_sugerido: r.enderecoSugerido,
-          tipo_local: r.tipoLocal, status: r.status,
-        }).eq('id', r.id);
-      }
-      setGerando(false);
-      toast(`${targets.length} alocação(ões) gerada(s) com sucesso!`);
-    }, 1800);
-  };
-
-  // ── Alterar Endereço ───────────────────────────────────────────────────────
-  const handleAlterar = () => {
-    if (selecionados.length === 0) { toast('Selecione ao menos um registro.', 'warn'); return; }
-    setModal('alterar');
-  };
-
-  const handleSaveEndereco = async (endereco, tipoLocal) => {
-    const ids = new Set(selecionados.map(r => r.id));
-    setRows(rs => rs.map(r => ids.has(r.id) ? { ...r, enderecoSugerido: endereco, tipoLocal, status: 'Posicionado' } : r));
-    setModal(null);
-    for (const id of ids) {
-      await supabase.from('alocacoes').update({ endereco_sugerido: endereco, tipo_local: tipoLocal, status: 'Posicionado' }).eq('id', id);
+    for (const r of livres) {
+      await supabase.from('enderecos').update({ status: 'bloqueado' }).eq('id', r.id);
     }
-    toast(`Endereço ${endereco} aplicado em ${selecionados.length} registro(s).`);
+    await fetchRows();
+    setGerando(false);
+    toast(`${livres.length} endereço(s) bloqueado(s).`);
   };
 
-  // ── Confirmar Alocação ─────────────────────────────────────────────────────
-  const handleConfirmar = () => {
-    const elegíveis = selecionados.filter(r => r.status === 'Posicionado');
-    if (elegíveis.length === 0) {
-      toast('Selecione registros com status "Posicionado" para confirmar.', 'warn');
-      return;
+  // ── Liberar endereço bloqueado ────────────────────────────────────────────
+  const handleLiberar = async () => {
+    if (selecionados.length === 0) { toast('Selecione ao menos um endereço.', 'warn'); return; }
+    const bloqueados = selecionados.filter(r => r.status === 'Bloqueado');
+    if (bloqueados.length === 0) { toast('Apenas endereços Bloqueados podem ser liberados.', 'warn'); return; }
+    setGerando(true);
+    for (const r of bloqueados) {
+      await supabase.from('enderecos').update({ status: 'livre' }).eq('id', r.id);
     }
-    setModal('confirmar');
+    await fetchRows();
+    setGerando(false);
+    toast(`${bloqueados.length} endereço(s) liberado(s).`);
   };
 
-  const handleAutorizado = async () => {
-    const ids = new Set(selecionados.filter(r => r.status === 'Posicionado').map(r => r.id));
-    setRows(rs => rs.map(r => ids.has(r.id) ? { ...r, status: 'Finalizado', selecionado: false } : r));
-    setModal(null);
-    for (const id of ids) {
-      await supabase.from('alocacoes').update({ status: 'Finalizado' }).eq('id', id);
-    }
-    toast(`${ids.size} alocação(ões) CONFIRMADA(S)! Guarda registrada.`);
-  };
-
-  // ── Resetar Lote (anteriormente "Excluir") ────────────────────────────────
-  // Ação correta: volta para Pendente, preserva a ordem; NÃO apaga o ordemId
-  // O lote físico impresso ainda existe — avise o operador
+  // ── Remover alocação de endereços selecionados ────────────────────────────
   const handleResetar = async () => {
     if (selecionados.length === 0) { toast('Selecione ao menos um registro.', 'warn'); return; }
-    const naoFinalizado = selecionados.filter(r => r.status !== 'Finalizado');
-    if (naoFinalizado.length === 0) { toast('Registros Finalizados não podem ser resetados.', 'warn'); return; }
-    const ids = new Set(naoFinalizado.map(r => r.id));
-    setRows(rs => rs.map(r =>
-      ids.has(r.id)
-        ? { ...r, lote: null, enderecoSugerido: null, tipoLocal: null, status: 'Cancelado', selecionado: false }
-        : r
-    ));
-    for (const id of ids) {
-      await supabase.from('alocacoes').update({ lote: null, endereco_sugerido: null, tipo_local: null, status: 'Cancelado' }).eq('id', id);
+    const ocupados = selecionados.filter(r => r.status === 'Ocupado');
+    if (ocupados.length === 0) { toast('Apenas endereços Ocupados podem ter alocação removida.', 'warn'); return; }
+    setGerando(true);
+    for (const r of ocupados) {
+      await supabase.from('alocacao_estoque').delete().eq('endereco_id', r.id).eq('warehouse_id', warehouseId);
+      await supabase.from('enderecos').update({ status: 'livre' }).eq('id', r.id);
     }
-    toast(`${naoFinalizado.length} registro(s) cancelado(s). Lotes físicos precisam ser inutilizados manualmente.`, 'warn');
+    await fetchRows();
+    setGerando(false);
+    toast(`${ocupados.length} alocação(ões) removida(s).`, 'warn');
   };
 
-  const posicionadosSelect = selecionados.filter(r => r.status === 'Posicionado').length;
+  const posicionadosSelect = selecionados.filter(r => r.status === 'Ocupado').length;
 
   const actionGroups = [[
-    { label: gerando ? 'Gerando...' : 'Gerar Alocação', icon: gerando ? RefreshCw : Zap, primary: true, onClick: handleGenerate, disabled: gerando || pendentes.length === 0 },
-    { label: 'Alterar Endereço', icon: ArrowRightLeft, onClick: handleAlterar, disabled: selecionados.length === 0 },
-    { label: 'Confirmar',        icon: ShieldCheck,     onClick: handleConfirmar, disabled: posicionadosSelect === 0 },
-    { label: 'Cancelar',         icon: RotateCcw,       onClick: handleResetar,  disabled: selecionados.length === 0 },
+    { label: gerando ? 'Aguarde...' : 'Bloquear',       icon: gerando ? RefreshCw : Lock,         onClick: handleBloquear, disabled: gerando || selecionados.filter(r => r.status === 'Livre').length === 0 },
+    { label: 'Liberar',        icon: ShieldCheck,     onClick: handleLiberar,  disabled: selecionados.filter(r => r.status === 'Bloqueado').length === 0 },
+    { label: 'Remover Aloc.',  icon: RotateCcw,       onClick: handleResetar,  disabled: selecionados.filter(r => r.status === 'Ocupado').length === 0 },
+    { label: 'Atualizar',      icon: RefreshCw,       onClick: fetchRows,      disabled: loading || gerando },
   ]];
 
   return (
@@ -616,9 +573,9 @@ export default function AllocationMap() {
       {/* ═══ KPIs ═══ */}
       <div className="flex gap-3 flex-wrap">
         {[
-          { label: 'Pendentes',    val: kpiPendentes,    color: 'text-amber-500' },
-          { label: 'Posicionados', val: kpiPosicionados, color: 'text-blue-500'  },
-          { label: 'Finalizados',  val: kpiFinalizados,  color: 'text-green-600' },
+          { label: 'Livres',     val: kpiPendentes,    color: 'text-green-600' },
+          { label: 'Ocupados',   val: kpiPosicionados, color: 'text-blue-500'  },
+          { label: 'Bloqueados', val: kpiFinalizados,  color: 'text-red-600'   },
         ].map(k => (
           <div key={k.label} className="text-center bg-white dark:bg-slate-800 border border-slate-100 rounded-2xl px-5 py-3 min-w-[80px]"
             title={statusFiltro !== 'Todos' ? `Filtrado por: ${statusFiltro}` : 'Total do sistema'}>

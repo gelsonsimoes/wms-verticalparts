@@ -25,16 +25,18 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
-// ─── TABELAS ALVO ────────────────────────────────────────────────────
-const TABELAS = [
-  { id: 'logs_seg',    label: 'Logs de Segurança',          icon: Shield,    est: 142800, desc: 'Registros de acesso, autenticação e eventos de segurança' },
-  { id: 'erros_int',   label: 'Erros de Integração',         icon: XCircle,   est: 38420,  desc: 'Erros de integração REST, XML e ETL falhados' },
-  { id: 'xml_proc',    label: 'Arquivos XML Processados',    icon: FileX,     est: 67100,  desc: 'XMLs de NF-e, CT-e e MDF-e já processados e confirmados' },
-  { id: 'ativ_fin',    label: 'Atividades Finalizadas',      icon: CheckCircle2, est: 95300, desc: 'Tarefas de separação, conferência e alocação concluídas' },
-  { id: 'inv_antigos', label: 'Inventários Antigos',         icon: Database,  est: 31200,  desc: 'Ciclos de inventário com mais de 12 meses' },
+// ─── TABELAS ALVO — definição base (contagens carregadas do Supabase em runtime) ──
+const TABELAS_DEF = [
+  { id: 'activity_logs',      label: 'Logs de Atividade',           icon: Shield,       table: 'activity_logs',      desc: 'Registros de acesso, autenticação e eventos de segurança' },
+  { id: 'erros_int',          label: 'Erros de Integração',          icon: XCircle,      table: null,                 desc: 'Erros de integração REST, XML e ETL falhados' },
+  { id: 'xml_proc',           label: 'Arquivos XML Processados',     icon: FileX,        table: null,                 desc: 'XMLs de NF-e, CT-e e MDF-e já processados e confirmados' },
+  { id: 'movimento_estoque',  label: 'Movimentações de Estoque',     icon: CheckCircle2, table: 'movimento_estoque',  desc: 'Registros de entrada, saída e transferência de estoque' },
+  { id: 'inv_antigos',        label: 'Inventários Antigos',          icon: Database,     table: null,                 desc: 'Ciclos de inventário com mais de 12 meses' },
 ];
 
 // ─── MOCK HISTÓRICO ───────────────────────────────────────────────────
@@ -289,11 +291,32 @@ function ProgressoExpurgo({ tabelasSel, onDone, startTime }) {
 
 // ─── ABA 1: CONFIGURAR EXPURGO ───────────────────────────────────────
 function ConfigurarExpurgo({ historico, setHistorico }) {
+  const { warehouseId } = useApp();
   const [dataLimite, setDataLimite]   = useState('2025-01-01');
   const [selecionadas, setSelecionadas] = useState({});
   const [showModal,   setShowModal]   = useState(false);
   const [showProgress,setShowProgress]= useState(false);
   const [successMsg,  setSuccessMsg]  = useState(false);
+
+  // Contagens reais do Supabase
+  const [TABELAS, setTABELAS] = useState(TABELAS_DEF.map(t => ({ ...t, est: 0 })));
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const updated = await Promise.all(TABELAS_DEF.map(async (t) => {
+        if (!t.table) return { ...t, est: 0 };
+        try {
+          const { count } = await supabase
+            .from(t.table)
+            .select('*', { count: 'exact', head: true });
+          return { ...t, est: count ?? 0 };
+        } catch (_) {
+          return { ...t, est: 0 };
+        }
+      }));
+      setTABELAS(updated);
+    };
+    fetchCounts();
+  }, [warehouseId]);
 
   const toggle = id => setSelecionadas(s => ({ ...s, [id]: !s[id] }));
   const todasSel = TABELAS.every(t => selecionadas[t.id]);

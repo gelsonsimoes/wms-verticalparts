@@ -1,28 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { RefreshCcw, Search, Filter, CheckCircle2, XCircle, Clock, Database } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
+import EnterprisePageBase from '../components/layout/EnterprisePageBase';
+
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
-const MOCK_ORDERS = [
-  { erpId: 'PED-99824', date: '26/02/2026', depositor: 'VerticalParts Matriz', items: 12,  status: 'Importado', wmsRef: 'WMS-7712' },
-  { erpId: 'PED-99825', date: '26/02/2026', depositor: 'VerticalParts Matriz', items: 3,   status: 'Erro',      wmsRef: '-' },
-  { erpId: 'PED-99826', date: '26/02/2026', depositor: 'VerticalParts Matriz', items: 105, status: 'Pendente',  wmsRef: '-' },
-  { erpId: 'PED-99827', date: '26/02/2026', depositor: 'VerticalParts Matriz', items: 1,   status: 'Importado', wmsRef: 'WMS-7714' },
-  { erpId: 'PED-99828', date: '26/02/2026', depositor: 'VerticalParts Matriz', items: 45,  status: 'Importado', wmsRef: 'WMS-7715' },
-];
-
 // ─── Mapeamento centralizado de status → badge ────────────────────────────────
-// Adicionar novo status: apenas uma entrada aqui, sem tocar no JSX da tabela.
 const STATUS_CONFIG = {
-  Importado: { label: 'Importado', icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
-  Pendente:  { label: 'Pendente',  icon: Clock,        className: 'bg-yellow-100 text-yellow-700' },
-  Erro:      { label: 'Falha',     icon: XCircle,      className: 'bg-red-100 text-red-700' },
+  Importado:        { label: 'Importado',  icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
+  aguardando_expedicao: { label: 'Aguardando', icon: Clock,    className: 'bg-yellow-100 text-yellow-700' },
+  pendente:         { label: 'Pendente',   icon: Clock,        className: 'bg-yellow-100 text-yellow-700' },
+  cancelado:        { label: 'Cancelado',  icon: XCircle,      className: 'bg-red-100 text-red-700' },
+  faturado:         { label: 'Faturado',   icon: CheckCircle2, className: 'bg-green-100 text-green-700' },
+  erro:             { label: 'Falha',      icon: XCircle,      className: 'bg-red-100 text-red-700' },
 };
 
 function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status];
-  if (!cfg) return <span className="text-slate-400 text-xs">—</span>;
+  const cfg = STATUS_CONFIG[status] || { label: status, icon: Clock, className: 'bg-slate-100 text-slate-600' };
   const Icon = cfg.icon;
   return (
     <span className={cn(
@@ -35,78 +32,112 @@ function StatusBadge({ status }) {
   );
 }
 
+// ─── Toast inline ─────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+  return (
+    <div role="alert" onClick={onClose}
+      className={cn(
+        'fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-sm font-bold border-2 animate-in slide-in-from-bottom-4 duration-300 cursor-pointer',
+        type === 'erro'
+          ? 'bg-red-50 text-red-700 border-red-200'
+          : 'bg-green-50 text-green-700 border-green-200'
+      )}>
+      {type === 'erro' ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+      {msg}
+    </div>
+  );
+}
+
 export default function ERPOrderIntegration() {
+  const { warehouseId } = useApp();
+  const [orders,   setOrders]   = useState([]);
+  const [loading,  setLoading]  = useState(false);
   const [syncing,  setSyncing]  = useState(false);
-  const [lastSync, setLastSync] = useState('26/02/2026 14:02:15');
+  const [lastSync, setLastSync] = useState('—');
   const [search,   setSearch]   = useState('');
+  const [toast,    setToast]    = useState(null);
+  const toastRef = useRef(null);
 
-  // ── Estatísticas derivadas dos dados — nunca ficam dessincronizadas ──────────
-  const stats = useMemo(() => ({
-    total:     MOCK_ORDERS.length,
-    pendentes: MOCK_ORDERS.filter(o => o.status === 'Pendente').length,
-    erros:     MOCK_ORDERS.filter(o => o.status === 'Erro').length,
-  }), []);
+  const showToast = (msg, type = 'ok') => {
+    setToast({ msg, type });
+    clearTimeout(toastRef.current);
+    toastRef.current = setTimeout(() => setToast(null), 3500);
+  };
+  useEffect(() => () => clearTimeout(toastRef.current), []);
 
-  // ── Busca funcional: filtra por ID ERP ou Ref WMS ────────────────────────────
-  const filteredOrders = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return MOCK_ORDERS;
-    return MOCK_ORDERS.filter(o =>
-      o.erpId.toLowerCase().includes(q) ||
-      o.wmsRef.toLowerCase().includes(q)
-    );
-  }, [search]);
-
-  const handleSync = () => {
-    setSyncing(true);
-    // ⚠️ INTEGRAÇÃO NECESSÁRIA: substituir por POST /api/erp/sync
-    // Em produção: tratar erros com try/catch e exibir feedback de falha.
-    // Exemplo:
-    //   try { await api.post('/erp/sync'); setLastSync(new Date().toLocaleString('pt-BR')); }
-    //   catch (err) { setSyncError(err.message); }
-    //   finally { setSyncing(false); }
-    setTimeout(() => {
-      setSyncing(false);
+  // ── Fetch notas_saida ─────────────────────────────────────────────────────
+  const fetchOrders = useCallback(async () => {
+    if (!warehouseId) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('notas_saida')
+      .select('id, nf, cliente, situacao, total_itens, valor, created_at')
+      .eq('warehouse_id', warehouseId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      console.error('[ERPOrderIntegration] fetch error:', error);
+      showToast('Erro ao carregar pedidos.', 'erro');
+    } else {
+      setOrders(data || []);
       setLastSync(new Date().toLocaleString('pt-BR'));
-    }, 2000);
+    }
+    setLoading(false);
+  }, [warehouseId]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    await fetchOrders();
+    setSyncing(false);
+    showToast('Sincronização concluída.');
   };
 
+  // ── Estatísticas derivadas ─────────────────────────────────────────────────
+  const stats = useMemo(() => ({
+    total:     orders.length,
+    pendentes: orders.filter(o => o.situacao === 'pendente' || o.situacao === 'aguardando_expedicao').length,
+    erros:     orders.filter(o => o.situacao === 'cancelado' || o.situacao === 'erro').length,
+  }), [orders]);
+
+  // ── Busca funcional ────────────────────────────────────────────────────────
+  const filteredOrders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(o =>
+      (o.nf || '').toLowerCase().includes(q) ||
+      (o.cliente || '').toLowerCase().includes(q)
+    );
+  }, [orders, search]);
+
+  const actionGroups = [[
+    { label: syncing ? 'Sincronizando...' : 'Sincronizar', icon: RefreshCcw, primary: true, onClick: handleSync, disabled: syncing || loading },
+  ]];
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-100 pb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Sincronizar Ordens ERP</h1>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Conector Direto com Omie / Outros ERPs</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Última Sincronização</p>
-            <p className="text-sm font-bold text-slate-900">{lastSync}</p>
-          </div>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            aria-busy={syncing}
-            className={cn(
-              'flex items-center gap-2 px-6 py-3 font-black rounded-[2rem] text-sm shadow-lg transition-all',
-              syncing
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                : 'bg-[#ffcd00] text-black hover:scale-105 active:scale-95 shadow-yellow-500/20'
-            )}
-          >
-            <RefreshCcw className={cn('w-5 h-5', syncing && 'animate-spin')} aria-hidden="true" />
-            {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
-          </button>
+    <EnterprisePageBase
+      title="Sincronizar Ordens ERP"
+      breadcrumbItems={[{ label: 'Integração' }]}
+      actionGroups={actionGroups}
+    >
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* Sub-header */}
+      <div className="flex items-center justify-between mb-6">
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Conector Direto com Omie / Outros ERPs</p>
+        <div className="text-right">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Última Sincronização</p>
+          <p className="text-sm font-bold text-slate-900">{lastSync}</p>
         </div>
       </div>
 
-      {/* KPI Cards — derivados dos dados, nunca desincronizam */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-100 flex items-center gap-4">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-full" aria-hidden="true"><Database className="w-6 h-6" /></div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Hoje</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total</p>
             <h3 className="text-2xl font-black text-slate-900">{String(stats.total).padStart(2, '0')}</h3>
           </div>
         </div>
@@ -129,18 +160,16 @@ export default function ERPOrderIntegration() {
       {/* Tabela */}
       <div className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-slate-100">
         <div className="flex flex-wrap items-center gap-4 mb-6">
-          {/* Busca controlada e funcional */}
           <div className="relative flex-1 min-w-[200px]">
             <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por ID ERP ou Ref WMS..."
+              placeholder="Buscar por NF ou cliente..."
               className="w-full pl-11 pr-4 py-3 bg-slate-50 rounded-[2rem] border-none text-sm font-bold focus:ring-2 focus:ring-[#ffcd00] outline-none"
             />
           </div>
-          {/* Desabilitado enquanto não implementado — evita botão sem ação */}
           <button
             disabled
             title="Filtros avançados em desenvolvimento"
@@ -151,45 +180,54 @@ export default function ERPOrderIntegration() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Ordem ERP</th>
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Data</th>
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Depositante</th>
-                {/* "Acessos/Itens" era label ambígua — renomeado para "Itens" */}
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Itens</th>
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Ref WMS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-slate-400 font-bold">
-                    Nenhuma ordem encontrada para "{search}".
-                  </td>
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-slate-400">
+              <RefreshCcw className="w-6 h-6 animate-spin" />
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">NF</th>
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Data</th>
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Cliente</th>
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Itens</th>
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Valor</th>
+                  <th className="pb-3 px-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Status</th>
                 </tr>
-              ) : (
-                filteredOrders.map(order => (
-                  <tr key={order.erpId} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="py-4 px-4 text-sm font-black text-slate-900">{order.erpId}</td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-500">{order.date}</td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-600">{order.depositor}</td>
-                    <td className="py-4 px-4 text-sm font-black text-slate-900">
-                      {order.items} <span className="font-bold text-slate-400 text-xs">un</span>
+              </thead>
+              <tbody>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-sm text-slate-400 font-bold">
+                      {search ? `Nenhuma NF encontrada para "${search}".` : 'Nenhuma nota de saída registrada.'}
                     </td>
-                    <td className="py-4 px-4">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="py-4 px-4 text-sm font-bold text-slate-500">{order.wmsRef}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  filteredOrders.map(order => (
+                    <tr key={order.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="py-4 px-4 text-sm font-black text-slate-900">{order.nf || '—'}</td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-500">
+                        {order.created_at ? new Date(order.created_at).toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-600">{order.cliente || '—'}</td>
+                      <td className="py-4 px-4 text-sm font-black text-slate-900">
+                        {order.total_itens ?? 0} <span className="font-bold text-slate-400 text-xs">un</span>
+                      </td>
+                      <td className="py-4 px-4 text-sm font-bold text-slate-600">
+                        {order.valor != null ? `R$ ${Number(order.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="py-4 px-4">
+                        <StatusBadge status={order.situacao || 'pendente'} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-    </div>
+    </EnterprisePageBase>
   );
 }

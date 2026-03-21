@@ -4,49 +4,99 @@
 // Layout profissional com grade de posições, TV Mode e filtros visuais.
 // Restaurado de v4.3.25.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../hooks/useApp';
+import { supabase } from '../lib/supabaseClient';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { Search, Monitor, X, ArrowRight, Layers, Box } from 'lucide-react';
+import { Search, Monitor, X, ArrowRight, Layers, Box, CheckCircle2, XCircle } from 'lucide-react';
 
-// Centralized Mock Data for Buffer 1
-const dadosBuffer1 = [
-    { linha: 1, coluna: "A", ocupado: true, sku: 'VPER-CAIXA-001', item: 'Caixa Grande Tipo A' },
-    { linha: 3, coluna: "F", ocupado: true, sku: 'VPER-CAIXA-002', item: 'Caixa Média Tipo B' },
-    { linha: 5, coluna: "K", ocupado: true, sku: 'VPER-CAIXA-003', item: 'Caixa Extra Grande' },
-    { linha: 2, coluna: "B", ocupado: true, sku: 'VPER-MOT-220', item: 'Motor de Tração 220V' },
-    { linha: 4, coluna: "D", ocupado: true, sku: 'VPER-CAB-10', item: 'Cabo de Aço 10mm' },
-    { linha: 6, coluna: "H", ocupado: true, sku: 'VPER-PAI-800', item: 'Painel Elétrico 800W' },
-    { linha: 7, coluna: "M", ocupado: true, sku: 'VPER-FRE-200', item: 'Freio Magnético D-200' },
-    ...Array.from({ length: 25 }, (_, i) => ({
-        linha: (i % 7) + 1,
-        coluna: String.fromCharCode(65 + (i % 14)),
-        ocupado: true,
-        sku: `VPER-BOX-REF${i}`,
-        item: `Lote de Caixas ${i}`
-    }))
-];
+// ─── Toast inline ────────────────────────────────────────────────────────────
+function Toast({ msg, type, onClose }) {
+    const bg =
+        type === 'erro' ? 'bg-red-600 border-red-400' :
+        type === 'warn' ? 'bg-amber-500 border-amber-300' :
+        'bg-green-600 border-green-400';
+    return (
+        <div
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-sm font-bold border-2 text-white cursor-pointer ${bg}`}
+            onClick={onClose}
+            role="alert"
+        >
+            {type === 'erro' ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+            {msg}
+        </div>
+    );
+}
+
+const ROWS = [1, 2, 3, 4, 5, 6, 7];
+const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+const TOTAL_POSITIONS = ROWS.length * COLS.length; // 98
 
 const Buffer1 = () => {
     const location = useLocation();
-    const { isTvMode } = useApp();
+    const { warehouseId } = useApp();
     const [searchTerm, setSearchTerm] = useState('');
     const [hoveredPos, setHoveredPos] = useState(null);
+    const [ocupados, setOcupados] = useState([]); // [{ endereco_id, sku, item }]
+    const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState(null);
+    const toastRef = useRef(null);
 
-    const rows = [1, 2, 3, 4, 5, 6, 7];
-    const cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'];
+    const showToast = (msg, type = 'ok') => {
+        setToast({ msg, type });
+        clearTimeout(toastRef.current);
+        toastRef.current = setTimeout(() => setToast(null), 4000);
+    };
+
+    useEffect(() => () => clearTimeout(toastRef.current), []);
+
+    useEffect(() => {
+        if (!warehouseId) return;
+        const fetch = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('alocacao_estoque')
+                .select('endereco_id, quantidade, produto_id, produtos(sku, nome)')
+                .eq('warehouse_id', warehouseId)
+                .like('endereco_id', 'B1_%')
+                .gt('quantidade', 0);
+            if (error) {
+                showToast('Erro ao carregar Buffer 1.', 'erro');
+                setLoading(false);
+                return;
+            }
+            setOcupados((data || []).map(r => ({
+                endereco_id: r.endereco_id,
+                sku: r.produtos?.sku || r.produto_id || '',
+                item: r.produtos?.nome || '',
+                quantidade: r.quantidade,
+            })));
+            setLoading(false);
+        };
+        fetch();
+
+        const channel = supabase
+            .channel('buffer1-rt')
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'alocacao_estoque',
+                filter: `warehouse_id=eq.${warehouseId}`,
+            }, fetch)
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    }, [warehouseId]);
 
     const getAddressData = (linha, coluna) => {
-        return dadosBuffer1.find(d => d.linha === linha && d.coluna === coluna);
+        const address = `B1_${linha}${coluna}`;
+        return ocupados.find(d => d.endereco_id === address);
     };
 
     const StatusBox = ({ linha, coluna }) => {
         const data = getAddressData(linha, coluna);
-        const occupied = data?.ocupado;
+        const occupied = !!data;
         const address = `B1_${linha}${coluna}`;
-        
-        const isSelected = searchTerm && 
+
+        const isSelected = searchTerm &&
             (address.toLowerCase().includes(searchTerm.toLowerCase()) ||
              data?.sku?.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -81,7 +131,7 @@ const Buffer1 = () => {
                 <div className="flex items-center gap-3">
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 group-focus-within:text-[#ffcd00]" size={16} />
-                        <input 
+                        <input
                             type="text"
                             placeholder="Buscar SKU ou Endereço (ex: B1_1A)..."
                             value={searchTerm}
@@ -96,41 +146,43 @@ const Buffer1 = () => {
                 </div>
             }
         >
+            {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
             <div className="space-y-8 pb-20">
                 {/* Navigation Buttons */}
                 <div className="flex items-center justify-center gap-4 mb-8">
-                    <Link 
+                    <Link
                         to="/operacao/mapa-visual"
                         className={`
                         flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/mapa-visual' 
-                            ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20' 
+                        ${location.pathname === '/operacao/mapa-visual'
+                            ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20'
                             : 'bg-white/5 text-white/60 hover:bg-white/10'}
                         `}
                     >
                         <Layers size={16} />
                         MAPA VISUAL
                     </Link>
-                    
-                    <Link 
+
+                    <Link
                         to="/operacao/buffer-1"
                         className={`
                         flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-1' 
-                            ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20' 
+                        ${location.pathname === '/operacao/buffer-1'
+                            ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20'
                             : 'bg-white/5 text-white/60 hover:bg-white/10'}
                         `}
                     >
                         <Box size={16} />
                         BUFFER 1
                     </Link>
-                    
-                    <Link 
+
+                    <Link
                         to="/operacao/buffer-2"
                         className={`
                         flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-2' 
-                            ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20' 
+                        ${location.pathname === '/operacao/buffer-2'
+                            ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20'
                             : 'bg-white/5 text-white/60 hover:bg-white/10'}
                         `}
                     >
@@ -147,14 +199,13 @@ const Buffer1 = () => {
                                 <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Ocupação Total</span>
                                 <div className="flex items-end gap-2">
                                     <span className="text-3xl font-black text-blue-500">
-                                        {Math.round((dadosBuffer1.length / 98) * 100)}%
+                                        {loading ? '…' : `${Math.round((ocupados.length / TOTAL_POSITIONS) * 100)}%`}
                                     </span>
-                                    <span className="text-xs font-bold text-green-500 mb-1">↑ 1.2%</span>
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Posições Livres</span>
-                                <span className="text-3xl font-black text-white">{98 - dadosBuffer1.length}</span>
+                                <span className="text-3xl font-black text-white">{loading ? '…' : TOTAL_POSITIONS - ocupados.length}</span>
                             </div>
                             <div className="flex flex-col gap-1">
                                 <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Área Útil</span>
@@ -187,9 +238,9 @@ const Buffer1 = () => {
                 <div className="relative">
                     {/* Tooltip */}
                     {hoveredPos && (
-                        <div 
+                        <div
                             className="fixed z-[100] bg-black/90 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-2xl pointer-events-none animate-in fade-in zoom-in duration-200"
-                            style={{ 
+                            style={{
                                 left: `${Math.min(window.innerWidth - 250, 20)}px`,
                                 bottom: '20px'
                             }}
@@ -197,25 +248,25 @@ const Buffer1 = () => {
                             <div className="flex flex-col gap-2 min-w-[200px]">
                                 <div className="flex justify-between items-center border-b border-white/10 pb-2">
                                     <span className="text-[10px] font-black text-blue-400 tracking-widest">{hoveredPos.address}</span>
-                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${hoveredPos.data?.ocupado ? 'bg-red-600' : 'bg-green-600'} text-white uppercase`}>
-                                        {hoveredPos.data?.ocupado ? 'OCUPADO' : 'LIVRE'}
+                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${hoveredPos.data ? 'bg-red-600' : 'bg-green-600'} text-white uppercase`}>
+                                        {hoveredPos.data ? 'OCUPADO' : 'LIVRE'}
                                     </span>
                                 </div>
-                                {hoveredPos.data?.ocupado ? (
+                                {hoveredPos.data ? (
                                     <>
                                         <div className="flex flex-col">
                                             <span className="text-[8px] font-bold text-white/40 uppercase">Produto / SKU</span>
-                                            <span className="text-xs font-black text-white leading-tight">{hoveredPos.data.item}</span>
+                                            <span className="text-xs font-black text-white leading-tight">{hoveredPos.data.item || '—'}</span>
                                             <span className="text-[10px] font-mono text-blue-400/80">{hoveredPos.data.sku}</span>
                                         </div>
                                         <div className="flex justify-between mt-1">
                                             <div className="flex flex-col">
-                                                <span className="text-[8px] font-bold text-white/40 uppercase">Tipo</span>
-                                                <span className="text-xs font-black text-white">BOX</span>
+                                                <span className="text-[8px] font-bold text-white/40 uppercase">Qtd</span>
+                                                <span className="text-xs font-black text-white">{hoveredPos.data.quantidade}</span>
                                             </div>
                                             <div className="flex flex-col items-end">
-                                                <span className="text-[8px] font-bold text-white/40 uppercase">Entrada</span>
-                                                <span className="text-xs font-black text-white">03/03 - 09:15</span>
+                                                <span className="text-[8px] font-bold text-white/40 uppercase">Tipo</span>
+                                                <span className="text-xs font-black text-white">BOX</span>
                                             </div>
                                         </div>
                                     </>
@@ -258,26 +309,32 @@ const Buffer1 = () => {
                                     <div className="w-5 h-5 rounded-sm bg-red-600/90 border border-red-400 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
                                     <span className="text-xs text-slate-300">Ocupado</span>
                                 </div>
+                                {loading && (
+                                    <span className="text-xs text-blue-400 animate-pulse">Carregando dados...</span>
+                                )}
+                                {!loading && ocupados.length === 0 && (
+                                    <span className="text-xs text-white/40 italic">Nenhuma posição ocupada neste buffer.</span>
+                                )}
                             </div>
                              {/* CSS Grid for perfect Excel-like alignment */}
                              <div className="grid grid-cols-[40px_repeat(14,1fr)] gap-2">
                                 {/* Header: Column Labels */}
                                 <div className="w-10" />
-                                {cols.map(col => (
+                                {COLS.map(col => (
                                     <div key={col} className="text-center text-xs font-black text-white/20 uppercase">
                                         {col}
                                     </div>
                                 ))}
 
                                 {/* Grid content by rows */}
-                                {rows.map(row => (
+                                {ROWS.map(row => (
                                     <React.Fragment key={row}>
                                         {/* Row label */}
                                         <div className="flex items-center justify-center text-xs font-black text-white/20 border-r border-white/5">
                                             {row}
                                         </div>
                                         {/* Row cells */}
-                                        {cols.map(col => (
+                                        {COLS.map(col => (
                                             <div key={`${row}-${col}`} className="flex justify-center items-center">
                                                 <StatusBox linha={row} coluna={col} />
                                             </div>

@@ -1,12 +1,29 @@
+/**
+ * 2.15 — Conferência Colmeia (HoneycombCheck)
+ *
+ * PRECEDENTES:
+ *   - 3.1 WavePickingWizard  → cria tarefas (tipo='separacao', cor_colmeia, detalhes)
+ *   - 7.4 ProductCatalog     → produtos no catálogo
+ *   - 7.2 Warehouses         → warehouse_id do operador
+ *
+ * DEPENDENTES:
+ *   - 2.11 PackingStation    → consome itens já separados e finalizados na colmeia
+ *   - 2.12 OutboundMonitoring→ rastreia status da expedição
+ *   - 3.2 WaveSLADashboard   → monitora tempo de execução das ondas
+ *   - 8.3 OperatorPerformance→ usa bipado_por + bipado_em de itens_tarefa
+ */
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     ArrowLeft, ScanBarcode, Package, Lock, X, AlertTriangle,
     Eye, ListChecks, BoxSelect, Info, TrendingUp, CheckCircle2,
-    Hash, Layers,
+    Hash, Layers, Plus, RefreshCw, Loader2, ChevronRight,
 } from 'lucide-react';
 import Tooltip from '../components/ui/Tooltip';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
-// ========== CORES DAS COLMEIAS ==========
+// ========== PALETA DE CORES ==========
 const CORES_COLMEIA = [
     { nome: 'BEGE',     hex: '#D2B48C', text: '#5C4033', glow: 'rgba(210,180,140,0.55)' },
     { nome: 'ROXA',     hex: '#9B59B6', text: '#FFFFFF', glow: 'rgba(155,89,182,0.50)' },
@@ -20,19 +37,7 @@ const CORES_COLMEIA = [
     { nome: 'ROSA',     hex: '#E91E8C', text: '#FFFFFF', glow: 'rgba(233,30,140,0.50)' },
 ];
 
-// ========== SIMULAÇÃO DE PEDIDOS POR COR ==========
-const PEDIDOS_SIM = {
-    BEGE:     { produto: 'PASTILHA DE FREIO CERÂMICA VP-FR4429',     total: 20, separados: 4,  descricao: 'Peças de freio para linha de elevadores BST' },
-    ROXA:     { produto: 'CABO DE FREIO INOX 2.5MM',                 total: 15, separados: 2,  descricao: 'Cabos de alta resistência para passagem em roldanas' },
-    VERDE:    { produto: 'GUIA DE ELEVADOR BST 18KG/M',              total: 25, separados: 9,  descricao: 'Guias de deslizamento para cabinas de elevadores' },
-    VERMELHA: { produto: 'LIMITADOR DE VELOCIDADE MONARCH',          total: 18, separados: 6,  descricao: 'Dispositivo de segurança anti-queda para elevadores' },
-    AZUL:     { produto: 'PAINEL DE COMANDO THYSSENKRUPP',           total: 12, separados: 0,  descricao: 'Painel eletrônico de controle de andar e chamadas' },
-    AMARELA:  { produto: 'SENSOR DE PORTA DE PAVIMENTO BST',         total: 10, separados: 3,  descricao: 'Sensor magnético de posição de porta por pavimento' },
-    LARANJA:  { produto: 'CORREIA DENTADA OTIS ESCADA ROLANTE',      total: 22, separados: 8,  descricao: 'Correia de tração para escadas rolantes OTIS GEN2' },
-    BRANCA:   { produto: 'BATENTE DE CABINA PVC 90MM',               total: 8,  separados: 1,  descricao: 'Perfil de vedação e amortecimento para portas de cabina' },
-    PRETA:    { produto: 'SISTEMA DE RESGATE AUTOMÁTICO SR-200',     total: 16, separados: 5,  descricao: 'Módulo eletrônico de resgate em caso de queda de energia' },
-    ROSA:     { produto: 'QUADRO ELÉTRICO DE MANOBRA VP-QM-01',      total: 14, separados: 3,  descricao: 'Quadro de força e manobra para elevadores hidráulicos' },
-};
+const COR_MAP = Object.fromEntries(CORES_COLMEIA.map(c => [c.nome, c]));
 
 // ========== STATUS DOS ESCANINHOS ==========
 const STATUS = {
@@ -45,96 +50,76 @@ const STATUS = {
 };
 
 const STATUS_CONFIG = {
-    [STATUS.NAO_UTILIZADO]: { bg: '#94A3B8', border: '#64748B', label: 'Não utilizado',       dica: 'Este escaninho não está sendo usado nesta onda de separação.' },
-    [STATUS.VAZIO]:         { bg: '#3B82F6', border: '#2563EB', label: 'Vazio',               dica: 'Escaninho disponível — o próximo produto bipado será colocado aqui.' },
-    [STATUS.COM_PRODUTO]:   { bg: '#EAB308', border: '#CA8A04', label: 'Com produto',         dica: 'Escaninho ocupado com produto. Clique com botão direito para ver conteúdo.' },
-    [STATUS.COLOCANDO]:     { bg: '#F97316', border: '#EA580C', label: 'Colocando...',        dica: 'Produto recém bipado — aguardando confirmação de colocação física no escaninho.' },
-    [STATUS.FINALIZADO]:    { bg: '#22C55E', border: '#16A34A', label: 'Finalizado',          dica: 'Escaninho confirmado pelo supervisor como totalmente preenchido.' },
-    [STATUS.AGUARDANDO]:    { bg: '#8B5CF6', border: '#7C3AED', label: 'Aguard. conferência', dica: 'Pedido completo — aguardando conferência final pelo supervisor.' },
+    [STATUS.NAO_UTILIZADO]: { bg: '#94A3B8', border: '#64748B', label: 'Não utilizado',       dica: 'Este escaninho não está sendo usado nesta onda.' },
+    [STATUS.VAZIO]:         { bg: '#3B82F6', border: '#2563EB', label: 'Vazio',               dica: 'Disponível — o próximo produto bipado será alocado aqui.' },
+    [STATUS.COM_PRODUTO]:   { bg: '#EAB308', border: '#CA8A04', label: 'Com produto',         dica: 'Produto alocado. Botão direito para ver conteúdo ou finalizar.' },
+    [STATUS.COLOCANDO]:     { bg: '#F97316', border: '#EA580C', label: 'Colocando...',        dica: 'Produto recém bipado — confirme a colocação física.' },
+    [STATUS.FINALIZADO]:    { bg: '#22C55E', border: '#16A34A', label: 'Finalizado',          dica: 'Confirmado pelo supervisor como totalmente preenchido.' },
+    [STATUS.AGUARDANDO]:    { bg: '#8B5CF6', border: '#7C3AED', label: 'Aguard. conferência', dica: 'Pedido completo — aguardando conferência final.' },
 };
 
-// ========== PAINEL DE PREVIEW (hover na seleção de cor) ==========
-function ColorPreviewPanel({ cor, pedido }) {
-    if (!cor || !pedido) return null;
-    const pct = Math.round((pedido.separados / pedido.total) * 100);
-    const restam = pedido.total - pedido.separados;
+// ========== PAINEL DE PREVIEW (hover) ==========
+function ColorPreviewPanel({ cor, tarefa, itensCor }) {
+    if (!cor) return null;
+    const total    = tarefa?.detalhes?.total_itens ?? 0;
+    const bipados  = itensCor?.length ?? 0;
+    const pct      = total > 0 ? Math.round((bipados / total) * 100) : 0;
+    const prodNome = tarefa?.detalhes?.produto_nome ?? 'Sem onda ativa';
 
     return (
-        <div
-            className="fixed right-6 top-1/2 -translate-y-1/2 z-[60] w-72 pointer-events-none
-                        animate-in slide-in-from-right-6 fade-in duration-300"
-            aria-live="polite"
-            aria-label={`Preview da colmeia ${cor.nome}`}
-        >
-            <div
-                className="rounded-3xl overflow-hidden shadow-2xl border-4"
-                style={{
-                    borderColor: cor.hex,
-                    boxShadow: `0 24px 60px ${cor.glow}, 0 8px 20px rgba(0,0,0,0.18)`,
-                }}
-            >
-                {/* Cabeçalho colorido */}
-                <div
-                    className="px-5 py-4 flex items-center gap-3"
-                    style={{ backgroundColor: cor.hex, color: cor.text }}
-                >
+        <div className="fixed right-6 top-1/2 -translate-y-1/2 z-[60] w-72 pointer-events-none
+                        animate-in slide-in-from-right-6 fade-in duration-300">
+            <div className="rounded-3xl overflow-hidden shadow-2xl border-4"
+                style={{ borderColor: cor.hex, boxShadow: `0 24px 60px ${cor.glow}, 0 8px 20px rgba(0,0,0,0.18)` }}>
+                <div className="px-5 py-4 flex items-center gap-3"
+                    style={{ backgroundColor: cor.hex, color: cor.text }}>
                     <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                        <Package className="w-5 h-5" aria-hidden="true" />
+                        <Package className="w-5 h-5" />
                     </div>
                     <div>
                         <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-70">Colmeia</p>
-                        <p className="text-lg font-black uppercase tracking-tight leading-none">{cor.nome}</p>
+                        <p className="text-lg font-black uppercase">{cor.nome}</p>
                     </div>
                     <div className="ml-auto text-right">
-                        <p className="text-2xl font-black leading-none">{pct}%</p>
+                        <p className="text-2xl font-black">{tarefa ? `${pct}%` : '—'}</p>
                         <p className="text-[8px] font-bold uppercase opacity-70">separado</p>
                     </div>
                 </div>
-
-                {/* Corpo */}
                 <div className="bg-white dark:bg-slate-900 px-5 py-4 space-y-4">
-                    {/* Produto */}
                     <div>
                         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Produto</p>
-                        <p className="text-[11px] font-black text-slate-800 dark:text-white leading-snug">{pedido.produto}</p>
-                        <p className="text-[9px] text-slate-400 font-medium mt-1 leading-relaxed">{pedido.descricao}</p>
+                        <p className="text-[11px] font-black text-slate-800 dark:text-white leading-snug">{prodNome}</p>
+                        {tarefa?.numero_onda && (
+                            <p className="text-[9px] text-slate-400 font-medium mt-1">Onda: {tarefa.numero_onda}</p>
+                        )}
                     </div>
-
-                    {/* Barra de progresso */}
-                    <div className="space-y-1.5">
-                        <div className="flex justify-between">
-                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Progresso</span>
-                            <span className="text-[9px] font-black" style={{ color: cor.hex }}>{pedido.separados} / {pedido.total}</span>
-                        </div>
-                        <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200">
-                            <div
-                                className="h-full rounded-full transition-all duration-700"
-                                style={{ width: `${pct}%`, backgroundColor: cor.hex }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 text-center">
-                            <p className="text-base font-black" style={{ color: cor.hex }}>{pedido.total}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Total</p>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3 text-center">
-                            <p className="text-base font-black text-green-600">{pedido.separados}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Separados</p>
-                        </div>
-                        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl p-3 text-center">
-                            <p className="text-base font-black text-amber-600">{restam}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Restam</p>
-                        </div>
-                    </div>
-
-                    {/* Dica */}
-                    <div className="flex items-start gap-2 p-3 rounded-2xl border" style={{ borderColor: `${cor.hex}33`, backgroundColor: `${cor.hex}0d` }}>
-                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: cor.hex }} aria-hidden="true" />
+                    {tarefa && (
+                        <>
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between">
+                                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Progresso</span>
+                                    <span className="text-[9px] font-black" style={{ color: cor.hex }}>{bipados} / {total}</span>
+                                </div>
+                                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                                    <div className="h-full rounded-full transition-all duration-700"
+                                        style={{ width: `${pct}%`, backgroundColor: cor.hex }} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[['Total', total, cor.hex], ['Bipados', bipados, '#22C55E'], ['Restam', Math.max(0, total - bipados), '#EAB308']].map(([lbl, val, clr]) => (
+                                    <div key={lbl} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 text-center">
+                                        <p className="text-base font-black" style={{ color: clr }}>{val}</p>
+                                        <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest">{lbl}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                    <div className="flex items-start gap-2 p-3 rounded-2xl border"
+                        style={{ borderColor: `${cor.hex}33`, backgroundColor: `${cor.hex}0d` }}>
+                        <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: cor.hex }} />
                         <p className="text-[9px] font-bold text-slate-600 dark:text-slate-300">
-                            Clique para abrir a interface de conferência desta colmeia.
+                            {tarefa ? 'Clique para abrir a conferência desta colmeia.' : 'Sem onda ativa. Clique para iniciar uma nova.'}
                         </p>
                     </div>
                 </div>
@@ -145,25 +130,23 @@ function ColorPreviewPanel({ cor, pedido }) {
 
 // ========== COMPONENTE ESCANINHO ==========
 function Escaninho({ numero, status, qtd, onContextMenu }) {
-    const config = STATUS_CONFIG[status];
+    const config    = STATUS_CONFIG[status];
     const isPiscando = status === STATUS.COLOCANDO;
-
     return (
         <Tooltip
             content={
                 status === STATUS.NAO_UTILIZADO ? 'Escaninho não utilizado nesta onda' :
-                status === STATUS.VAZIO         ? `Escaninho ${String(numero).padStart(2,'0')} — Disponível. O próximo produto bipado virá aqui.` :
-                status === STATUS.COM_PRODUTO   ? `Escaninho ${String(numero).padStart(2,'0')} — ${qtd} un. Botão direito para ver conteúdo ou finalizar.` :
-                status === STATUS.COLOCANDO     ? `Aguardando colocação física do produto no escaninho ${String(numero).padStart(2,'0')}...` :
-                status === STATUS.FINALIZADO    ? `Escaninho ${String(numero).padStart(2,'0')} — Finalizado e confirmado pelo supervisor.` :
-                                                  `Escaninho ${String(numero).padStart(2,'0')} — Aguardando conferência final.`
+                status === STATUS.VAZIO         ? `Escaninho ${String(numero).padStart(2,'0')} — Disponível. Próximo produto bipado virá aqui.` :
+                status === STATUS.COM_PRODUTO   ? `Escaninho ${String(numero).padStart(2,'0')} — ${qtd} un. Botão direito para opções.` :
+                status === STATUS.COLOCANDO     ? `Aguardando colocação física no escaninho ${String(numero).padStart(2,'0')}...` :
+                status === STATUS.FINALIZADO    ? `Escaninho ${String(numero).padStart(2,'0')} — Finalizado pelo supervisor.` :
+                                                  `Escaninho ${String(numero).padStart(2,'0')} — Aguardando conferência.`
             }
-            side="top"
-            delay={200}
+            side="top" delay={200}
         >
             <button
                 onContextMenu={onContextMenu}
-                aria-label={`Escaninho ${String(numero).padStart(2,'0')} — ${config.label}${qtd ? ` — ${qtd} unidades` : ''}`}
+                aria-label={`Escaninho ${String(numero).padStart(2,'0')} — ${config.label}${qtd ? ` — ${qtd} un` : ''}`}
                 className={`relative aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 font-black transition-all duration-300 cursor-context-menu hover:scale-110 select-none border-2 ${isPiscando ? 'animate-pulse' : ''}`}
                 style={{
                     backgroundColor: config.bg,
@@ -174,14 +157,14 @@ function Escaninho({ numero, status, qtd, onContextMenu }) {
                         : `0 6px 20px ${config.bg}55, 0 2px 6px rgba(0,0,0,0.12)`,
                 }}
             >
-                <span className="text-2xl md:text-3xl font-black leading-none">{String(numero).padStart(2, '0')}</span>
+                <span className="text-2xl md:text-3xl font-black leading-none">{String(numero).padStart(2,'0')}</span>
                 {status !== STATUS.NAO_UTILIZADO && (
                     <span className="text-[8px] md:text-[9px] uppercase tracking-widest font-bold opacity-80">
                         {status === STATUS.COM_PRODUTO && `${qtd} un`}
-                        {status === STATUS.COLOCANDO && '← AQUI'}
-                        {status === STATUS.VAZIO && 'vazio'}
-                        {status === STATUS.FINALIZADO && '✓ ok'}
-                        {status === STATUS.AGUARDANDO && 'aguardando'}
+                        {status === STATUS.COLOCANDO   && '← AQUI'}
+                        {status === STATUS.VAZIO       && 'vazio'}
+                        {status === STATUS.FINALIZADO  && '✓ ok'}
+                        {status === STATUS.AGUARDANDO  && 'aguardando'}
                     </span>
                 )}
                 {isPiscando && (
@@ -195,46 +178,42 @@ function Escaninho({ numero, status, qtd, onContextMenu }) {
 // ========== MODAL SUPERVISOR ==========
 function SupervisorModal({ onConfirm, onClose }) {
     const [senha, setSenha] = useState('');
-
     useEffect(() => {
-        const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', onKey);
-        return () => document.removeEventListener('keydown', onKey);
+        const h = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', h);
+        return () => document.removeEventListener('keydown', h);
     }, [onClose]);
-
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-            role="dialog" aria-modal="true" aria-labelledby="supervisor-modal-title" onClick={onClose}>
+            onClick={onClose} role="dialog" aria-modal="true">
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-5" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center">
                         <Lock className="w-6 h-6 text-red-500" />
                     </div>
                     <div>
-                        <h3 id="supervisor-modal-title" className="text-base font-black">Autorização Supervisor</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Escaninho Cheio</p>
+                        <h3 className="text-base font-black">Autorização Supervisor</h3>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Fechar Escaninho</p>
                     </div>
                 </div>
                 <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-[10px] font-bold text-amber-700">
-                        Marcar escaninho como cheio interrompe a alocação neste slot. Um supervisor deve autorizar.
+                        Marcar como cheio interrompe alocação neste slot. Supervisor deve autorizar.
                     </p>
                 </div>
                 <div className="space-y-1.5">
-                    <Tooltip content="Digite a senha do supervisor para autorizar o fechamento deste escaninho." showIcon>
+                    <Tooltip content="Senha do supervisor para fechar o escaninho." showIcon>
                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha do Supervisor</label>
                     </Tooltip>
-                    <input
-                        type="password" value={senha} onChange={e => setSenha(e.target.value)}
+                    <input type="password" value={senha} onChange={e => setSenha(e.target.value)}
                         autoFocus placeholder="••••••"
-                        className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-center text-lg font-black tracking-[0.5em] focus:border-primary outline-none transition-all"
-                    />
+                        className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl py-3 px-4 text-center text-lg font-black tracking-[0.5em] focus:border-primary outline-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                     <button onClick={onClose} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
                     <button onClick={() => { if (senha.length >= 3) onConfirm(); }} disabled={senha.length < 3}
-                        className="py-3 bg-red-500 text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-red-600 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5">
+                        className="py-3 bg-red-500 text-white font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-red-600 disabled:opacity-40 flex items-center justify-center gap-1.5 transition-all">
                         <Lock className="w-3.5 h-3.5" /> Autorizar
                     </button>
                 </div>
@@ -243,67 +222,55 @@ function SupervisorModal({ onConfirm, onClose }) {
     );
 }
 
-// ========== MENU DE CONTEXTO ==========
+// ========== CONTEXT MENU ==========
 function ContextMenu({ x, y, escaninho, onConteudo, onRestante, onEscaninhoCheio, onClose }) {
-    const menuRef = useRef(null);
-
+    const ref = useRef(null);
     useEffect(() => {
-        const handleClick = () => onClose();
-        document.addEventListener('click', handleClick);
-        return () => document.removeEventListener('click', handleClick);
+        const h = () => onClose();
+        document.addEventListener('click', h);
+        return () => document.removeEventListener('click', h);
     }, [onClose]);
-
-    const adjustedStyle = useMemo(() => ({
+    const style = useMemo(() => ({
         position: 'fixed',
         top:  Math.min(y, window.innerHeight - 160),
         left: Math.min(x, window.innerWidth  - 220),
         zIndex: 95,
     }), [x, y]);
-
     return (
-        <div ref={menuRef} style={adjustedStyle}
-            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
+        <div ref={ref} style={style} className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-100">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    Escaninho #{String(escaninho.numero).padStart(2, '0')}
+                    Escaninho #{String(escaninho.numero).padStart(2,'0')}
                 </p>
             </div>
             <div className="p-1.5 space-y-0.5">
-                <button onClick={onConteudo}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all text-left">
-                    <Eye className="w-4 h-4" /> Conteúdo
-                    <span className="ml-auto text-[8px] text-slate-300 font-normal">Ver produtos</span>
+                <button onClick={onConteudo} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-blue-50 hover:text-blue-600 transition-all text-left">
+                    <Eye className="w-4 h-4" /> Conteúdo <span className="ml-auto text-[8px] text-slate-300">Ver produtos</span>
                 </button>
-                <button onClick={onRestante}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-amber-50 hover:text-amber-600 transition-all text-left">
-                    <ListChecks className="w-4 h-4" /> Restante
-                    <span className="ml-auto text-[8px] text-slate-300 font-normal">Faltando bipar</span>
+                <button onClick={onRestante} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black hover:bg-amber-50 hover:text-amber-600 transition-all text-left">
+                    <ListChecks className="w-4 h-4" /> Restante <span className="ml-auto text-[8px] text-slate-300">Faltando bipar</span>
                 </button>
-                <div className="mx-3 my-1 border-t border-slate-100 dark:border-slate-800" aria-hidden="true" />
-                <button onClick={onEscaninhoCheio}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black text-red-500 hover:bg-red-50 transition-all text-left">
-                    <BoxSelect className="w-4 h-4" /> Escaninho Cheio
-                    <span className="ml-auto text-[8px] text-red-300 font-normal">Supervisor</span>
+                <div className="mx-3 my-1 border-t border-slate-100" />
+                <button onClick={onEscaninhoCheio} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-black text-red-500 hover:bg-red-50 transition-all text-left">
+                    <BoxSelect className="w-4 h-4" /> Escaninho Cheio <span className="ml-auto text-[8px] text-red-300">Supervisor</span>
                 </button>
             </div>
         </div>
     );
 }
 
-// ========== MODAL CONTEÚDO / RESTANTE ==========
+// ========== INFO MODAL ==========
 function InfoModal({ title, items, onClose }) {
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                     <h3 className="text-base font-black">{title}</h3>
-                    <button onClick={onClose} aria-label="Fechar" className="p-2 text-slate-400 hover:text-red-500 transition-colors">
-                        <X className="w-5 h-5" />
-                    </button>
+                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-red-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                     {items.length > 0 ? items.map((item, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div key={i} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100">
                             <div className="flex items-center gap-2">
                                 <Package className="w-3.5 h-3.5 text-secondary" />
                                 <span className="text-xs font-black">{item.nome}</span>
@@ -320,200 +287,417 @@ function InfoModal({ title, items, onClose }) {
     );
 }
 
+// ========== MODAL NOVA ONDA ==========
+function NovaOndaModal({ cor, warehouseId, onCreated, onClose }) {
+    const [sku,       setSku]       = useState('');
+    const [desc,      setDesc]      = useState('');
+    const [total,     setTotal]     = useState(20);
+    const [numOnda,   setNumOnda]   = useState(`WAVE-${Date.now().toString().slice(-6)}`);
+    const [loading,   setLoading]   = useState(false);
+    const [erro,      setErro]      = useState('');
+
+    const criar = async () => {
+        if (!desc.trim()) { setErro('Informe a descrição do produto.'); return; }
+        setLoading(true); setErro('');
+        const { data, error } = await supabase.from('tarefas').insert({
+            tipo:        'separacao',
+            prioridade:  'Alta',
+            status:      'em_execucao',
+            cor_colmeia: cor.nome,
+            numero_onda: numOnda,
+            descricao:   `Separação ${cor.nome} — ${desc}`,
+            detalhes: {
+                warehouse_id:  warehouseId,
+                produto_sku:   sku.trim() || null,
+                produto_nome:  desc.trim(),
+                total_itens:   Number(total),
+                numero_onda:   numOnda,
+            },
+        }).select().single();
+        setLoading(false);
+        if (error) { setErro(error.message); return; }
+        onCreated(data);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-5" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: cor.hex }}>
+                        <Plus className="w-5 h-5" style={{ color: cor.text }} />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-black">Nova Onda</h3>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Colmeia {cor.nome}</p>
+                    </div>
+                </div>
+                {erro && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-[10px] font-bold text-red-600">{erro}</div>
+                )}
+                <div className="space-y-4">
+                    <div className="space-y-1">
+                        <Tooltip content="Número de identificação desta onda de separação." showIcon>
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Nº da Onda</label>
+                        </Tooltip>
+                        <input value={numOnda} onChange={e => setNumOnda(e.target.value)}
+                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold outline-none focus:border-primary transition-all" />
+                    </div>
+                    <div className="space-y-1">
+                        <Tooltip content="SKU do produto principal desta onda (opcional)." showIcon>
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">SKU (opcional)</label>
+                        </Tooltip>
+                        <input value={sku} onChange={e => setSku(e.target.value)} placeholder="VP-FR4429"
+                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold outline-none focus:border-primary transition-all" />
+                    </div>
+                    <div className="space-y-1">
+                        <Tooltip content="Nome/descrição do produto a separar nesta colmeia." showIcon>
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição *</label>
+                        </Tooltip>
+                        <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="PASTILHA DE FREIO CERÂMICA..."
+                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold outline-none focus:border-primary transition-all" />
+                    </div>
+                    <div className="space-y-1">
+                        <Tooltip content="Total de itens a separar nesta onda." showIcon>
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Total de Itens</label>
+                        </Tooltip>
+                        <input type="number" value={total} onChange={e => setTotal(e.target.value)} min={1} max={500}
+                            className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl py-2.5 px-4 text-sm font-bold outline-none focus:border-primary transition-all" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <button onClick={onClose} className="py-3 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-slate-200 transition-all">Cancelar</button>
+                    <button onClick={criar} disabled={loading}
+                        className="py-3 bg-primary text-secondary font-black rounded-xl text-[10px] tracking-widest uppercase hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-all">
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Criar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ========== COMPONENTE PRINCIPAL ==========
 export default function HoneycombCheck() {
-    const [corSelecionada, setCorSelecionada] = useState(null);
+    const { warehouseId } = useApp();
+
+    // ── Estado geral ──
+    const [tarefasMap,     setTarefasMap]     = useState({}); // { COR_NOME: tarefa }
+    const [loadingTarefas, setLoadingTarefas] = useState(true);
     const [hoveredCor,     setHoveredCor]     = useState(null);
-    const [escaninhos,     setEscaninhos]     = useState([]);
+    const [showNovaOnda,   setShowNovaOnda]   = useState(null); // cor ou null
+
+    // ── Estado da conferência (tela 2) ──
+    const [tarefaAtiva,    setTarefaAtiva]    = useState(null);
+    const [corAtiva,       setCorAtiva]       = useState(null);
+    const [itens,          setItens]          = useState([]);  // itens_tarefa do DB
     const [inputCode,      setInputCode]      = useState('');
-    const [restam,         setRestam]         = useState(0);
-    const [pedido,         setPedido]         = useState(null);
     const [contextMenu,    setContextMenu]    = useState(null);
     const [showSupervisor, setShowSupervisor] = useState(false);
-    const [supervisorTarget, setSupervisorTarget] = useState(null);
+    const [supervisorAlvo, setSupervisorAlvo] = useState(null);
     const [infoModal,      setInfoModal]      = useState(null);
     const [ultimos,        setUltimos]        = useState([]);
     const [ultimoBipado,   setUltimoBipado]   = useState(null);
+    const [loadingItens,   setLoadingItens]   = useState(false);
+    const [bipando,        setBipando]        = useState(false);
+
     const inputRef    = useRef(null);
     const timeoutsRef = useRef([]);
+    const realtimeRef = useRef(null);
 
-    useEffect(() => () => { timeoutsRef.current.forEach(clearTimeout); timeoutsRef.current = []; }, []);
-
-    const selecionarCor = useCallback((cor) => {
+    useEffect(() => () => {
         timeoutsRef.current.forEach(clearTimeout);
-        timeoutsRef.current = [];
-        setCorSelecionada(cor);
-        const ped = PEDIDOS_SIM[cor.nome] || { produto: 'PRODUTO GENÉRICO', descricao: '', total: 25, separados: 0 };
-        setPedido(ped);
-        setRestam(ped.total - ped.separados);
-        const grid = [];
-        let restantesParaDistribuir = ped.separados;
-        for (let i = 1; i <= 25; i++) {
-            let status = STATUS.NAO_UTILIZADO;
-            let qtd = 0;
-            if (i <= ped.total) {
-                if (i <= ped.separados) {
-                    const eUltimo = i === ped.separados;
-                    qtd = eUltimo
-                        ? restantesParaDistribuir
-                        : Math.min(restantesParaDistribuir, Math.floor(Math.random() * 3) + 1);
-                    restantesParaDistribuir -= qtd;
-                    status = STATUS.COM_PRODUTO;
-                } else {
-                    status = STATUS.VAZIO;
-                }
-            }
-            grid.push({ numero: i, status, qtd, items: qtd > 0 ? [{ nome: ped.produto, qtd }] : [] });
-        }
-        setEscaninhos(grid);
+        realtimeRef.current?.unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (corSelecionada && inputRef.current) inputRef.current.focus();
-    }, [corSelecionada]);
+    // ── Carrega tarefas ativas por warehouse ──
+    const fetchTarefas = useCallback(async () => {
+        setLoadingTarefas(true);
+        const { data } = await supabase
+            .from('tarefas')
+            .select('*')
+            .eq('tipo', 'separacao')
+            .in('status', ['pendente', 'em_execucao'])
+            .not('cor_colmeia', 'is', null);
 
-    const handleBip = (e) => {
-        if (e.key !== 'Enter' || !inputCode.trim()) return;
+        const mapa = {};
+        (data || []).forEach(t => {
+            if (t.detalhes?.warehouse_id === warehouseId) {
+                mapa[t.cor_colmeia] = t;
+            }
+        });
+        setTarefasMap(mapa);
+        setLoadingTarefas(false);
+    }, [warehouseId]);
+
+    useEffect(() => { fetchTarefas(); }, [fetchTarefas]);
+
+    // ── Abre conferência de uma cor ──
+    const abrirColmeia = useCallback(async (cor) => {
+        const tarefa = tarefasMap[cor.nome];
+        if (!tarefa) { setShowNovaOnda(cor); return; }
+
+        setCorAtiva(cor);
+        setTarefaAtiva(tarefa);
+        setLoadingItens(true);
+
+        const { data: itensData } = await supabase
+            .from('itens_tarefa')
+            .select('*')
+            .eq('tarefa_id', tarefa.id)
+            .order('sequencia', { ascending: true });
+
+        setItens(itensData || []);
+        setLoadingItens(false);
+
+        // Realtime: ouve mudanças em itens_tarefa desta tarefa
+        realtimeRef.current?.unsubscribe();
+        realtimeRef.current = supabase
+            .channel(`colmeia_${tarefa.id}`)
+            .on('postgres_changes', {
+                event: '*', schema: 'public', table: 'itens_tarefa',
+                filter: `tarefa_id=eq.${tarefa.id}`,
+            }, () => {
+                supabase.from('itens_tarefa').select('*').eq('tarefa_id', tarefa.id)
+                    .order('sequencia', { ascending: true })
+                    .then(({ data }) => setItens(data || []));
+            })
+            .subscribe();
+    }, [tarefasMap]);
+
+    useEffect(() => {
+        if (corAtiva && inputRef.current) inputRef.current.focus();
+    }, [corAtiva]);
+
+    // ── Monta o grid 5×5 a partir dos itens ──
+    const escaninhos = useMemo(() => {
+        const total     = tarefaAtiva?.detalhes?.total_itens ?? 25;
+        const capacidade = Math.min(total, 25);
+
+        // Agrupa itens por escaninho_numero
+        const porSlot = {};
+        itens.forEach(item => {
+            const n = item.escaninho_numero;
+            if (n == null) return;
+            if (!porSlot[n]) porSlot[n] = { qtd: 0, status: item.status, items: [] };
+            porSlot[n].qtd++;
+            porSlot[n].items.push({ nome: item.descricao || item.sku, qtd: 1 });
+            // pior status: colocando > aguardando > com_produto > finalizado
+            const prioridade = { colocando: 5, aguardando: 4, com_produto: 3, finalizado: 2, pendente: 1 };
+            if ((prioridade[item.status] || 0) > (prioridade[porSlot[n].status] || 0)) {
+                porSlot[n].status = item.status;
+            }
+        });
+
+        return Array.from({ length: 25 }, (_, i) => {
+            const n = i + 1;
+            if (n > capacidade) return { numero: n, status: STATUS.NAO_UTILIZADO, qtd: 0, items: [] };
+            if (porSlot[n])     return { numero: n, status: porSlot[n].status, qtd: porSlot[n].qtd, items: porSlot[n].items };
+            return { numero: n, status: STATUS.VAZIO, qtd: 0, items: [] };
+        });
+    }, [itens, tarefaAtiva]);
+
+    // ── Próximo escaninho disponível ──
+    const proximoVazio = useMemo(() => {
+        return escaninhos.find(e => e.status === STATUS.VAZIO)?.numero ?? null;
+    }, [escaninhos]);
+
+    // ── Bip de produto ──
+    const handleBip = async (e) => {
+        if (e.key !== 'Enter' || !inputCode.trim() || bipando) return;
         const codigo = inputCode.trim();
         setInputCode('');
-        const idxColocando = escaninhos.findIndex(e => e.status === STATUS.COLOCANDO);
-        if (idxColocando !== -1) {
-            setEscaninhos(prev => prev.map((esc, i) =>
-                i === idxColocando ? { ...esc, status: STATUS.COM_PRODUTO, qtd: (esc.qtd || 0) + 1, items: [...esc.items, { nome: pedido?.produto || codigo, qtd: 1 }] } : esc
-            ));
-            setRestam(r => Math.max(0, r - 1));
-            setUltimos(prev => [{ code: codigo, nome: pedido?.produto || codigo, ts: Date.now() }, ...prev].slice(0, 5));
-            setUltimoBipado({ code: codigo, nome: pedido?.produto || codigo });
-            return;
+
+        // Já tem um COLOCANDO? confirma ele primeiro
+        const colocando = itens.find(it => it.status === 'colocando');
+        if (colocando) {
+            await supabase.from('itens_tarefa').update({ status: 'com_produto', bipado_em: new Date().toISOString() })
+                .eq('id', colocando.id);
         }
-        const idxVazio = escaninhos.findIndex(e => e.status === STATUS.VAZIO);
-        if (idxVazio === -1) return;
-        setEscaninhos(prev => prev.map((esc, i) =>
-            i === idxVazio ? { ...esc, status: STATUS.COLOCANDO, qtd: (esc.qtd || 0) + 1, items: [...esc.items, { nome: pedido?.produto || codigo, qtd: 1 }] } : esc
-        ));
-        setRestam(r => Math.max(0, r - 1));
-        const tid = setTimeout(() => {
-            setEscaninhos(prev => prev.map((esc, i) =>
-                i === idxVazio && esc.status === STATUS.COLOCANDO ? { ...esc, status: STATUS.COM_PRODUTO } : esc
-            ));
-            timeoutsRef.current = timeoutsRef.current.filter(id => id !== tid);
-        }, 1200);
-        timeoutsRef.current.push(tid);
-        setUltimos(prev => [{ code: codigo, nome: pedido?.produto || codigo, ts: Date.now() }, ...prev].slice(0, 5));
-        setUltimoBipado({ code: codigo, nome: pedido?.produto || codigo });
+
+        if (proximoVazio == null) return;
+
+        setBipando(true);
+        const seqAtual = itens.length;
+        const { data: novoItem } = await supabase.from('itens_tarefa').insert({
+            tarefa_id:          tarefaAtiva.id,
+            sku:                codigo,
+            descricao:          tarefaAtiva.detalhes?.produto_nome || codigo,
+            sequencia:          seqAtual,
+            quantidade_esperada: 1,
+            quantidade_bipada:   1,
+            escaninho_numero:    proximoVazio,
+            status:              'colocando',
+            bipado_em:           new Date().toISOString(),
+        }).select().single();
+        setBipando(false);
+
+        if (novoItem) {
+            setItens(prev => [...prev, novoItem]);
+            setUltimos(prev => [{ code: codigo, nome: novoItem.descricao, ts: Date.now() }, ...prev].slice(0, 5));
+            setUltimoBipado({ code: codigo, nome: novoItem.descricao });
+
+            // Auto-confirma após 1.2s
+            const tid = setTimeout(async () => {
+                await supabase.from('itens_tarefa').update({ status: 'com_produto' }).eq('id', novoItem.id);
+                setItens(prev => prev.map(it => it.id === novoItem.id ? { ...it, status: 'com_produto' } : it));
+                timeoutsRef.current = timeoutsRef.current.filter(id => id !== tid);
+            }, 1200);
+            timeoutsRef.current.push(tid);
+        }
     };
 
     const handleContextMenu = (e, esc) => {
         e.preventDefault();
-        if (esc.status !== STATUS.COM_PRODUTO) return;
+        if (esc.status !== STATUS.COM_PRODUTO && esc.status !== STATUS.FINALIZADO) return;
         setContextMenu({ x: e.clientX, y: e.clientY, escaninho: esc });
     };
 
     const handleConteudo = () => {
         if (!contextMenu) return;
         const esc = escaninhos.find(e => e.numero === contextMenu.escaninho.numero);
-        setInfoModal({ title: `Conteúdo — Escaninho #${String(contextMenu.escaninho.numero).padStart(2, '0')}`, items: esc?.items || [] });
+        setInfoModal({ title: `Conteúdo — Escaninho #${String(contextMenu.escaninho.numero).padStart(2,'0')}`, items: esc?.items || [] });
         setContextMenu(null);
     };
 
     const handleRestante = () => {
         if (!contextMenu) return;
-        setInfoModal({ title: 'Restante — Separação', items: [{ nome: pedido?.produto || 'PRODUTO', qtd: restam }] });
+        const total    = tarefaAtiva?.detalhes?.total_itens ?? 0;
+        const bipados  = itens.filter(it => it.status !== 'pendente').length;
+        const restam   = Math.max(0, total - bipados);
+        setInfoModal({ title: 'Restante — Separação', items: restam > 0 ? [{ nome: tarefaAtiva?.detalhes?.produto_nome || 'PRODUTO', qtd: restam }] : [] });
         setContextMenu(null);
     };
 
     const handleEscaninhoCheio = () => {
         if (!contextMenu) return;
-        setSupervisorTarget(contextMenu.escaninho.numero);
+        setSupervisorAlvo(contextMenu.escaninho.numero);
         setShowSupervisor(true);
         setContextMenu(null);
     };
 
-    const confirmarEscaninhoCheio = () => {
-        if (supervisorTarget == null) return;
-        setEscaninhos(prev => prev.map(esc => esc.numero === supervisorTarget ? { ...esc, status: STATUS.FINALIZADO } : esc));
+    const confirmarEscaninhoCheio = async () => {
+        if (supervisorAlvo == null) return;
+        await supabase.from('itens_tarefa')
+            .update({ status: 'finalizado', finalizado_em: new Date().toISOString() })
+            .eq('tarefa_id', tarefaAtiva.id)
+            .eq('escaninho_numero', supervisorAlvo);
+        setItens(prev => prev.map(it =>
+            it.escaninho_numero === supervisorAlvo ? { ...it, status: 'finalizado' } : it
+        ));
         setShowSupervisor(false);
-        setSupervisorTarget(null);
+        setSupervisorAlvo(null);
     };
 
     const voltar = () => {
-        setCorSelecionada(null);
-        setEscaninhos([]);
-        setPedido(null);
-        setRestam(0);
+        realtimeRef.current?.unsubscribe();
+        timeoutsRef.current.forEach(clearTimeout);
+        setCorAtiva(null);
+        setTarefaAtiva(null);
+        setItens([]);
         setContextMenu(null);
         setUltimos([]);
         setUltimoBipado(null);
+        fetchTarefas();
     };
 
-    // ====== TELA 1: SELEÇÃO DE COR ======
-    if (!corSelecionada) {
+    const onNovaOndaCriada = (tarefa) => {
+        const cor = showNovaOnda;
+        setShowNovaOnda(null);
+        setTarefasMap(prev => ({ ...prev, [cor.nome]: tarefa }));
+        abrirColmeia(cor);
+    };
+
+    // ══════════════════════════════════════════════════
+    // TELA 1 — Seleção de cor
+    // ══════════════════════════════════════════════════
+    if (!corAtiva) {
+        const itensCor = hoveredCor ? itens.filter(it => it.status !== 'pendente') : [];
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                {/* Painel de preview no hover */}
-                <ColorPreviewPanel cor={hoveredCor} pedido={hoveredCor ? PEDIDOS_SIM[hoveredCor.nome] : null} />
+                {showNovaOnda && (
+                    <NovaOndaModal cor={showNovaOnda} warehouseId={warehouseId}
+                        onCreated={onNovaOndaCriada} onClose={() => setShowNovaOnda(null)} />
+                )}
+                <ColorPreviewPanel cor={hoveredCor} tarefa={hoveredCor ? tarefasMap[hoveredCor.nome] : null} itensCor={itensCor} />
 
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-black tracking-tight">2.15 Conferência Colmeia</h1>
                     <p className="text-sm text-slate-500 font-medium">
                         Selecione a cor da colmeia para iniciar a conferência
-                        <span className="ml-2 text-[10px] text-slate-400">— passe o mouse sobre as cores para ver detalhes</span>
+                        <span className="ml-2 text-[10px] text-slate-400">— passe o mouse para ver detalhes</span>
                     </p>
                 </div>
 
-                <div className="max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                    {CORES_COLMEIA.map(cor => {
-                        const ped = PEDIDOS_SIM[cor.nome];
-                        const pct = ped ? Math.round((ped.separados / ped.total) * 100) : 0;
-                        const isHovered = hoveredCor?.nome === cor.nome;
-                        return (
-                            <button
-                                key={cor.nome}
-                                onClick={() => selecionarCor(cor)}
-                                onMouseEnter={() => setHoveredCor(cor)}
-                                onMouseLeave={() => setHoveredCor(null)}
-                                aria-label={`Colmeia ${cor.nome} — ${ped?.total ?? 0} itens, ${pct}% separado`}
-                                className="group relative aspect-square rounded-3xl flex flex-col items-center justify-center gap-2 font-black transition-all duration-300 hover:scale-110 active:scale-95 border-4 border-white/30 overflow-hidden"
-                                style={{
-                                    backgroundColor: cor.hex,
-                                    color: cor.text,
-                                    boxShadow: isHovered
-                                        ? `0 16px 48px ${cor.glow}, 0 8px 20px rgba(0,0,0,0.20), 0 0 0 4px white`
-                                        : `0 8px 28px ${cor.glow}, 0 4px 10px rgba(0,0,0,0.12)`,
-                                    transform: isHovered ? 'scale(1.1)' : 'scale(1)',
-                                }}
-                            >
-                                {/* Brilho interno no hover */}
-                                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-3xl" />
+                {loadingTarefas ? (
+                    <div className="flex items-center justify-center py-12 gap-3 text-slate-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm font-bold">Carregando ondas ativas...</span>
+                    </div>
+                ) : (
+                    <div className="max-w-3xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                        {CORES_COLMEIA.map(cor => {
+                            const tarefa   = tarefasMap[cor.nome];
+                            const total    = tarefa?.detalhes?.total_itens ?? 0;
+                            const isHovered = hoveredCor?.nome === cor.nome;
+                            const ativa    = !!tarefa;
 
-                                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center z-10">
-                                    <Package className="w-5 h-5" aria-hidden="true" />
-                                </div>
-                                <span className="text-xs uppercase tracking-widest font-black z-10">{cor.nome}</span>
-                                <span className="text-[8px] uppercase tracking-widest opacity-60 z-10">{ped?.total ?? 0} itens</span>
+                            return (
+                                <Tooltip key={cor.nome}
+                                    content={ativa
+                                        ? `Onda ativa — ${tarefa.numero_onda || ''}. Clique para conferir.`
+                                        : `Sem onda ativa. Clique para iniciar uma nova onda nesta colmeia.`}
+                                    side="top">
+                                    <button
+                                        onClick={() => abrirColmeia(cor)}
+                                        onMouseEnter={() => setHoveredCor(cor)}
+                                        onMouseLeave={() => setHoveredCor(null)}
+                                        aria-label={`Colmeia ${cor.nome}${ativa ? ` — onda ativa, ${total} itens` : ' — sem onda'}`}
+                                        className="group relative aspect-square rounded-3xl flex flex-col items-center justify-center gap-2 font-black transition-all duration-300 hover:scale-110 active:scale-95 border-4 overflow-hidden"
+                                        style={{
+                                            backgroundColor: cor.hex,
+                                            color: cor.text,
+                                            borderColor: ativa ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.2)',
+                                            opacity: ativa ? 1 : 0.65,
+                                            boxShadow: isHovered
+                                                ? `0 16px 48px ${cor.glow}, 0 8px 20px rgba(0,0,0,0.20), 0 0 0 4px white`
+                                                : `0 8px 28px ${cor.glow}, 0 4px 10px rgba(0,0,0,0.12)`,
+                                        }}
+                                    >
+                                        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300 rounded-3xl" />
+                                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center z-10">
+                                            {ativa ? <ChevronRight className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                                        </div>
+                                        <span className="text-xs uppercase tracking-widest font-black z-10">{cor.nome}</span>
+                                        <span className="text-[8px] uppercase tracking-widest opacity-70 z-10">
+                                            {ativa ? `${total} itens` : 'sem onda'}
+                                        </span>
+                                        {ativa && (
+                                            <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/10 rounded-b-3xl overflow-hidden">
+                                                <div className="h-full bg-white/50" style={{ width: '100%' }} />
+                                            </div>
+                                        )}
+                                        {ativa && (
+                                            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-green-400 shadow-sm shadow-green-400" />
+                                        )}
+                                        <div className="absolute inset-0 rounded-3xl border-2 border-white/0 group-hover:border-white/50 transition-all duration-200" />
+                                    </button>
+                                </Tooltip>
+                            );
+                        })}
+                    </div>
+                )}
 
-                                {/* Mini barra de progresso na base */}
-                                {ped && ped.separados > 0 && (
-                                    <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/10 rounded-b-3xl overflow-hidden">
-                                        <div
-                                            className="h-full bg-white/50 transition-all duration-700"
-                                            style={{ width: `${pct}%` }}
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Badge de % no canto */}
-                                {pct > 0 && (
-                                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-lg bg-black/20 text-[7px] font-black">
-                                        {pct}%
-                                    </div>
-                                )}
-
-                                {/* Borda de hover */}
-                                <div className="absolute inset-0 rounded-3xl border-2 border-white/0 group-hover:border-white/50 transition-all duration-200" />
-                            </button>
-                        );
-                    })}
+                <div className="max-w-3xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold">
+                        <div className="w-2 h-2 rounded-full bg-green-400" /> Onda ativa
+                        <div className="w-2 h-2 rounded-full bg-slate-300 ml-3" /> Sem onda
+                    </div>
+                    <Tooltip content="Recarregar ondas ativas do servidor." side="left">
+                        <button onClick={fetchTarefas} className="p-2 text-slate-400 hover:text-primary transition-colors">
+                            <RefreshCw className="w-4 h-4" />
+                        </button>
+                    </Tooltip>
                 </div>
 
                 {/* Legenda */}
@@ -537,20 +721,26 @@ export default function HoneycombCheck() {
         );
     }
 
-    // ====== TELA 2: INTERFACE PRINCIPAL ======
+    // ══════════════════════════════════════════════════
+    // TELA 2 — Interface de conferência
+    // ══════════════════════════════════════════════════
+    const total       = tarefaAtiva?.detalhes?.total_itens ?? 0;
+    const bipados     = itens.filter(it => it.status !== 'pendente').length;
+    const restam      = Math.max(0, total - bipados);
     const finalizados = escaninhos.filter(e => e.status === STATUS.FINALIZADO).length;
     const comProduto  = escaninhos.filter(e => e.status === STATUS.COM_PRODUTO || e.status === STATUS.COLOCANDO).length;
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
-            {showSupervisor  && <SupervisorModal onConfirm={confirmarEscaninhoCheio} onClose={() => setShowSupervisor(false)} />}
-            {contextMenu     && <ContextMenu x={contextMenu.x} y={contextMenu.y} escaninho={contextMenu.escaninho} onConteudo={handleConteudo} onRestante={handleRestante} onEscaninhoCheio={handleEscaninhoCheio} onClose={() => setContextMenu(null)} />}
-            {infoModal       && <InfoModal title={infoModal.title} items={infoModal.items} onClose={() => setInfoModal(null)} />}
+            {showSupervisor && <SupervisorModal onConfirm={confirmarEscaninhoCheio} onClose={() => setShowSupervisor(false)} />}
+            {contextMenu    && <ContextMenu x={contextMenu.x} y={contextMenu.y} escaninho={contextMenu.escaninho}
+                onConteudo={handleConteudo} onRestante={handleRestante} onEscaninhoCheio={handleEscaninhoCheio} onClose={() => setContextMenu(null)} />}
+            {infoModal      && <InfoModal title={infoModal.title} items={infoModal.items} onClose={() => setInfoModal(null)} />}
 
             {/* Cabeçalho */}
             <div className="flex items-center gap-4">
                 <Tooltip content="Voltar à seleção de colmeia" side="right">
-                    <button onClick={voltar} aria-label="Voltar à seleção de cor"
+                    <button onClick={voltar} aria-label="Voltar"
                         className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all">
                         <ArrowLeft className="w-5 h-5" />
                     </button>
@@ -558,22 +748,24 @@ export default function HoneycombCheck() {
                 <div className="flex-1">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-xl border-2 border-white/50 shadow-lg"
-                            style={{ backgroundColor: corSelecionada.hex, boxShadow: `0 4px 16px ${corSelecionada.glow}` }} />
+                            style={{ backgroundColor: corAtiva.hex, boxShadow: `0 4px 16px ${corAtiva.glow}` }} />
                         <div>
-                            <h1 className="text-xl font-black tracking-tight">Colmeia {corSelecionada.nome}</h1>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Conferência de Separação</p>
+                            <h1 className="text-xl font-black tracking-tight">Colmeia {corAtiva.nome}</h1>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                {tarefaAtiva.numero_onda || tarefaAtiva.id.slice(0,8)} — Conferência de Separação
+                            </p>
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-3">
-                    <Tooltip content="Escaninhos confirmados pelo supervisor como totalmente preenchidos." side="bottom">
+                <div className="flex gap-3 flex-wrap justify-end">
+                    <Tooltip content="Escaninhos confirmados pelo supervisor." side="bottom">
                         <div className="px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-xl cursor-help">
                             <span className="text-[9px] font-black text-green-600 uppercase tracking-widest flex items-center gap-1.5">
                                 <CheckCircle2 className="w-3 h-3" /> Finalizados: {finalizados}
                             </span>
                         </div>
                     </Tooltip>
-                    <Tooltip content="Escaninhos com produto alocado aguardando finalização." side="bottom">
+                    <Tooltip content="Escaninhos com produto aguardando finalização." side="bottom">
                         <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-help">
                             <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1.5">
                                 <Package className="w-3 h-3" /> Com produto: {comProduto}
@@ -581,7 +773,7 @@ export default function HoneycombCheck() {
                         </div>
                     </Tooltip>
                     {ultimoBipado && (
-                        <Tooltip content={`Último produto confirmado: ${ultimoBipado.nome}`} side="bottom">
+                        <Tooltip content={`Último bipado: ${ultimoBipado.nome}`} side="bottom">
                             <div className="px-4 py-2 bg-primary/10 border border-primary/20 rounded-xl max-w-xs cursor-help">
                                 <span className="text-[9px] font-black text-primary uppercase tracking-widest truncate block">
                                     ↳ {ultimoBipado.nome}
@@ -594,45 +786,39 @@ export default function HoneycombCheck() {
 
             {/* Banner Restam */}
             <div className="rounded-2xl p-4 flex items-center justify-center gap-3 shadow-lg"
-                style={{ backgroundColor: corSelecionada.hex, color: corSelecionada.text, boxShadow: `0 8px 32px ${corSelecionada.glow}` }}>
-                <TrendingUp className="w-5 h-5 opacity-70 shrink-0" aria-hidden="true" />
+                style={{ backgroundColor: corAtiva.hex, color: corAtiva.text, boxShadow: `0 8px 32px ${corAtiva.glow}` }}>
+                <TrendingUp className="w-5 h-5 opacity-70 shrink-0" />
                 <span className="text-lg md:text-xl font-black tracking-tight">
-                    RESTAM: [{restam}] — {pedido?.produto}
+                    RESTAM: [{restam}] — {tarefaAtiva.detalhes?.produto_nome || tarefaAtiva.descricao}
                 </span>
+                <span className="ml-auto text-xs font-black opacity-70">{bipados}/{total} bipados</span>
             </div>
 
             {/* Scanner */}
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex items-center gap-3">
-                <Tooltip content="Aponte o leitor de código de barras para o produto ou caixinha colorida. O sistema alocará automaticamente no próximo escaninho disponível." side="right">
-                    <ScanBarcode className="w-5 h-5 text-secondary shrink-0 cursor-help" />
+                <Tooltip content="Aponte o leitor para o código do produto. O sistema aloca automaticamente no próximo escaninho disponível." side="right">
+                    <ScanBarcode className={`w-5 h-5 shrink-0 cursor-help ${bipando ? 'text-amber-500 animate-pulse' : 'text-secondary'}`} />
                 </Tooltip>
-                <label htmlFor="barcode-input" className="sr-only">Código de barras do produto</label>
-                <input
-                    id="barcode-input"
-                    ref={inputRef}
-                    type="text"
-                    value={inputCode}
-                    onChange={e => setInputCode(e.target.value)}
-                    onKeyDown={handleBip}
-                    placeholder="Passe o produto ou caixa colorida na leitora..."
-                    className="flex-1 bg-transparent text-sm font-bold outline-none placeholder:text-slate-300"
-                    autoFocus
-                />
-                <Tooltip content="Pressione Enter após digitar o código manualmente." side="left">
-                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest shrink-0 cursor-help">ENTER p/ confirmar</span>
+                <label htmlFor="barcode-input" className="sr-only">Código de barras</label>
+                <input id="barcode-input" ref={inputRef} type="text"
+                    value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={handleBip}
+                    placeholder={proximoVazio ? `Escaninho ${String(proximoVazio).padStart(2,'0')} disponível — bipe o produto...` : 'Todos os escaninhos utilizados'}
+                    disabled={proximoVazio == null}
+                    className="flex-1 bg-transparent text-sm font-bold outline-none placeholder:text-slate-300 disabled:opacity-40" autoFocus />
+                <Tooltip content="Pressione ENTER após digitar o código manualmente." side="left">
+                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest shrink-0 cursor-help">ENTER</span>
                 </Tooltip>
             </div>
 
-            {/* Últimos 5 Produtos */}
+            {/* Últimos 5 */}
             {ultimos.length > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                        <Hash className="w-3 h-3" /> Últimos 5 Produtos Conferidos
+                        <Hash className="w-3 h-3" /> Últimos 5 Bipados
                     </p>
                     <div className="flex flex-wrap gap-2">
                         {ultimos.map((u, i) => (
-                            <div key={`${u.ts}-${i}`}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div key={`${u.ts}-${i}`} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100">
                                 <span className="text-[8px] font-black text-slate-300">#{i + 1}</span>
                                 <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 truncate max-w-[160px]">{u.nome}</span>
                                 <code className="text-[8px] font-mono text-secondary">{u.code}</code>
@@ -642,23 +828,25 @@ export default function HoneycombCheck() {
                 </div>
             )}
 
-            {/* Grid de Escaninhos 5×5 */}
+            {/* Grid 5×5 */}
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 shadow-sm">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Layers className="w-3.5 h-3.5" /> Grade de Escaninhos
                     <span className="text-slate-300 font-normal">— botão direito em escaninhos com produto para opções</span>
                 </p>
-                <div className="grid grid-cols-5 gap-3 md:gap-4 max-w-2xl mx-auto">
-                    {escaninhos.map(esc => (
-                        <Escaninho
-                            key={esc.numero}
-                            numero={esc.numero}
-                            status={esc.status}
-                            qtd={esc.qtd}
-                            onContextMenu={(e) => handleContextMenu(e, esc)}
-                        />
-                    ))}
-                </div>
+                {loadingItens ? (
+                    <div className="flex items-center justify-center py-12 gap-3 text-slate-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm font-bold">Carregando escaninhos...</span>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-5 gap-3 md:gap-4 max-w-2xl mx-auto">
+                        {escaninhos.map(esc => (
+                            <Escaninho key={esc.numero} numero={esc.numero} status={esc.status} qtd={esc.qtd}
+                                onContextMenu={(e) => handleContextMenu(e, esc)} />
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Legenda */}

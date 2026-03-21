@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -460,6 +462,7 @@ function PainelSefaz() {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────
 export default function SefazCertificates() {
+  const { warehouseId } = useApp();
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 space-y-5 animate-in fade-in duration-700">
 

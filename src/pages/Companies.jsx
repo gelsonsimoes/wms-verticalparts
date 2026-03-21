@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 import {
   Building2, Plus, Save, Trash2, FileText,
@@ -82,6 +83,8 @@ export default function Companies() {
   const [erros,           setErros]            = useState({});
   const [dirty,           setDirty]            = useState(false);  // detecta alterações não salvas
   const [confirmDelete,   setConfirmDelete]    = useState(false);
+  const [confirmDiscard,  setConfirmDiscard]   = useState(null);  // null | 'select' | 'new'
+  const [pendingAction,   setPendingAction]    = useState(null);  // holds pending callback
   const { toast, show: showToast } = useToast();
 
   // Sincroniza formData quando selectedCompany muda externamente (ex: dado atualizado no contexto)
@@ -102,7 +105,16 @@ export default function Companies() {
   }, [selectedCompany, isNew]);
 
   const handleSelect = (company) => {
-    if (dirty && !window.confirm('Há alterações não salvas. Descartar?')) return;
+    if (dirty) {
+      setPendingAction(() => () => {
+        setIsNew(false);
+        setSelectedCompany(company);
+        setErros({});
+        setDirty(false);
+      });
+      setConfirmDiscard('select');
+      return;
+    }
     setIsNew(false);
     setSelectedCompany(company);
     setErros({});
@@ -110,12 +122,33 @@ export default function Companies() {
   };
 
   const handleNew = () => {
-    if (dirty && !window.confirm('Há alterações não salvas. Descartar?')) return;
+    if (dirty) {
+      setPendingAction(() => () => {
+        setIsNew(true);
+        setSelectedCompany({ id: '__new__' });
+        setFormData(FORM_VAZIO);
+        setErros({});
+        setDirty(false);
+      });
+      setConfirmDiscard('new');
+      return;
+    }
     setIsNew(true);
     setSelectedCompany({ id: '__new__' }); // marcador — sem ID real ainda
     setFormData(FORM_VAZIO); // endereço vazio, não hardcoded
     setErros({});
     setDirty(false);
+  };
+
+  const confirmDiscardAction = () => {
+    if (pendingAction) pendingAction();
+    setPendingAction(null);
+    setConfirmDiscard(null);
+  };
+
+  const cancelDiscardAction = () => {
+    setPendingAction(null);
+    setConfirmDiscard(null);
   };
 
   const handleChange = (field, value) => {
@@ -128,7 +161,7 @@ export default function Companies() {
     handleChange('cnpj', mascaraCNPJ(raw));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errosVal = validateForm(formData);
     if (Object.keys(errosVal).length > 0) {
       setErros(errosVal);
@@ -137,11 +170,14 @@ export default function Companies() {
     }
     try {
       if (isNew) {
-        // ID gerado pelo contexto — não enviamos 'AUTO'
         const { id: _, ...dadosSemId } = formData;
-        addCompany(dadosSemId);
+        const { data, error } = await supabase.from('warehouses').insert(dadosSemId).select().single();
+        if (error) throw error;
+        addCompany(data ?? dadosSemId);
         showToast('Empresa cadastrada com sucesso!', 'ok');
       } else {
+        const { error } = await supabase.from('warehouses').update(formData).eq('id', formData.id);
+        if (error) throw error;
         updateCompany(formData.id, formData);
         showToast('Registro atualizado com sucesso!', 'ok');
       }
@@ -157,8 +193,10 @@ export default function Companies() {
     setConfirmDelete(true);
   };
 
-  const confirmarDelete = () => {
+  const confirmarDelete = async () => {
     try {
+      const { error } = await supabase.from('warehouses').delete().eq('id', selectedCompany.id);
+      if (error) throw error;
       deleteCompany(selectedCompany.id);
       showToast(`Empresa "${formData.name}" excluída.`, 'ok');
       setSelectedCompany(null);
@@ -262,6 +300,33 @@ export default function Companies() {
               <button onClick={confirmarDelete}
                 className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-black hover:bg-red-700 active:scale-95 transition-all">
                 Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de descarte de alterações */}
+      {confirmDiscard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 max-w-sm w-full shadow-2xl border border-amber-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-2xl flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-black text-slate-800 dark:text-white">Alterações não salvas</p>
+                <p className="text-xs text-slate-500">Deseja descartar as alterações?</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={cancelDiscardAction}
+                className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-black text-slate-500 hover:border-slate-400 transition-all">
+                Cancelar
+              </button>
+              <button onClick={confirmDiscardAction}
+                className="flex-1 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-black hover:bg-amber-600 active:scale-95 transition-all">
+                Descartar
               </button>
             </div>
           </div>

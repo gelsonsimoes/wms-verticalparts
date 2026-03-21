@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 import {
     Search, Filter, Plus, MapPin, Edit2, Trash2,
     ChevronLeft, ChevronRight, Package, AlertTriangle,
@@ -89,7 +91,35 @@ const generateAddresses = () => {
     return addresses;
 };
 
-const INITIAL_DATA = generateAddresses();
+// Map enderecos row → UI address object
+const _normAddr = (row) => ({
+    id: row.id,
+    code: row.codigo || '',
+    street: row.rua || '',
+    pp: row.predio || '',
+    level: row.nivel || 'A',
+    levelName: LEVEL_NAME[row.nivel] || row.nivel || '',
+    position: parseInt(row.vao) || 1,
+    type: row.tipo || 'Picking',
+    status: row.status || 'Vazio',
+    occupation: 0,
+    items: 0,
+    lastUpdate: row.created_at ? new Date(row.created_at).toLocaleDateString('pt-BR') : '—',
+    area: row.area || '',
+});
+
+// Map UI address object → enderecos row (excluding warehouse_id, added at save time)
+const _denormAddr = (addr, warehouseId) => ({
+    warehouse_id: warehouseId,
+    codigo: addr.code || `${addr.street}_${addr.pp}_${addr.level}${addr.position}`,
+    rua: addr.street || '',
+    predio: addr.pp || '',
+    nivel: addr.level || 'A',
+    vao: String(addr.position || 1),
+    tipo: addr.type || 'Picking',
+    status: addr.status || 'Vazio',
+    area: addr.area || null,
+});
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -431,7 +461,26 @@ function Pagination({ page, totalPages, onPageChange }) {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function AddressManagement() {
-    const [data, setData] = useState(INITIAL_DATA);
+    const { warehouses } = useApp();
+    // Use first warehouse id as fallback; in production pass via context
+    const warehouseId = warehouses?.[0]?.id ?? null;
+
+    const [data, setData] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!warehouseId) { setLoading(false); return; }
+        setLoading(true);
+        supabase
+            .from('enderecos')
+            .select('*')
+            .eq('warehouse_id', warehouseId)
+            .order('codigo')
+            .then(({ data: rows, error }) => {
+                if (!error && rows) setData(rows.map(_normAddr));
+                setLoading(false);
+            });
+    }, [warehouseId]);
     const [search, setSearch] = useState('');
     const [filterStreet, setFilterStreet] = useState('');
     const [filterPP, setFilterPP] = useState('');
@@ -478,18 +527,33 @@ export default function AddressManagement() {
         : Object.values(PP_MAP).flat();
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
-    const handleSave = (addr) => {
+    const handleSave = async (addr) => {
         if (addr.id) {
+            const { error } = await supabase
+                .from('enderecos')
+                .update(_denormAddr(addr, warehouseId))
+                .eq('id', addr.id);
+            if (error) { console.error('[AddressManagement] update:', error.message); return; }
             setData(d => d.map(a => a.id === addr.id ? { ...a, ...addr } : a));
         } else {
-            const newId = Math.max(0, ...data.map(a => a.id)) + 1;
-            setData(d => [...d, { ...addr, id: newId }]);
+            const { data: inserted, error } = await supabase
+                .from('enderecos')
+                .insert(_denormAddr(addr, warehouseId))
+                .select()
+                .single();
+            if (error) { console.error('[AddressManagement] insert:', error.message); return; }
+            setData(d => [...d, _normAddr(inserted)]);
         }
         setModal(null);
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!deleteTarget) return;
+        const { error } = await supabase
+            .from('enderecos')
+            .delete()
+            .eq('id', deleteTarget.id);
+        if (error) { console.error('[AddressManagement] delete:', error.message); return; }
         setData(d => d.filter(a => a.id !== deleteTarget.id));
         setDeleteTarget(null);
     };
@@ -672,10 +736,16 @@ export default function AddressManagement() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {paginated.length === 0 ? (
+                            {loading ? (
                                 <tr>
                                     <td colSpan={9} className="px-5 py-12 text-center text-slate-400 text-sm">
-                                        Nenhum endereço encontrado com os filtros aplicados.
+                                        Carregando endereços…
+                                    </td>
+                                </tr>
+                            ) : paginated.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} className="px-5 py-12 text-center text-slate-400 text-sm">
+                                        {!warehouseId ? 'Nenhum armazém selecionado.' : 'Nenhum endereço encontrado com os filtros aplicados.'}
                                     </td>
                                 </tr>
                             ) : paginated.map(addr => (

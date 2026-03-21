@@ -1,12 +1,14 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   FileSignature, Plus, Edit3, Ban, CheckCircle2, Warehouse, Briefcase,
   Filter, ChevronDown, X, Building2, DollarSign, Clock, Layers, Save,
-  Trash2, PlusCircle, XCircle, AlertTriangle,
+  Trash2, PlusCircle, XCircle, AlertTriangle, RefreshCw, Info,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
@@ -17,28 +19,23 @@ function stableProtocol(contractId) {
   return `TX-${Math.abs(h).toString(16).padStart(4, '0').toUpperCase().slice(0, 4)}`;
 }
 
-// ─── Mock data ──────────────────────────────────────────────────────────────
+// ─── Configuração estática ────────────────────────────────────────────────────
 const STATUSES = ['Aberto', 'Em Vigência', 'Aguardando Revisão', 'Finalizado', 'Cancelado'];
 
-const INITIAL_CONTRACTS = [
-  { id: 'CTR-2026-001', description: 'Logística de Entrada - VerticalParts SP', payer: 'LogiTech Solutions Ltda', status: 'Em Vigência',        startDate: '2026-01-01', endDate: '2026-12-31', warehouseIds: ['WH-01','WH-02'], services: ['SRV-001','SRV-002'] },
-  { id: 'CTR-2026-002', description: 'Armazenagem Especial - Motores Export',   payer: 'BMW Automotive BR',       status: 'Aguardando Revisão',  startDate: '2026-02-15', endDate: '2027-02-15', warehouseIds: [],               services: ['SRV-002'] },
-  { id: 'CTR-2026-003', description: 'Distribuição Sudeste - E-commerce',       payer: 'Mercado Livre WMS',       status: 'Aberto',              startDate: '2026-03-01', endDate: '2028-03-01', warehouseIds: ['WH-03'],         services: [] },
-  { id: 'CTR-2026-004', description: 'Consultoria Logística - Inventário',      payer: 'ConsultLog BR',           status: 'Finalizado',          startDate: '2025-01-01', endDate: '2025-12-31', warehouseIds: ['WH-01'],         services: [] },
-  { id: 'CTR-2026-005', description: 'Operação Temporária - Black Friday',      payer: 'Retail Group SA',         status: 'Cancelado',           startDate: '2025-11-01', endDate: '2025-11-30', warehouseIds: [],               services: [] },
-];
+// Não há tabela de contratos no banco — lista vazia, gerenciada localmente
+const INITIAL_CONTRACTS = [];
 
 const WAREHOUSES = [
-  { id: 'WH-01', name: 'CD Matriz — Cajamar',         location: 'Cajamar, SP' },
-  { id: 'WH-02', name: 'CD Nordeste — Salvador',      location: 'Salvador, BA' },
-  { id: 'WH-03', name: 'CD Sul — Curitiba',           location: 'Curitiba, PR' },
+  { id: 'WH-01', name: 'CD Matriz — Cajamar',            location: 'Cajamar, SP' },
+  { id: 'WH-02', name: 'CD Nordeste — Salvador',         location: 'Salvador, BA' },
+  { id: 'WH-03', name: 'CD Sul — Curitiba',              location: 'Curitiba, PR' },
   { id: 'WH-04', name: 'Filial Interna — VerticalParts', location: 'São Paulo, SP' },
 ];
 
 const INITIAL_SERVICES = [
-  { id: 'SRV-001', code: 'LOG-01', name: 'Recebimento por Volume',    shift: 'Diurno',  value: 12.50, calcType: 'Unidade' },
+  { id: 'SRV-001', code: 'LOG-01', name: 'Recebimento por Volume',     shift: 'Diurno',  value: 12.50, calcType: 'Unidade' },
   { id: 'SRV-002', code: 'LOG-02', name: 'Armazenagem por Palete/Dia', shift: 'Geral',   value: 3.80,  calcType: 'Diária'  },
-  { id: 'SRV-003', code: 'LOG-03', name: 'Expedição Urgente (Zap)',   shift: 'Noturno', value: 25.00, calcType: 'Unidade' },
+  { id: 'SRV-003', code: 'LOG-03', name: 'Expedição Urgente (Zap)',    shift: 'Noturno', value: 25.00, calcType: 'Unidade' },
 ];
 
 const STATUS_COLORS = {
@@ -405,6 +402,7 @@ function CancelModal({ contract, onClose, onConfirm }) {
 
 // ─── Componente principal ─────────────────────────────────────────────────
 export default function ContractManager() {
+  const { warehouseId } = useApp();
   const [contracts, setContracts] = useState(INITIAL_CONTRACTS);
   const [services,  setServices]  = useState(INITIAL_SERVICES);
   const [viewStatus, setViewStatus] = useState('Todos');
@@ -519,7 +517,19 @@ export default function ContractManager() {
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800 text-xs text-slate-600 dark:text-slate-300">
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="p-12 text-center text-slate-400 font-medium">Nenhum contrato encontrado.</td></tr>
+                <tr>
+                  <td colSpan={6} className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                        <Info className="w-7 h-7 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Nenhum contrato cadastrado</p>
+                      <p className="text-xs text-slate-400 max-w-xs">
+                        Clique em "Cadastrar Contrato" para adicionar o primeiro contrato ao sistema.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
               )}
               {filtered.map(item => (
                 <tr key={item.id} onClick={() => setSelectedId(item.id === selectedId ? null : item.id)}
