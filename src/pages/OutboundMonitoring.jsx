@@ -3,7 +3,7 @@ import {
     Filter, CheckCircle2, AlertCircle, Clock,
     Truck, ShoppingCart, Box, X, RefreshCw,
     List, PackageCheck, Scissors, FileSignature, Zap,
-    Check, BarChart3, CalendarDays, ArrowUpRight,
+    Check, BarChart3, CalendarDays, ArrowUpRight, Search,
 } from 'lucide-react';
 import { useApp }      from '../hooks/useApp';
 import { useOutbound } from '../hooks/useOutbound';
