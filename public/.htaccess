@@ -1,8 +1,92 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# .htaccess — WMS VerticalParts (React Router SPA + Hostinger Apache)
+# Atualizado pelo Gemini Round 3 / Antigravity em 2026-03-21
+# ═══════════════════════════════════════════════════════════════════════════════
+
+Options -MultiViews
+
+# ── 1. React Router: redireciona tudo para index.html ────────────────────────
 <IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+    RewriteEngine On
+    RewriteBase /
+
+    # Página inicial: sem redirect
+    RewriteRule ^index\.html$ - [L]
+
+    # Ignora arquivos e pastas reais (assets estáticos)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Ignora extensões de arquivo estático
+    RewriteCond %{REQUEST_URI} !^.*\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|avif|map)$
+
+    # Redireciona todas as rotas para index.html (React Router assume o controle)
+    RewriteRule ^ /index.html [L]
+</IfModule>
+
+# ── 2. Forçar HTTPS (descomente quando SSL estiver ativo na Hostinger) ─────────
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# ── 3. Compressão gzip para melhor performance ────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE text/plain
+</IfModule>
+
+# ── 4. Cache de longa duração para assets com hash (gerados pelo Vite) ────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/html                 "access plus 0 seconds"
+    ExpiresByType application/javascript    "access plus 1 year"
+    ExpiresByType text/javascript           "access plus 1 year"
+    ExpiresByType text/css                  "access plus 1 year"
+    ExpiresByType font/woff                 "access plus 1 year"
+    ExpiresByType font/woff2                "access plus 1 year"
+    ExpiresByType application/font-woff     "access plus 1 year"
+    ExpiresByType application/font-woff2    "access plus 1 year"
+    ExpiresByType image/png                 "access plus 6 months"
+    ExpiresByType image/jpeg                "access plus 6 months"
+    ExpiresByType image/svg+xml             "access plus 6 months"
+    ExpiresByType image/webp                "access plus 6 months"
+    ExpiresByType image/x-icon              "access plus 1 year"
+</IfModule>
+
+# ── 5. Cabeçalhos de segurança e cache granular ────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # index.html: sempre sem cache (garante que a nova versão seja carregada)
+    <FilesMatch "^index\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    # Assets com hash do Vite: 1 ano imutável
+    <FilesMatch "\.(js|css|woff2?|ttf|eot)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>
+
+# ── 6. Tipos MIME corretos para assets modernos ───────────────────────────────
+<IfModule mod_mime.c>
+    AddType application/javascript .js .mjs
+    AddType text/css               .css
+    AddType image/webp             .webp
+    AddType image/avif             .avif
+    AddType font/woff              .woff
+    AddType font/woff2             .woff2
+    AddType image/svg+xml          .svg
 </IfModule>

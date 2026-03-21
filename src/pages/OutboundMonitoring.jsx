@@ -1,568 +1,303 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Filter, CheckCircle2, AlertCircle, Clock,
     Truck, ShoppingCart, Box, X, RefreshCw,
     List, PackageCheck, Scissors, FileSignature, Zap,
-    Check, BarChart3, CalendarDays,
+    Check, BarChart3, CalendarDays, ArrowUpRight,
 } from 'lucide-react';
-import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { supabase } from '../lib/supabaseClient';
-import { useApp } from '../hooks/useApp';
+import { useApp }      from '../hooks/useApp';
+import { useOutbound } from '../hooks/useOutbound';
 
-// ── Dados de demonstração injetados quando o warehouse está vazio ──
-const SEED_NFS = [
-    {
-        nf: '11422', serie: '1', cliente: 'VERTICAL DISTRIBUIDORA LTDA',
-        situacao: 'Aguardando Formação Onda', mov_estoque: true, solicit_cancelamento: false,
-        sep_ini: false, sep_fim: false, conf_ini: false, conf_fim: false,
-        total_itens: 12, valor: 'R$ 1.250,00',
-    },
-    {
-        nf: '11423', serie: '1', cliente: 'OFICINA DO ZE CAR VALHO',
-        situacao: 'Pendentes', mov_estoque: true, solicit_cancelamento: false,
-        sep_ini: true, sep_fim: false, conf_ini: false, conf_fim: false,
-        total_itens: 5, valor: 'R$ 480,00',
-    },
-    {
-        nf: '11424', serie: '1', cliente: 'AUTO PECAS AVENIDA',
-        situacao: 'Pendentes', mov_estoque: true, solicit_cancelamento: true,
-        sep_ini: true, sep_fim: true, conf_ini: true, conf_fim: false,
-        total_itens: 28, valor: 'R$ 4.100,00',
-    },
-    {
-        nf: '11425', serie: '1', cliente: 'TRANSP. RAPIDO BRASIL',
-        situacao: 'Processadas', mov_estoque: false, solicit_cancelamento: false,
-        sep_ini: true, sep_fim: true, conf_ini: true, conf_fim: true,
-        total_itens: 45, valor: 'R$ 12.800,00',
-    },
-];
+// ── STATUS CONFIG PREMIUM ────────────────────────────────────────────────────
+const SITUACOES = ['Todas', 'Pendentes', 'Processadas', 'Canceladas', 'Aguardando Formação Onda'];
 
-// Quantos dias o período representa
-const PERIODO_DIAS = { 'Hoje': 0, '3 dias': 3, '7 dias': 7, '15 dias': 15, '30 dias': 30 };
+const SITUACAO_STYLE = {
+    'Processadas':              'bg-green-500/10 text-green-400 border-green-500/20',
+    'Pendentes':                'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    'Canceladas':               'bg-red-500/10 text-red-400 border-red-500/20',
+    'Aguardando Formação Onda': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    'Padrao':                   'bg-white/5 text-white/30 border-white/10',
+};
 
+// ── SKELETON BLINDADO ────────────────────────────────────────────────────────
+function SkeletonRow() {
+    return (
+        <tr className="border-b border-white/5 animate-pulse">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+                <td key={i} className="p-6">
+                    <div className="h-3 bg-white/5 rounded-full w-24" />
+                </td>
+            ))}
+        </tr>
+    );
+}
+
+// ── MONITORAMENTO DE SAÍDA (100% REAL & PREMIUM) ──────────────────────────────
 export default function OutboundMonitoring() {
-    const { warehouseId }       = useApp();
-    const [nfs,           setNfs]           = useState([]);
-    const [isLoading,     setIsLoading]     = useState(false);
+    const { warehouseId } = useApp();
+    const { orders, loading, error, refetch, fetchOrderItems } = useOutbound(warehouseId);
+
+    const [search,        setSearch]        = useState('');
     const [situacao,      setSituacao]      = useState('Todas');
-    const [movEstoque,    setMovEstoque]    = useState(null);
-    const [solicitCancel, setSolicitCancel] = useState(null);
+    const [periodo,       setPeriodo]       = useState('Hoje');
     const [selectedRows,  setSelectedRows]  = useState([]);
     const [drawerOpen,    setDrawerOpen]    = useState(false);
-    const [drawerType,    setDrawerType]    = useState('');
-    const [activeNf,      setActiveNf]      = useState(null);
-    const [periodo,       setPeriodo]       = useState('Hoje');
+    const [drawerItems,   setDrawerItems]   = useState([]);
+    const [activeOrder,   setActiveOrder]   = useState(null);
+    const [loadingItems,  setLoadingItems]  = useState(false);
 
-    const loadingRef = useRef(null);
-    useEffect(() => () => { if (loadingRef.current) clearTimeout(loadingRef.current); }, []);
+    // ── Filtro de Pesquisa e Situação ──
+    const filteredData = useMemo(() => {
+        const q = search.toLowerCase();
+        return orders.filter(item => {
+            if (situacao !== 'Todas' && item.situacao !== situacao) return false;
+            if (q && !(
+                (item.nf ?? '').toLowerCase().includes(q) ||
+                (item.cliente ?? '').toLowerCase().includes(q)
+            )) return false;
+            return true;
+        });
+    }, [orders, search, situacao]);
 
-    // ── Fetch principal ──────────────────────────────────────────────
-    const fetchNfs = useCallback(async () => {
-        if (!warehouseId) return;
-        setIsLoading(true);
-        try {
-            const dias = PERIODO_DIAS[periodo] ?? 0;
-            let query = supabase
-                .from('notas_saida')
-                .select('*')
-                .eq('warehouse_id', warehouseId)
-                .order('created_at', { ascending: false });
-
-            if (dias === 0) {
-                query = query.gte('data_referencia', new Date().toISOString().slice(0, 10));
-            } else {
-                const from = new Date();
-                from.setDate(from.getDate() - dias);
-                query = query.gte('data_referencia', from.toISOString().slice(0, 10));
-            }
-
-            const { data, error } = await query;
-            if (error) throw error;
-
-            // Seed quando vazio
-            if (!data || data.length === 0) {
-                const seeds = SEED_NFS.map(s => ({ ...s, warehouse_id: warehouseId }));
-                const { data: inserted } = await supabase
-                    .from('notas_saida')
-                    .insert(seeds)
-                    .select();
-                setNfs(inserted ?? []);
-            } else {
-                setNfs(data);
-            }
-        } catch (err) {
-            console.error('fetchNfs:', err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [warehouseId, periodo]);
-
-    useEffect(() => { fetchNfs(); }, [fetchNfs]);
-
-    // ── Realtime ─────────────────────────────────────────────────────
-    useEffect(() => {
-        if (!warehouseId) return;
-        const channel = supabase
-            .channel('notas_saida_rt')
-            .on('postgres_changes', {
-                event: '*', schema: 'public', table: 'notas_saida',
-                filter: `warehouse_id=eq.${warehouseId}`,
-            }, () => fetchNfs())
-            .subscribe();
-        return () => supabase.removeChannel(channel);
-    }, [warehouseId, fetchNfs]);
-
-    // ── Filtro local ─────────────────────────────────────────────────
-    const filteredData = nfs.filter(item => {
-        if (situacao !== 'Todas' && item.situacao !== situacao) return false;
-        if (movEstoque    !== null && item.mov_estoque         !== movEstoque)    return false;
-        if (solicitCancel !== null && item.solicit_cancelamento !== solicitCancel) return false;
-        return true;
-    });
-
-    const allSelected  = filteredData.length > 0 && filteredData.every(i => selectedRows.includes(i.id));
-    const someSelected = !allSelected && filteredData.some(i => selectedRows.includes(i.id));
-
-    const toggleAll = () =>
-        allSelected ? setSelectedRows([]) : setSelectedRows(filteredData.map(i => i.id));
-
-    const toggleRow = (id) =>
-        setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
-
-    const openDrawer = (nf, type) => {
-        setActiveNf(nf);
-        setDrawerType(type);
+    // ── Abrir Detalhe Real ──
+    const openOrderDetail = async (order) => {
+        setActiveOrder(order);
         setDrawerOpen(true);
+        setLoadingItems(true);
+        const items = await fetchOrderItems(order.id);
+        setDrawerItems(items);
+        setLoadingItems(false);
     };
 
-    // ── Status indicator ─────────────────────────────────────────────
-    const renderStatusIndicator = (active, label) => (
-        <div className="flex flex-col items-center gap-1 group/status">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                active
-                    ? 'bg-secondary text-primary shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-300'
-            }`}>
-                {active
-                    ? <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
-                    : <Clock className="w-4 h-4" aria-hidden="true" />
-                }
-            </div>
-            <span className={`text-[7px] font-black uppercase tracking-tighter ${active ? 'text-primary' : 'text-slate-400 opacity-50'}`}>
-                {label}
-            </span>
-        </div>
-    );
-
-    // ── actionGroups ─────────────────────────────────────────────────
-    const actionGroups = [[
-        { label: 'Atualizar', icon: RefreshCw, onClick: fetchNfs, disabled: isLoading },
-    ]];
+    const toggleRow = (id) =>
+        setSelectedRows(p => p.includes(id) ? p.filter(r => r !== id) : [...p, id]);
 
     return (
-        <EnterprisePageBase
-            title="Monitorar Saída"
-            subtitle="Cockpit Operacional de Expedição — Monitoramento Real-time"
-            icon={Truck}
-            actionGroups={actionGroups}
-        >
-            <div className="space-y-6 pb-20">
+        <main className="space-y-6 p-4 md:p-6 animate-fade-up">
+            
+            {/* ── HEADER PREMIUM ── */}
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-black rounded-2xl border border-white/10 shadow-lg">
+                        <Truck className="w-5 h-5 text-[var(--vp-primary)]" />
+                    </div>
+                    <div>
+                        <h1 className="text-lg font-black tracking-tighter text-white uppercase flex items-center gap-2">
+                             Monitoramento de <span className="text-[var(--vp-primary)] italic">Saída</span>
+                             <span className="text-[9px] px-2 py-0.5 bg-white/5 rounded-full text-white/40 font-mono tracking-widest border border-white/10">COCKPIT</span>
+                        </h1>
+                        <p className="text-[10px] text-white/30 font-bold uppercase tracking-[0.2em] mt-1">
+                            Expedição Geográfica — Rastreamento de Movimentação em Tempo Real
+                        </p>
+                    </div>
+                </div>
 
-                {/* ====== FILTROS RÁPIDOS ====== */}
-                <div className="bg-primary p-6 rounded-[2rem] shadow-xl border-b-8 border-secondary/20 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-white/10 transition-colors pointer-events-none" aria-hidden="true" />
+                <div className="flex gap-4">
+                    <button
+                        onClick={refetch}
+                        disabled={loading}
+                        className="flex items-center gap-2 text-[10px] font-black text-white px-5 py-2.5 vp-glass rounded-xl border-white/10 hover:border-[var(--vp-primary)] transition-all active:scale-95"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 text-[var(--vp-primary)] ${loading ? 'animate-spin' : ''}`} />
+                        RESYNC CLOUD
+                    </button>
+                </div>
+            </header>
 
-                    <div className="flex flex-wrap items-end gap-6 relative z-10">
-                        {/* Situação */}
-                        <div className="space-y-2">
-                            <label htmlFor="situacao-nf" className="text-[10px] font-black text-white/50 uppercase tracking-widest px-1">Situação da Nota</label>
-                            <select
-                                id="situacao-nf"
-                                value={situacao}
-                                onChange={(e) => setSituacao(e.target.value)}
-                                className="bg-white/10 border-2 border-white/20 rounded-xl px-4 py-2.5 text-white font-bold text-sm outline-none focus:border-secondary transition-all appearance-none pr-10 min-w-[220px]"
-                            >
-                                <option className="bg-primary text-white">Todas</option>
-                                <option className="bg-primary text-white">Pendentes</option>
-                                <option className="bg-primary text-white">Processadas</option>
-                                <option className="bg-primary text-white">Canceladas</option>
-                                <option className="bg-primary text-white">Aguardando Formação Onda</option>
-                            </select>
-                        </div>
+            {/* ── FILTROS "BLINDADOS" ── */}
+            <div className="vp-glass rounded-2xl p-4 flex flex-wrap gap-4 items-center border-white/5 shadow-2xl">
+                <div className="relative flex-1 min-w-[280px]">
+                    <Search className="w-4 h-4 text-white/20 absolute left-4 top-1/2 -translate-y-1/2" />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="BUSCAR NOTA FISCAL OU CLIENTE..."
+                        className="w-full pl-12 pr-4 py-3 bg-black/40 border border-white/5 focus:border-[var(--vp-primary)] rounded-xl text-xs font-bold text-white outline-none transition-all placeholder:text-white/10 uppercase tracking-wider"
+                    />
+                </div>
 
-                        {/* Toggles */}
-                        <div className="flex gap-6 items-center bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 mb-0.5">
-                            <div className="flex items-center gap-3">
-                                <span id="lbl-mov-estoque" className="text-[10px] font-black text-white/50 uppercase tracking-widest">Movimenta Estoque</span>
-                                <button
-                                    role="switch"
-                                    aria-checked={movEstoque === null ? 'mixed' : movEstoque}
-                                    aria-labelledby="lbl-mov-estoque"
-                                    onClick={() => setMovEstoque(v => v === null ? true : v === true ? false : null)}
-                                    className={`w-12 h-6 rounded-full p-1 transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-                                        movEstoque === true  ? 'bg-secondary' :
-                                        movEstoque === false ? 'bg-red-500' :
-                                        'bg-slate-700'
-                                    }`}
-                                >
-                                    <div className={`w-4 h-4 rounded-full bg-primary transition-transform ${
-                                        movEstoque === true  ? 'translate-x-6' :
-                                        movEstoque === false ? 'translate-x-3' :
-                                        ''
-                                    }`} aria-hidden="true" />
-                                </button>
-                                <span className="text-[10px] font-black text-white uppercase">
-                                    {movEstoque === null ? 'TODOS' : movEstoque ? 'SIM' : 'NÃO'}
-                                </span>
-                            </div>
-                            <div className="w-px h-6 bg-white/10" aria-hidden="true" />
-                            <div className="flex items-center gap-3">
-                                <span id="lbl-solit-cancel" className="text-[10px] font-black text-white/50 uppercase tracking-widest">Solícit. Cancelamento</span>
-                                <button
-                                    role="switch"
-                                    aria-checked={solicitCancel === null ? 'mixed' : solicitCancel}
-                                    aria-labelledby="lbl-solit-cancel"
-                                    onClick={() => setSolicitCancel(v => v === null ? true : v === true ? false : null)}
-                                    className={`w-12 h-6 rounded-full p-1 transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-                                        solicitCancel === true  ? 'bg-red-500' :
-                                        solicitCancel === false ? 'bg-secondary' :
-                                        'bg-slate-700'
-                                    }`}
-                                >
-                                    <div className={`w-4 h-4 rounded-full bg-primary transition-transform ${
-                                        solicitCancel === true  ? 'translate-x-6' :
-                                        solicitCancel === false ? 'translate-x-3' :
-                                        ''
-                                    }`} aria-hidden="true" />
-                                </button>
-                                <span className="text-[10px] font-black text-white uppercase">
-                                    {solicitCancel === null ? 'TODOS' : solicitCancel ? 'SIM' : 'NÃO'}
-                                </span>
-                            </div>
-                        </div>
+                <div className="flex items-center gap-2 p-1.5 bg-black/40 border border-white/5 rounded-xl">
+                    <select
+                        value={situacao}
+                        onChange={e => setSituacao(e.target.value)}
+                        className="bg-transparent text-[10px] font-black text-white px-4 outline-none border-none uppercase tracking-widest"
+                    >
+                        {SITUACOES.map(s => <option key={s} value={s} className="bg-[#0F0F0F]">{s}</option>)}
+                    </select>
+                </div>
 
-                        {/* Exibir Dados */}
+                <div className="flex items-center gap-2 p-1.5 bg-black/40 border border-white/5 rounded-xl">
+                    {['Hoje', '3 dias', '7 dias'].map(p => (
                         <button
-                            onClick={fetchNfs}
-                            disabled={isLoading}
-                            aria-label="Aplicar filtros e exibir dados"
-                            className="bg-secondary text-primary font-black py-2.5 px-8 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 mb-0.5 disabled:opacity-60 disabled:pointer-events-none"
+                            key={p}
+                            onClick={() => setPeriodo(p)}
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${periodo === p
+                                ? 'bg-[var(--vp-primary)] text-black'
+                                : 'text-white/20 hover:text-white'
+                            }`}
                         >
-                            <Filter className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
-                            {isLoading ? 'Carregando...' : 'Exibir Dados'}
+                            {p}
                         </button>
+                    ))}
+                </div>
+            </div>
 
-                        {/* Pills de Período — inline, sem dropdown (evita overflow-hidden do pai) */}
-                        <div className="flex items-center gap-1 bg-white/10 border border-white/20 rounded-2xl p-1 mb-0.5" role="group" aria-label="Selecionar período">
-                            <CalendarDays className="w-4 h-4 text-white/50 ml-2 shrink-0" aria-hidden="true" />
-                            {Object.keys(PERIODO_DIAS).map(p => (
-                                <button
-                                    key={p}
-                                    onClick={() => setPeriodo(p)}
-                                    aria-pressed={periodo === p}
-                                    className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                                        periodo === p
-                                            ? 'bg-secondary text-primary shadow-md'
-                                            : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                    }`}
-                                >
-                                    {p}
-                                </button>
+            {/* ── GRID DE EXPEDIÇÃO PREMIUM ── */}
+            <div className="vp-glass rounded-3xl overflow-hidden border-white/5 shadow-[0_30px_60px_rgba(0,0,0,0.5)]">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-white/3 border-b border-white/5">
+                                <th className="p-5 w-12" />
+                                <th className="p-5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Nota / Serie</th>
+                                <th className="p-5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Status Operacional</th>
+                                <th className="p-5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Progresso Batch</th>
+                                <th className="p-5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Destinatário</th>
+                                <th className="p-5 text-[9px] font-black text-white/20 uppercase tracking-[0.2em] text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {loading && orders.length === 0
+                                ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+                                : filteredData.map(order => {
+                                    const stClass = SITUACAO_STYLE[order.situacao] || SITUACAO_STYLE.Padrao;
+                                    return (
+                                        <tr key={order.id} className="vp-table-row group">
+                                            <td className="p-5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedRows.includes(order.id)}
+                                                    onChange={() => toggleRow(order.id)}
+                                                    className="w-4 h-4 rounded-md accent-[var(--vp-primary)]"
+                                                />
+                                            </td>
+                                            <td className="p-5">
+                                                <div className="text-lg font-black text-white tracking-tighter group-hover:text-[var(--vp-primary)] transition-colors">
+                                                    {order.nf} <span className="text-[10px] text-white/20 italic ml-1">/{order.serie}</span>
+                                                </div>
+                                                <div className="text-[9px] font-black text-white/20 uppercase tracking-widest mt-0.5">
+                                                    {order.total_itens} SKU(s) • R$ {Number(order.valor).toLocaleString('pt-BR')}
+                                                </div>
+                                            </td>
+                                            <td className="p-5">
+                                                <span className={`vp-badge flex items-center gap-2 border w-fit px-3 py-1.5 ${stClass}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${order.situacao === 'Processadas' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-white/20'}`} />
+                                                    {order.situacao}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 min-w-[200px]">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-white/30">
+                                                        <span>{order.pct_separacao}% Separação</span>
+                                                        <span className="text-white/60">{order.qtd_total_separada}/{order.qtd_total_planejada} ITENS</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-gradient-to-r from-[var(--vp-primary)] to-amber-500 transition-all duration-700" style={{ width: `${order.pct_separacao}%` }} />
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-5 max-w-[240px]">
+                                                <div className="text-xs font-black text-white truncate uppercase tracking-tight">{order.cliente}</div>
+                                                <div className="text-[9px] text-white/30 font-bold uppercase mt-1 tracking-widest">
+                                                    {order.last_update ? new Date(order.last_update).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                                </div>
+                                            </td>
+                                            <td className="p-5 text-right">
+                                                <button
+                                                    onClick={() => openOrderDetail(order)}
+                                                    className="p-3 bg-white/5 hover:bg-[var(--vp-primary)] hover:text-black hover:border-transparent text-white/40 border border-white/5 rounded-xl transition-all active:scale-90 flex items-center gap-2 ml-auto group/btn"
+                                                >
+                                                    <List className="w-4 h-4" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">Detalhes</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* ── GAVETA LATERAL PREMIUM (REAL) ── */}
+            {drawerOpen && (
+                <div role="dialog" aria-modal="true" className="fixed inset-0 z-[100] flex justify-end animate-in fade-in duration-300">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setDrawerOpen(false)} />
+                    <aside className="w-full max-w-lg bg-[#0A0A0A] border-l border-white/10 relative z-[110] flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.8)] animate-in slide-in-from-right duration-500">
+                        {/* Header Gaveta */}
+                        <div className="p-8 bg-black relative border-b border-white/5">
+                            <button onClick={() => setDrawerOpen(false)} className="absolute top-6 right-6 p-2 text-white/20 hover:text-white transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                            <div className="flex items-center gap-5 mt-4">
+                                <div className="p-4 bg-[var(--vp-primary)]/10 rounded-2xl border border-[var(--vp-primary)]/20">
+                                    <ShoppingCart className="w-8 h-8 text-[var(--vp-primary)] shadow-[0_0_15px_rgba(255,215,0,0.3)]" />
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-black text-white italic tracking-tighter">Itens da <span className="text-[var(--vp-primary)]">NF #{activeOrder?.nf}</span></h2>
+                                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] mt-1">{activeOrder?.cliente}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Conteúdo Gaveta */}
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                            {loadingItems ? (
+                                Array.from({ length: 4 }).map((_, i) => (
+                                    <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse" />
+                                ))
+                            ) : drawerItems.length === 0 ? (
+                                <div className="text-center py-20">
+                                    <Box className="w-12 h-12 text-white/5 mx-auto mb-4" />
+                                    <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Nenhum item cadastrado para esta Nota</p>
+                                </div>
+                            ) : drawerItems.map(item => (
+                                <div key={item.id} className="p-6 vp-glass rounded-2xl border-white/5 hover:border-[var(--vp-primary)]/20 transition-all group">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="min-w-0">
+                                            <p className="font-black text-sm text-white truncate group-hover:text-[var(--vp-primary)] transition-colors uppercase tracking-tight">{item.desc}</p>
+                                            <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-1 font-mono">SKU: {item.sku}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-2xl font-black text-white tracking-tighter leading-none">{item.separado}</p>
+                                            <p className="text-[10px] font-black text-white/20 uppercase mt-1">de {item.total} {item.unidade}</p>
+                                        </div>
+                                    </div>
+                                    {/* Progress Mini */}
+                                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-[var(--vp-primary)] transition-all duration-700" 
+                                            style={{ width: `${(item.separado/item.total)*100}%` }} 
+                                        />
+                                    </div>
+                                </div>
                             ))}
                         </div>
-                    </div>
-                </div>
 
-                {/* ====== TOOLBAR DE AÇÕES ====== */}
-                <div className="flex flex-wrap gap-2 pt-2">
-                    {/* Grupo Controle */}
-                    <div className="flex items-center gap-1 p-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 mr-2" aria-hidden="true">Controle</span>
-                        <button aria-label="Faturar NF selecionada" className="p-2 hover:bg-secondary/10 hover:text-secondary rounded-xl transition-all group">
-                            <FileSignature className="w-5 h-5 text-slate-500 group-hover:text-secondary" aria-hidden="true" />
-                        </button>
-                        <button aria-label="Gerar Separação" className="p-2 hover:bg-secondary/10 hover:text-secondary rounded-xl transition-all group">
-                            <ShoppingCart className="w-5 h-5 text-slate-500 group-hover:text-secondary" aria-hidden="true" />
-                        </button>
-                        <button aria-label="Gerar Conferência" className="p-2 hover:bg-secondary/10 hover:text-secondary rounded-xl transition-all group">
-                            <PackageCheck className="w-5 h-5 text-slate-500 group-hover:text-secondary" aria-hidden="true" />
-                        </button>
-                        <button aria-label="Fura Fila — prioridade imediata" className="p-2 hover:bg-amber-100 hover:text-amber-600 rounded-xl transition-all group">
-                            <Zap className="w-5 h-5 text-slate-500 group-hover:text-amber-600" aria-hidden="true" />
-                        </button>
-                    </div>
-
-                    {/* Grupo Detalhes */}
-                    <div className="flex items-center gap-1 p-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 mr-2" aria-hidden="true">Detalhes</span>
-                        {['Itens', 'Lotes', 'Volumes', 'CT-e'].map(txt => (
-                            <button key={txt} aria-label={`Ver ${txt}`} className="px-3 py-1.5 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-all">{txt}</button>
-                        ))}
-                        <button aria-label="Corte Físico" className="p-2 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all group">
-                            <Scissors className="w-5 h-5 text-slate-500 group-hover:text-red-600" aria-hidden="true" />
-                        </button>
-                    </div>
-
-                    {/* Grupo Acompanhamento */}
-                    <div className="flex items-center gap-1 p-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-3 mr-2" aria-hidden="true">Acompanhamento</span>
-                        <button
-                            onClick={() => {
-                                const nf = nfs.find(n => n.id === selectedRows[0]);
-                                if (nf) openDrawer(nf, 'SEP');
-                            }}
-                            className="px-4 py-1.5 text-[9px] font-black uppercase bg-primary text-white rounded-lg hover:bg-primary/90 transition-all disabled:opacity-30 disabled:grayscale"
-                            disabled={selectedRows.length === 0}
-                        >
-                            Separação por Produto
-                        </button>
-                        <button
-                            onClick={() => {
-                                const nf = nfs.find(n => n.id === selectedRows[0]);
-                                if (nf) openDrawer(nf, 'CONF');
-                            }}
-                            className="px-4 py-1.5 text-[9px] font-black uppercase bg-primary text-white rounded-lg hover:bg-primary/90 transition-all disabled:opacity-30 disabled:grayscale"
-                            disabled={selectedRows.length === 0}
-                        >
-                            Conferência por Produto
-                        </button>
-                    </div>
-                </div>
-
-                {/* ====== GRID PRINCIPAL ====== */}
-                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                                    <th scope="col" className="px-6 py-4 w-12">
-                                        <button
-                                            role="checkbox"
-                                            aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
-                                            aria-label="Selecionar todas as notas fiscais visíveis"
-                                            onClick={toggleAll}
-                                            className={`w-5 h-5 border-2 rounded flex items-center justify-center cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-                                                allSelected ? 'bg-secondary border-secondary' : 'border-slate-300 hover:border-secondary'
-                                            }`}
-                                        >
-                                            {allSelected && <Check className="w-3 h-3 text-primary" aria-hidden="true" />}
-                                        </button>
-                                    </th>
-                                    <th scope="col" className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">NF / Série</th>
-                                    <th scope="col" className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Situação Operacional</th>
-                                    <th scope="col" className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Etapas Expedição</th>
-                                    <th scope="col" className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Cliente / Destinatário</th>
-                                    <th scope="col" className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Ult. Atualiz.</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-                                {isLoading && nfs.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-400 text-sm font-bold">
-                                            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3 text-secondary" />
-                                            Carregando notas fiscais...
-                                        </td>
-                                    </tr>
-                                ) : filteredData.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-16 text-center text-slate-400 text-sm font-bold">
-                                            Nenhuma nota fiscal encontrada para os filtros selecionados.
-                                        </td>
-                                    </tr>
-                                ) : filteredData.map((item) => (
-                                    <tr
-                                        key={item.id}
-                                        onClick={() => toggleRow(item.id)}
-                                        className={`group transition-all cursor-pointer ${selectedRows.includes(item.id) ? 'bg-secondary/5' : 'hover:bg-slate-50 dark:hover:bg-slate-900/50'}`}
-                                    >
-                                        <td className="px-6 py-4">
-                                            <button
-                                                role="checkbox"
-                                                aria-checked={selectedRows.includes(item.id)}
-                                                aria-label={`Selecionar NF ${item.nf}`}
-                                                onClick={(e) => { e.stopPropagation(); toggleRow(item.id); }}
-                                                className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all focus:outline-none focus:ring-2 focus:ring-secondary ${
-                                                    selectedRows.includes(item.id) ? 'bg-secondary border-secondary' : 'border-slate-300 hover:border-secondary'
-                                                }`}
-                                            >
-                                                {selectedRows.includes(item.id) && <Check className="w-3 h-3 text-primary" aria-hidden="true" />}
-                                            </button>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black text-lg text-primary">{item.nf}</p>
-                                            <p className="text-[10px] font-bold text-slate-400">Série: {item.serie} • {item.total_itens} itens</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1.5">
-                                                <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tighter rounded border w-fit ${
-                                                    item.situacao === 'Processadas'              ? 'bg-green-100 text-green-700 border-green-200' :
-                                                    item.situacao === 'Aguardando Formação Onda' ? 'bg-amber-100 text-amber-600 border-amber-200' :
-                                                    'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                                                }`}>
-                                                    {item.situacao}
-                                                </span>
-                                                {item.solicit_cancelamento && (
-                                                    <span className="flex items-center gap-1 text-[8px] font-black text-red-600 uppercase">
-                                                        <AlertCircle className="w-3 h-3" aria-hidden="true" /> Solicit. Cancelamento
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-6">
-                                                {renderStatusIndicator(item.sep_ini,  'Sep. Iniciada')}
-                                                {renderStatusIndicator(item.sep_fim,  'Sep. Concluída')}
-                                                <div className="w-4 h-px bg-slate-100 dark:bg-slate-700" aria-hidden="true" />
-                                                {renderStatusIndicator(item.conf_ini, 'Conf. Iniciada')}
-                                                {renderStatusIndicator(item.conf_fim, 'Conf. Concluída')}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="font-black text-xs uppercase text-slate-700 dark:text-slate-200 truncate max-w-[280px]">{item.cliente}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 italic">Vlr: {item.valor}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex flex-col items-end">
-                                                <span className="text-sm font-black text-slate-400 group-hover:text-primary transition-colors">
-                                                    {item.last_update
-                                                        ? new Date(item.last_update).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                                                        : '--:--'
-                                                    }
-                                                </span>
-                                                <span className="text-[7px] font-black uppercase tracking-widest text-slate-300">
-                                                    {item.data_referencia
-                                                        ? new Date(item.data_referencia + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                                                        : 'Hoje'
-                                                    }
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* ====== GAVETA LATERAL (OFFCANVAS) ====== */}
-                {drawerOpen && (
-                    <div className="fixed inset-0 z-[100] flex justify-end animate-in fade-in duration-300">
-                        <div
-                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                            onClick={() => setDrawerOpen(false)}
-                            aria-hidden="true"
-                        />
-
-                        <aside
-                            role="dialog"
-                            aria-modal="true"
-                            aria-label={`Detalhe por produto — NF ${activeNf?.nf}`}
-                            className="w-full max-w-xl bg-white dark:bg-slate-900 shadow-2xl relative z-[110] flex flex-col animate-in slide-in-from-right duration-500"
-                        >
-                            {/* Drawer Header */}
-                            <div className="p-8 border-b-8 border-secondary bg-primary text-white relative h-48 flex flex-col justify-end">
-                                <button
-                                    onClick={() => setDrawerOpen(false)}
-                                    aria-label="Fechar detalhe da NF"
-                                    className="absolute top-6 right-6 p-2 hover:bg-white/10 rounded-full transition-all"
-                                >
-                                    <X className="w-6 h-6 text-white" aria-hidden="true" />
-                                </button>
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-16 h-16 rounded-[2rem] bg-secondary flex items-center justify-center shadow-lg">
-                                        {drawerType === 'SEP'
-                                            ? <ShoppingCart className="w-8 h-8 text-primary" aria-hidden="true" />
-                                            : <PackageCheck  className="w-8 h-8 text-primary" aria-hidden="true" />
-                                        }
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-black italic tracking-tight">Detalhe por Produto</h2>
-                                        <p className="text-xs font-bold text-white/50 uppercase tracking-widest">Nota Fiscal: #{activeNf?.nf}</p>
-                                    </div>
+                        {/* Footer Gaveta */}
+                        <div className="p-8 border-t border-white/5 bg-black/40">
+                             <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="p-4 bg-white/3 rounded-xl border border-white/5">
+                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Status Conferência</p>
+                                    <p className="text-lg font-black text-white">{activeOrder?.pct_conferencia}%</p>
                                 </div>
-                            </div>
-
-                            {/* Drawer Content */}
-                            <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                                <div className="space-y-4">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                                        <List className="w-4 h-4" aria-hidden="true" /> Itens Processados
-                                    </h3>
-
-                                    {(activeNf
-                                        ? Array.from({ length: Math.min(activeNf.total_itens, 4) }, (_, i) => ({
-                                            id: i + 1,
-                                            desc: ['Barreira de Proteção Infravermelha', 'Escova de Segurança Nylon 27mm', 'Pallet de Aço Inox 1000mm', 'Luminária LED Verde 24V'][i] ?? `Item #${i + 1}`,
-                                            sku:  ['VEPEL-BPI-174FX', 'VPER-ESS-NY-27MM', 'VPER-PAL-INO-1000', 'VPER-LUM-LED-VRD-24V'][i] ?? `SKU-00${i + 1}`,
-                                            separado: drawerType === 'SEP' ? i + 1 : 0,
-                                            total: 5,
-                                        }))
-                                        : []
-                                    ).map(item => {
-                                        const pct = Math.round((item.separado / item.total) * 100);
-                                        return (
-                                            <div key={item.id} className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center justify-between group hover:border-secondary/30 transition-all">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                                                        <Box className="w-6 h-6 text-slate-400 group-hover:text-secondary transition-colors" aria-hidden="true" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-black text-sm tracking-tight text-primary">{item.desc}</p>
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase">SKU: {item.sku}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="flex items-center gap-2 mb-1 justify-end">
-                                                        <span className="text-lg font-black text-primary">{item.separado}</span>
-                                                        <span className="text-[10px] font-bold text-slate-300">/ {item.total}</span>
-                                                    </div>
-                                                    <div className="h-1.5 w-24 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-secondary transition-all duration-700"
-                                                            style={{ width: `${pct}%` }}
-                                                            role="progressbar"
-                                                            aria-valuenow={pct}
-                                                            aria-valuemin={0}
-                                                            aria-valuemax={100}
-                                                            aria-label={`${pct}% separado`}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                <div className="p-4 bg-white/3 rounded-xl border border-white/5">
+                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-1">Total Volumes</p>
+                                    <p className="text-lg font-black text-white">{activeOrder?.total_itens}</p>
                                 </div>
-
-                                <div className="p-6 rounded-3xl bg-secondary/10 border border-secondary/20 space-y-4">
-                                    <div className="flex items-center gap-2 text-primary font-black text-[10px] uppercase">
-                                        <BarChart3 className="w-4 h-4" aria-hidden="true" /> Estatísticas do Batch
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-[9px] font-bold text-slate-400 uppercase">Tempo Médio</p>
-                                            <p className="text-xl font-black">02:45 <span className="text-[10px]">min/sku</span></p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] font-bold text-slate-400 uppercase">Operador</p>
-                                            <p className="text-sm font-black">{drawerType === 'SEP' ? 'Matheus (Expedição)' : 'Thiago (Logística)'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Drawer Footer */}
-                            <div className="p-8 border-t border-slate-100 dark:border-slate-800">
-                                <button
-                                    onClick={() => setDrawerOpen(false)}
-                                    className="w-full py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-primary/95 transition-all shadow-xl shadow-primary/20"
-                                >
-                                    Fechar Detalhamento
-                                </button>
-                            </div>
-                        </aside>
-                    </div>
-                )}
-            </div>
-        </EnterprisePageBase>
+                             </div>
+                             <button
+                                onClick={() => setDrawerOpen(false)}
+                                className="w-full py-4 bg-[var(--vp-primary)] hover:bg-[var(--vp-primary-vibrant)] text-black rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
+                             >
+                                <CheckCircle2 className="w-4 h-4" />
+                                Fechar Detalhamento
+                             </button>
+                        </div>
+                    </aside>
+                </div>
+            )}
+        </main>
     );
 }

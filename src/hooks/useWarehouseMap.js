@@ -10,20 +10,24 @@ export function useWarehouseMap() {
   const carregarEnderecos = useCallback(async () => {
     try {
       const { data, error: err } = await supabase
-        .from('enderecos')
-        .select(`id, porta_palete, nivel, coluna, rua, paridade, status, tipo,
-          estoques ( quantidade, lote, validade, produtos ( sku, descricao ) )`)
-        .order('id');
+        .from('mapa_armazem')
+        .select('*')
+        .order('endereco');
       if (err) throw err;
       const mapa = {};
-      for (const end of data) {
-        const est = end.estoques?.[0];
-        mapa[end.id] = {
-          id: end.id, portaPalete: end.porta_palete, nivel: end.nivel,
-          coluna: end.coluna, rua: end.rua, paridade: end.paridade,
-          status: end.status, tipo: end.tipo,
-          sku: est?.produtos?.sku ?? null, produto: est?.produtos?.descricao ?? null,
-          lote: est?.lote ?? null, quantidade: est?.quantidade ?? 0,
+      for (const row of data) {
+        mapa[row.endereco_id] = {
+          id: row.endereco_id, 
+          portaPalete: row.porta_palete, 
+          nivel: row.nivel,
+          coluna: row.posicao, 
+          rua: row.rua, 
+          status: row.status_endereco === 'Ocupado' ? 'ocupado' : 'vazio', 
+          tipo: row.tipo_endereco,
+          sku: row.sku ?? null, 
+          produto: row.produto ?? null,
+          quantidade: row.quantidade ?? 0,
+          endereco: row.endereco
         };
       }
       setSlots(mapa); setLastSync(new Date()); setError(null);
@@ -50,7 +54,7 @@ export function useWarehouseMap() {
     const { error: err } = await supabase.from('enderecos')
       .update({ status: 'vazio', updated_at: new Date().toISOString() }).eq('id', enderecoId);
     if (err) return { ok: false, erro: err.message };
-    await supabase.from('estoques').delete().eq('endereco_id', enderecoId);
+    await supabase.from('alocacao_estoque').delete().eq('endereco_id', enderecoId);
     atualizarSlot(enderecoId, { status: 'vazio', sku: null, produto: null, quantidade: 0 });
     return { ok: true };
   }, [atualizarSlot]);
