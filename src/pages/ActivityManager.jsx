@@ -486,7 +486,7 @@ export default function ActivityManager() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Realtime ──────────────────────────────────────────────────────
+  // ── Realtime tarefas ──────────────────────────────────────────────
   useEffect(() => {
     if (!warehouseId) return;
     const channel = supabase
@@ -499,6 +499,34 @@ export default function ActivityManager() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [warehouseId, fetchData]);
+
+  // ── Feed Mobile Live (auditoria_inventario) ───────────────────────
+  const [mobileFeed, setMobileFeed] = useState([]);
+  const [mobileLoading, setMobileLoading] = useState(true);
+
+  const fetchMobileFeed = useCallback(async () => {
+    const { data } = await supabase
+      .from('auditoria_inventario')
+      .select('id, operador_nome, sku, descricao, endereco_label, quantidade_contada, quantidade_esperada, peso, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    setMobileFeed(data || []);
+    setMobileLoading(false);
+  }, []);
+
+  useEffect(() => { fetchMobileFeed(); }, [fetchMobileFeed]);
+
+  useEffect(() => {
+    const ch = supabase
+      .channel('mobile-feed-auditoria')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auditoria_inventario' },
+        (payload) => {
+          setMobileFeed(prev => [payload.new, ...prev].slice(0, 30));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   // Map O(1) para lookup de operador por id
   const operadoresMap = useMemo(
@@ -730,6 +758,122 @@ export default function ActivityManager() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* ═══════════ FEED MOBILE LIVE ═══════════ */}
+      <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="relative flex">
+              <span className="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-red-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Feed Mobile Live</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bipagens em tempo real dos coletores de campo</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{mobileFeed.length} registros</span>
+            <button
+              onClick={fetchMobileFeed}
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-colors"
+              title="Atualizar feed"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {mobileLoading ? (
+          <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-xs font-bold uppercase tracking-widest">Conectando ao feed...</span>
+          </div>
+        ) : mobileFeed.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-14 gap-3 text-slate-400">
+            <Activity className="w-10 h-10 opacity-30" />
+            <p className="text-xs font-bold uppercase tracking-widest">Nenhuma bipagem registrada ainda.</p>
+            <p className="text-[10px] text-slate-300 italic">Quando um operador usar o app mobile (Inventário Ativo), os dados aparecerão aqui em tempo real.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                  {['Horário', 'Operador', 'SKU', 'Descrição', 'Endereço', 'Qtd Contada', 'Qtd Esperada', 'Peso', 'Status'].map(h => (
+                    <th key={h} className="px-4 py-2.5 text-left text-[9px] font-black uppercase tracking-widest text-slate-400 whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {mobileFeed.map((row, i) => {
+                  const isDivergente = row.status === 'divergente';
+                  const ts = row.created_at ? new Date(row.created_at) : null;
+                  const hora = ts ? ts.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+                  const data = ts ? ts.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '';
+                  return (
+                    <tr
+                      key={row.id || i}
+                      className={cn(
+                        'border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors',
+                        i === 0 && 'animate-in fade-in slide-in-from-top-2 duration-500',
+                        isDivergente && 'bg-amber-50/60 dark:bg-amber-900/10'
+                      )}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="font-black text-slate-700 dark:text-slate-200">{hora}</div>
+                        <div className="text-[9px] text-slate-400">{data}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[8px] font-black text-primary shrink-0">
+                            {(row.operador_nome || 'OP').slice(0, 2).toUpperCase()}
+                          </div>
+                          <span className="font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">{row.operador_nome || '—'}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="font-black text-slate-900 dark:text-white font-mono tracking-tight">{row.sku}</span>
+                      </td>
+                      <td className="px-4 py-3 max-w-[200px]">
+                        <span className="text-slate-500 dark:text-slate-400 truncate block">{row.descricao || '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono font-bold text-slate-700 dark:text-slate-300">
+                          <MapPin className="w-2.5 h-2.5 text-slate-400" />{row.endereco_label || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={cn(
+                          'font-black text-base',
+                          isDivergente ? 'text-amber-600' : 'text-slate-900 dark:text-white'
+                        )}>{row.quantidade_contada ?? '—'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-slate-400 font-bold">{row.quantidade_esperada ?? '—'}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="text-slate-500 font-bold">{row.peso ? `${Number(row.peso).toFixed(2)} kg` : '—'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {isDivergente ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-black text-[9px] uppercase tracking-widest">
+                            <AlertTriangle className="w-2.5 h-2.5" /> Divergente
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-black text-[9px] uppercase tracking-widest">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> OK
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* MODAIS & GAVETA */}
