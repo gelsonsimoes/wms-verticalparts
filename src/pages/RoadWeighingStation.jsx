@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Truck,
   Scale,
@@ -51,12 +51,6 @@ function Toast({ toast, onClose }) {
 // ===== CONSTANTES =====
 const DIVERGENCE_TOLERANCE = 500; // kg
 const SCALES = ['Balança Rodoviária Primária — Toledo 60T', 'Balança Rodoviária Secundária — Toledo 30T', 'Plataforma de Eixo — Doca 01'];
-
-const SEED_VEHICLES = [
-  { placa: 'ABC-1D23', transportadora: 'TBM Logística',    tipo: 'Recebimento', pesoNota: 28500 },
-  { placa: 'DEF-4E56', transportadora: 'Rápido São Paulo', tipo: 'Expedição',   pesoNota: 14200 },
-  { placa: 'GHI-7F89', transportadora: 'VPC Express',      tipo: 'Recebimento', pesoNota: 33000 },
-];
 
 // ===== MODAL SUPERVISOR =====
 function SupervisorModal({ pesoNota, pesoBruto, onClose, onConfirm }) {
@@ -207,18 +201,16 @@ function HistoryModal({ onClose, warehouseId }) {
   }, [onClose]);
 
   useEffect(() => {
-    if (!warehouseId) { setLoading(false); return; }
     supabase
-      .from('pesagens')
+      .from('pesagens_rodoviarias')
       .select('*')
-      .eq('warehouse_id', warehouseId)
       .order('created_at', { ascending: false })
       .limit(30)
       .then(({ data }) => {
-        setHistory(data || []);
+        setHistory(data ?? []);
         setLoading(false);
       });
-  }, [warehouseId]);
+  }, []);
 
   const formatDateTime = (ts) => {
     if (!ts) return '—';
@@ -254,7 +246,7 @@ function HistoryModal({ onClose, warehouseId }) {
           ) : (
             <table className="w-full text-sm">
               <thead><tr className="bg-slate-900 border-b border-slate-800">
-                {['Data/Hora', 'SKU / Placa', 'Op.', 'Balança', 'Peso (Kg)', 'Status'].map(h => (
+                {['Data/Hora', 'Placa', 'Balança', 'Líquido (Kg)', 'Decl. App (Kg)', 'Status'].map(h => (
                   <th key={h} scope="col" className="p-4 text-left text-[9px] font-black text-slate-500 uppercase tracking-widest">{h}</th>
                 ))}
               </tr></thead>
@@ -262,14 +254,18 @@ function HistoryModal({ onClose, warehouseId }) {
                 {history.map(r => (
                   <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-900/50 transition-colors">
                     <td className="p-4 text-[10px] font-bold text-slate-400 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
-                    <td className="p-4"><code className="text-xs font-black text-primary px-2 py-0.5 bg-primary/10 rounded-lg">{r.sku}</code></td>
-                    <td className="p-4 text-[10px] font-bold text-slate-400">{r.modo}</td>
-                    <td className="p-4 text-[10px] font-bold text-slate-400 truncate max-w-[120px]">{r.balanca || '—'}</td>
-                    <td className="p-4 text-xs font-black text-primary tabular-nums">{Number(r.peso_capturado).toLocaleString('pt-BR')}</td>
+                    <td className="p-4"><code className="text-xs font-black text-primary px-2 py-0.5 bg-primary/10 rounded-lg">{r.placa ?? '—'}</code></td>
+                    <td className="p-4 text-[10px] font-bold text-slate-400 truncate max-w-[120px]">{r.balanca ?? '—'}</td>
+                    <td className="p-4 text-xs font-black text-primary tabular-nums">
+                      {r.liquido_kg != null ? Number(r.liquido_kg).toLocaleString('pt-BR') : '—'}
+                    </td>
+                    <td className="p-4 text-xs font-bold text-slate-400 tabular-nums">
+                      {r.peso_declarado_kg != null ? Number(r.peso_declarado_kg).toLocaleString('pt-BR') : '—'}
+                    </td>
                     <td className="p-4">
                       <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
-                        r.validado ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/40 text-amber-400'
-                      )}>{r.validado ? 'Aprovado' : 'Com Divergência'}</span>
+                        r.status === 'aprovado' ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/40 text-amber-400'
+                      )}>{r.status === 'aprovado' ? 'Aprovado' : 'Com Divergência'}</span>
                     </td>
                   </tr>
                 ))}
@@ -288,7 +284,50 @@ function HistoryModal({ onClose, warehouseId }) {
 // ===== COMPONENTE PRINCIPAL =====
 export default function RoadWeighingStation() {
   const { warehouseId } = useApp();
-  const [selectedVehicle, setSelectedVehicle]       = useState(SEED_VEHICLES[0]);
+
+  // ── Carrega veículos reais do Supabase ───────────────────────────────────
+  const [vehicles, setVehicles]   = useState([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('veiculos')
+      .select('id, placa, modelo, tipo, transportadora, tara, lotacao, status')
+      .in('status', ['disponivel', 'em_rota'])
+      .order('placa')
+      .then(({ data }) => {
+        const list = (data ?? []).map(v => ({
+          id:              v.id,
+          placa:           v.placa,
+          transportadora:  v.transportadora ?? v.modelo ?? 'N/I',
+          tipo:            v.tipo === 'caminhao' || v.tipo === 'van' ? 'Expedição' : 'Recebimento',
+          tara:            v.tara ?? 0,
+          // pesoNota será sobrescrito ao selecionar (via pedido_venda_omie)
+          pesoNota:        v.lotacao ?? 0,
+          pesoDeclaradoApp: null,
+        }));
+        setVehicles(list);
+        if (list.length > 0) setSelectedVehicle(list[0]);
+        setLoadingVehicles(false);
+      });
+  }, []);
+
+  // ── Busca peso declarado pelo mobile para o veículo selecionado ──────────
+  const fetchPesoDeclarado = useCallback(async (placa) => {
+    if (!placa) return null;
+    const { data } = await supabase
+      .from('pedidos_venda_omie')
+      .select('numero_pedido, peso_total_separado')
+      .eq('veiculo_placa', placa)
+      .in('status', ['separado', 'conferido'])
+      .order('atualizado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data ?? null;
+  }, []);
+
+  const [selectedVehicle, setSelectedVehicle]       = useState(null);
+  const [pesoDeclaradoInfo, setPesoDeclaradoInfo]   = useState(null); // { numero_pedido, peso_total_separado }
   const [activeScale, setActiveScale]               = useState(SCALES[0]);
   const [showScaleDropdown, setShowScaleDropdown]   = useState(false);
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
@@ -301,6 +340,13 @@ export default function RoadWeighingStation() {
   const [liberado, setLiberado]                     = useState(false);
   const [saved, setSaved]                           = useState(false);
   const [saving, setSaving]                         = useState(false);
+
+  // Ao mudar veículo, busca o peso declarado pelo mobile
+  useEffect(() => {
+    if (!selectedVehicle?.placa) return;
+    setPesoDeclaradoInfo(null);
+    fetchPesoDeclarado(selectedVehicle.placa).then(setPesoDeclaradoInfo);
+  }, [selectedVehicle, fetchPesoDeclarado]);
 
   // Toast
   const [toast, setToast]  = useState(null);
@@ -353,30 +399,42 @@ export default function RoadWeighingStation() {
     setCurrentWeight(8420);
   };
 
-  const liquido      = bruto !== null && tara !== null ? bruto - tara : null;
-  const hasDivergence = liquido !== null && Math.abs(liquido - selectedVehicle.pesoNota) > DIVERGENCE_TOLERANCE;
-  const canSave      = bruto !== null && tara !== null && (liberado || !hasDivergence);
+  const pesoReferencia = pesoDeclaradoInfo?.peso_total_separado ?? selectedVehicle?.pesoNota ?? 0;
+  const liquido        = bruto !== null && tara !== null ? bruto - tara : null;
+  const hasDivergence  = liquido !== null && pesoReferencia > 0 && Math.abs(liquido - pesoReferencia) > DIVERGENCE_TOLERANCE;
+  const canSave        = bruto !== null && tara !== null && (liberado || !hasDivergence);
 
-  // ─── Save to Supabase (pesagens table) ─────────────────────────
+  // ─── Save to Supabase (pesagens_rodoviarias) ───────────────────
   const handleSave = async () => {
-    if (!canSave || saving) return;
+    if (!canSave || saving || !selectedVehicle) return;
     setSaving(true);
+    const pesoDeclarado = pesoDeclaradoInfo?.peso_total_separado ?? null;
+    const divergenciaKg  = pesoDeclarado != null ? liquido - pesoDeclarado : null;
+    const divergenciaPct = pesoDeclarado != null && pesoDeclarado > 0
+      ? ((Math.abs(divergenciaKg) / pesoDeclarado) * 100)
+      : null;
+
     const payload = {
-      warehouse_id:   warehouseId,
-      sku:            selectedVehicle.placa,
-      descricao:      `${selectedVehicle.transportadora} — ${selectedVehicle.tipo}`,
-      peso_capturado: liquido,
-      peso_master:    selectedVehicle.pesoNota,
-      variacao:       liquido - selectedVehicle.pesoNota,
-      modo:           selectedVehicle.tipo === 'Recebimento' ? 'INBOUND' : 'OUTBOUND',
-      balanca:        activeScale,
-      validado:       !hasDivergence || liberado,
+      warehouse_id:       warehouseId,
+      placa:              selectedVehicle.placa,
+      veiculo_id:         selectedVehicle.id ?? null,
+      pedido_id:          pesoDeclaradoInfo?.id ?? null,
+      tara_kg:            tara,
+      bruto_kg:           bruto,
+      liquido_kg:         liquido,
+      peso_declarado_kg:  pesoDeclarado,
+      divergencia_kg:     divergenciaKg,
+      divergencia_pct:    divergenciaPct,
+      status:             hasDivergence && !liberado ? 'divergente' : 'aprovado',
+      liberado_por:       liberado ? 'supervisor' : null,
+      operador_nome:      'Balança Rodoviária',
+      balanca:            activeScale,
     };
-    const { error } = await supabase.from('pesagens').insert([payload]);
+    const { error } = await supabase.from('pesagens_rodoviarias').insert([payload]);
     setSaving(false);
     if (error) { showToast('Erro ao salvar pesagem: ' + error.message, 'error'); return; }
     setSaved(true);
-    showToast('Pesagem salva com sucesso!');
+    showToast('Pesagem registrada em pesagens_rodoviarias!');
     setTimeout(() => { handleReset(); setSaved(false); }, 2500);
   };
 
@@ -402,7 +460,7 @@ export default function RoadWeighingStation() {
 
         {/* Vehicle Data */}
         <div className="flex-1 grid grid-cols-3 gap-3">
-          {/* Vehicle selector */}
+          {/* Vehicle selector — dados reais de 'veiculos' */}
           <div className="relative col-span-1">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Veículo / Placa</p>
             <button
@@ -410,16 +468,18 @@ export default function RoadWeighingStation() {
               aria-expanded={showVehicleDropdown}
               aria-haspopup="listbox"
               aria-label="Selecionar veículo"
-              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-xl text-xs font-black text-primary hover:border-primary/50 transition-all"
+              disabled={loadingVehicles}
+              className="w-full flex items-center justify-between gap-2 px-3 py-2.5 bg-slate-800 border-2 border-slate-700 rounded-xl text-xs font-black text-primary hover:border-primary/50 transition-all disabled:opacity-50"
             >
               <span className="flex items-center gap-2">
-                <Truck className="w-3.5 h-3.5" aria-hidden="true" />{selectedVehicle.placa}
+                <Truck className="w-3.5 h-3.5" aria-hidden="true" />
+                {loadingVehicles ? 'Carregando...' : (selectedVehicle?.placa ?? '—')}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
             </button>
-            {showVehicleDropdown && (
-              <div className="absolute top-full mt-1 left-0 w-64 bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                {SEED_VEHICLES.map(v => (
+            {showVehicleDropdown && vehicles.length > 0 && (
+              <div className="absolute top-full mt-1 left-0 w-72 bg-slate-900 border-2 border-slate-800 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                {vehicles.map(v => (
                   <button key={v.placa}
                     onClick={() => { setSelectedVehicle(v); setShowVehicleDropdown(false); handleReset(); }}
                     className="w-full flex items-center justify-between px-4 py-3 text-left text-xs font-bold text-slate-300 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
@@ -434,17 +494,17 @@ export default function RoadWeighingStation() {
 
           <div>
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Transportadora</p>
-            <p className="text-sm font-black text-white">{selectedVehicle.transportadora}</p>
+            <p className="text-sm font-black text-white">{selectedVehicle?.transportadora ?? '—'}</p>
           </div>
           <div>
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tipo de Operação</p>
             <span className={cn("inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider",
-              selectedVehicle.tipo === 'Recebimento'
+              selectedVehicle?.tipo === 'Recebimento'
                 ? 'bg-blue-900/50 text-blue-300 border border-blue-800'
                 : 'bg-amber-900/50 text-amber-300 border border-amber-800'
             )}>
-              <ArrowRight className={cn("w-3 h-3", selectedVehicle.tipo === 'Expedição' && "rotate-180")} />
-              {selectedVehicle.tipo}
+              <ArrowRight className={cn("w-3 h-3", selectedVehicle?.tipo === 'Expedição' && "rotate-180")} />
+              {selectedVehicle?.tipo ?? '—'}
             </span>
           </div>
         </div>
@@ -587,7 +647,10 @@ export default function RoadWeighingStation() {
           </div>
           {liquido !== null && (
             <p className="text-[10px] font-bold text-slate-500 mt-2">
-              Nota: {selectedVehicle.pesoNota.toLocaleString('pt-BR')} Kg
+              Ref.: {pesoReferencia > 0 ? pesoReferencia.toLocaleString('pt-BR') + ' Kg' : '—'}
+              {pesoDeclaradoInfo && (
+                <span className="ml-1 text-primary/60">(App: {Number(pesoDeclaradoInfo.peso_total_separado).toLocaleString('pt-BR')} Kg)</span>
+              )}
             </p>
           )}
         </div>
@@ -684,8 +747,8 @@ export default function RoadWeighingStation() {
       {/* MODALS */}
       {showSupervisorModal && (
         <SupervisorModal
-          pesoNota={selectedVehicle.pesoNota}
-          pesoBruto={bruto || 0}
+          pesoNota={pesoReferencia}
+          pesoBruto={bruto ?? 0}
           onClose={() => setShowSupervisorModal(false)}
           onConfirm={(_motivo) => { setShowSupervisorModal(false); setLiberado(true); showToast('Divergência autorizada pelo supervisor.'); }}
         />
