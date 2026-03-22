@@ -67,6 +67,8 @@ const WarehouseAreas = lazy(() => import('./pages/WarehouseAreas'));
 const Sectors = lazy(() => import('./pages/Sectors'));
 const LabelManager = lazy(() => import('./pages/LabelManager'));
 const CustomerCatalog = lazy(() => import('./pages/CustomerCatalog'));
+const SupplierCatalog = lazy(() => import('./pages/SupplierCatalog'));
+const CarrierCatalog  = lazy(() => import('./pages/CarrierCatalog'));
 
 // 8. INDICADORES
 const FinancialDashboard = lazy(() => import('./pages/FinancialDashboard'));
@@ -160,6 +162,8 @@ export const appRoutes = [
   { path: '/cadastros/armazens', element: <Warehouses />, meta: { codigo: '7.2', titulo: 'Configurar Armazéns' } },
   { path: '/cadastros/enderecos', element: <AddressManagement />, meta: { codigo: '7.3', titulo: 'Cadastrar Endereços' } },
   { path: '/cadastros/clientes', element: <CustomerCatalog />, meta: { codigo: '7.3.1', titulo: 'Catálogo de Clientes' } },
+  { path: '/cadastros/fornecedores',    element: <SupplierCatalog />, meta: { codigo: '7.3.2', titulo: 'Catálogo de Fornecedores' } },
+  { path: '/cadastros/transportadoras', element: <CarrierCatalog />,  meta: { codigo: '7.3.3', titulo: 'Catálogo de Transportadoras' } },
   { path: '/cadastros/produtos', element: <ProductCatalog />, meta: { codigo: '7.4', titulo: 'Cadastro de Produtos' } },
   { path: '/cadastros/rotas-veiculos', element: <RoutesVehicles />, meta: { codigo: '7.5', titulo: 'Cadastrar Rotas e Veículos' } },
   { path: '/cadastros/areas', element: <WarehouseAreas />, meta: { codigo: '7.6', titulo: 'Configurar Áreas' } },

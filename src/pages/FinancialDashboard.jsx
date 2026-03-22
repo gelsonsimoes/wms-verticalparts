@@ -63,6 +63,36 @@ const fmtBRL = (v) =>
 export default function FinancialDashboard() {
     const { warehouseId } = useApp();
 
+    const [chartData, setChartData] = useState(billingHistory); // fallback nos estáticos
+
+    useEffect(() => {
+        const load = async () => {
+            const { data } = await supabase.from('notas_fiscais').select('tipo, valor_total, data_emissao');
+            if (!data || data.length === 0) return; // mantém fallback estático
+
+            // Agrupa por mês
+            const byMonth = {};
+            data.forEach(r => {
+                if (!r.data_emissao) return;
+                const m = r.data_emissao.slice(0, 7); // 'YYYY-MM'
+                if (!byMonth[m]) byMonth[m] = { entradas: 0, saidas: 0 };
+                if (r.tipo === 'entrada') byMonth[m].entradas += Number(r.valor_total || 0);
+                if (r.tipo === 'saida')   byMonth[m].saidas   += Number(r.valor_total || 0);
+            });
+
+            const months = { '01':'Jan','02':'Fev','03':'Mar','04':'Abr','05':'Mai','06':'Jun','07':'Jul','08':'Ago','09':'Set','10':'Out','11':'Nov','12':'Dez' };
+            const rows = Object.entries(byMonth).sort().map(([ym, v]) => ({
+                month: months[ym.slice(5)] || ym,
+                entradas: v.entradas,
+                saidas: v.saidas,
+                valor: v.entradas + v.saidas, // compatibilidade com chart existente
+            }));
+
+            if (rows.length > 0) setChartData(rows);
+        };
+        load();
+    }, []);
+
     // KPIs dinâmicos
     const [totalPagar,       setTotalPagar]       = useState(null);
     const [totalReceber,     setTotalReceber]      = useState(null);
@@ -214,7 +244,7 @@ export default function FinancialDashboard() {
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={billingHistory} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis
                                     dataKey="month"
