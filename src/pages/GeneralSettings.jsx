@@ -91,17 +91,19 @@ export default function GeneralSettings() {
   const [saveFeedback, setSaveFeedback] = useState(null); // { type: 'ok'|'err', msg }
 
   // Carrega configurações salvas do Supabase ao montar
+  // wms_settings usa schema key-value: { id, warehouse_id, chave, valor, tipo, descricao }
   useEffect(() => {
     const load = async () => {
       setLoadingSettings(true);
       try {
         const { data, error } = await supabase
           .from('wms_settings')
-          .select('*')
-          .eq('warehouse_id', warehouseId)
-          .maybeSingle();
-        if (!error && data?.config) {
-          setConfig(prev => ({ ...prev, ...data.config }));
+          .select('chave, valor')
+          .eq('warehouse_id', warehouseId);
+        if (!error && data && data.length > 0) {
+          const merged = {};
+          data.forEach(row => { if (row.chave) merged[row.chave] = row.valor; });
+          setConfig(prev => ({ ...prev, ...merged }));
         }
       } catch (_) {
         // tabela pode não existir ainda — usa defaults
@@ -115,9 +117,17 @@ export default function GeneralSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Converte o objeto config em linhas key-value e faz upsert em lote
+      const rows = Object.entries(config).map(([chave, valor]) => ({
+        warehouse_id: warehouseId,
+        chave,
+        valor: String(valor ?? ''),
+        tipo: 'config',
+        updated_at: new Date().toISOString(),
+      }));
       const { error } = await supabase
         .from('wms_settings')
-        .upsert({ warehouse_id: warehouseId, config }, { onConflict: 'warehouse_id' });
+        .upsert(rows, { onConflict: 'warehouse_id,chave' });
       if (error) throw error;
       setSaveFeedback({ type: 'ok', msg: 'Configurações salvas com sucesso!' });
     } catch (e) {

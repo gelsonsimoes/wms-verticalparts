@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     BarChart,
     Bar,
@@ -10,7 +10,6 @@ import {
     PieChart,
     Pie,
     Cell,
-    Legend
 } from 'recharts';
 import {
     DollarSign,
@@ -22,18 +21,10 @@ import {
     Wallet,
     CreditCard
 } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 
-// ====== DADOS MOCKADOS (VERTICALPARTS) ======
-// isPositiveChange: semântica contextual.
-// Receita subindo = bom. Custo diminuindo = bom.
-// trend !== isPositiveChange para métricas de custo.
-const kpiData = [
-    { label: 'Receita do Mês',     value: 'R$ 1.258.450,00', change: '+12.5%', trend: 'up',   isPositiveChange: true,  icon: DollarSign, color: '#FFD700' },
-    { label: 'Custo Armazenagem',  value: 'R$ 485.200,00',   change: '-2.4%',  trend: 'down', isPositiveChange: true,  icon: Wallet,     color: '#000000' }, // custo caindo = bom
-    { label: 'Diárias Pendentes',  value: '1.240',           change: '+156',   trend: 'up',   isPositiveChange: false, icon: Clock,      color: '#FFD700' }, // mais pendentes = ruim
-    { label: 'Contratos Ativos',   value: '42',              change: '+3',     trend: 'up',   isPositiveChange: true,  icon: FileText,   color: '#000000' },
-];
-
+// ====== DADOS ESTÁTICOS (gráficos que ainda não têm fonte real) ======
 const billingHistory = [
     { month: 'Set', valor: 850000 },
     { month: 'Out', valor: 920000 },
@@ -52,11 +43,6 @@ const serviceDistribution = [
 
 const COLORS = ['#FFD700', '#1A1A1A', '#4F4F4F', '#E0E0E0'];
 
-const KPI_COLORS = {
-    up: 'text-emerald-500',
-    down: 'text-rose-500'
-};
-
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
@@ -71,7 +57,104 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
+const fmtBRL = (v) =>
+    `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
 export default function FinancialDashboard() {
+    const { warehouseId } = useApp();
+
+    // KPIs dinâmicos
+    const [totalPagar,       setTotalPagar]       = useState(null);
+    const [totalReceber,     setTotalReceber]      = useState(null);
+    const [vencidas,         setVencidas]          = useState(null);
+    const [contratosAtivos,  setContratosAtivos]   = useState(null);
+    const [loadingKpis,      setLoadingKpis]       = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            setLoadingKpis(true);
+            try {
+                const today = new Date().toISOString().slice(0, 10);
+
+                // Busca contas_pagar e contas_receber em paralelo
+                const [resPagar, resReceber] = await Promise.all([
+                    supabase.from('contas_pagar').select('valor, vencimento, status'),
+                    supabase.from('contas_receber').select('valor, vencimento, status'),
+                ]);
+
+                const pagar    = resPagar.data    || [];
+                const receber  = resReceber.data  || [];
+
+                // KPI: Total a Pagar (status='aberto')
+                const sumPagar = pagar
+                    .filter(r => r.status === 'aberto')
+                    .reduce((acc, r) => acc + Number(r.valor || 0), 0);
+
+                // KPI: Total a Receber (status='aberto')
+                const sumReceber = receber
+                    .filter(r => r.status === 'aberto')
+                    .reduce((acc, r) => acc + Number(r.valor || 0), 0);
+
+                // KPI: Vencidas (vencimento < hoje AND status='aberto') — ambas as tabelas
+                const vencPagar   = pagar.filter(r => r.status === 'aberto' && r.vencimento && r.vencimento < today).length;
+                const vencReceber = receber.filter(r => r.status === 'aberto' && r.vencimento && r.vencimento < today).length;
+
+                // KPI: Contratos Ativos (proxy = contas_receber com status='aberto')
+                const ativos = receber.filter(r => r.status === 'aberto').length;
+
+                setTotalPagar(sumPagar);
+                setTotalReceber(sumReceber);
+                setVencidas(vencPagar + vencReceber);
+                setContratosAtivos(ativos);
+            } catch (err) {
+                console.error('[FinancialDashboard] fetch KPIs:', err.message);
+            } finally {
+                setLoadingKpis(false);
+            }
+        };
+        load();
+    }, [warehouseId]);
+
+    // Monta array de KPIs dinamicamente com dados reais
+    const kpiData = [
+        {
+            label: 'Total a Receber',
+            value: loadingKpis ? '—' : fmtBRL(totalReceber),
+            change: '+12.5%',
+            trend: 'up',
+            isPositiveChange: true,
+            icon: DollarSign,
+            color: '#FFD700',
+        },
+        {
+            label: 'Total a Pagar',
+            value: loadingKpis ? '—' : fmtBRL(totalPagar),
+            change: '-2.4%',
+            trend: 'down',
+            isPositiveChange: true,
+            icon: Wallet,
+            color: '#000000',
+        },
+        {
+            label: 'Títulos Vencidos',
+            value: loadingKpis ? '—' : String(vencidas ?? 0),
+            change: vencidas > 0 ? `+${vencidas}` : '0',
+            trend: vencidas > 0 ? 'up' : 'down',
+            isPositiveChange: vencidas === 0,
+            icon: Clock,
+            color: '#FFD700',
+        },
+        {
+            label: 'Contratos Ativos',
+            value: loadingKpis ? '—' : String(contratosAtivos ?? 0),
+            change: '+3',
+            trend: 'up',
+            isPositiveChange: true,
+            icon: FileText,
+            color: '#000000',
+        },
+    ];
+
     return (
         <div className="space-y-8 p-6 animate-in fade-in duration-700 font-['Poppins',_sans-serif]">
             {/* ====== CABEÇALHO ====== */}
@@ -99,7 +182,6 @@ export default function FinancialDashboard() {
                             <div className={`p-4 rounded-2xl ${kpi.color === '#FFD700' ? 'bg-primary/10 text-primary' : 'bg-secondary/5 text-secondary'} group-hover:scale-110 transition-transform`}>
                                 <kpi.icon className="w-6 h-6" aria-hidden="true" />
                             </div>
-                            {/* Badge usa isPositiveChange (semântico), não trend (direcional) */}
                             <div className={`flex items-center gap-1 text-[10px] font-black px-3 py-1.5 rounded-full ${
                                 kpi.isPositiveChange ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
                             }`}>
@@ -134,24 +216,24 @@ export default function FinancialDashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={billingHistory} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis 
-                                    dataKey="month" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }} 
+                                <XAxis
+                                    dataKey="month"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
                                     dy={10}
                                 />
-                                <YAxis 
-                                    axisLine={false} 
-                                    tickLine={false} 
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
                                     tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 800 }}
                                     tickFormatter={(value) => `R$ ${(value / 1000)}k`}
                                 />
                                 <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f8fafc' }} />
-                                <Bar 
-                                    dataKey="valor" 
-                                    fill="#FFD700" 
-                                    radius={[12, 12, 0, 0]} 
+                                <Bar
+                                    dataKey="valor"
+                                    fill="#FFD700"
+                                    radius={[12, 12, 0, 0]}
                                     barSize={40}
                                 />
                             </BarChart>
@@ -165,7 +247,7 @@ export default function FinancialDashboard() {
                         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-primary mb-1">Mix de Serviços</h3>
                         <p className="text-[10px] text-white/40 font-bold italic">Distribuição de Receita por Categoria</p>
                     </div>
-                    
+
                     <div className="h-[250px] w-full relative z-10">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -182,7 +264,7 @@ export default function FinancialDashboard() {
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#fff', fontSize: '10px', fontWeight: 'bold' }}
                                 />
                             </PieChart>

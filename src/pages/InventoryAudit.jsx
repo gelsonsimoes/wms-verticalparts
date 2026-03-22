@@ -43,7 +43,7 @@ export default function InventoryAudit() {
         try {
             const { data, error } = await supabase
                 .from('alocacao_estoque')
-                .select('*, produtos(sku, descricao, unidade_medida)')
+                .select('*, produtos(sku, descricao, unidade)')
                 .eq('warehouse_id', warehouseId);
 
             if (error) throw error;
@@ -52,7 +52,7 @@ export default function InventoryAudit() {
                 // seed: busca até 5 produtos para criar registros demo
                 const { data: prods } = await supabase
                     .from('produtos')
-                    .select('id, sku, descricao, unidade_medida')
+                    .select('id, sku, descricao, unidade')
                     .limit(5);
 
                 if (prods && prods.length > 0) {
@@ -74,7 +74,7 @@ export default function InventoryAudit() {
                 id:           r.id,
                 sku:          r.produtos?.sku          ?? '—',
                 descricao:    r.produtos?.descricao    ?? '—',
-                unidade:      r.produtos?.unidade_medida ?? 'UN',
+                unidade:      r.produtos?.unidade ?? 'UN',
                 endereco:     r.endereco_id            ?? '—',
                 systemStock:  r.quantidade             ?? 0,
                 status:       'Pendente',
