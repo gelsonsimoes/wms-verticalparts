@@ -621,6 +621,30 @@ function InviteModalFixed({ onClose, onSuccess }) {
 export default function UsersPage() {
   const { users, usersCrud, userGroups } = useApp();
 
+  // Fetch profiles do Supabase para enriquecer a lista de usuários
+  const [profilesMap, setProfilesMap] = useState({});
+  useEffect(() => {
+    supabase.from('profiles').select('*').then(({ data }) => {
+      if (data && data.length > 0) {
+        const map = {};
+        data.forEach(p => { map[p.id] = p; });
+        setProfilesMap(map);
+      }
+    });
+  }, []);
+
+  // Lista final: usuários do contexto enriquecidos com dados do profiles (quando disponível)
+  const usersWithProfiles = users.map(u => {
+    const profile = profilesMap[u.id];
+    if (!profile) return u;
+    return {
+      ...u,
+      nomeUsuario: profile.nome || u.nomeUsuario,
+      cargo:       profile.cargo || u.cargo,
+      telefone:    profile.telefone || u.telefone || '',
+    };
+  });
+
   const fieldId = useId();
   const [selectedUser, setSelectedUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -785,7 +809,7 @@ export default function UsersPage() {
             <LayoutGrid className="w-4 h-4 text-gray-400" />
             <h2 className="text-xs font-black uppercase tracking-widest text-gray-500">Listagem de Colaboradores</h2>
           </div>
-          <DataGrid columns={columns} data={users} onRowClick={handleSelect} />
+          <DataGrid columns={columns} data={usersWithProfiles} onRowClick={handleSelect} />
         </section>
 
         {(selectedUser || formData.usuario !== '') && (

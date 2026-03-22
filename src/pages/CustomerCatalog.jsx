@@ -129,13 +129,13 @@ export default function CustomerCatalog() {
   const handleSave = async () => {
     if (!formData.razao_social.trim()) { showToast('Razão Social é obrigatória.', 'error'); return; }
     if (isNew) {
-      const { data: inserted, error } = await supabase.from('customers').insert(formData).select().single();
+      const { data: inserted, error } = await supabase.from('clientes').insert(formData).select().single();
       if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       addCustomer(inserted ?? formData);
       setIsNew(false);
       showToast('Cliente cadastrado com sucesso!');
     } else if (selectedId) {
-      const { error } = await supabase.from('customers').update(formData).eq('id', selectedId);
+      const { error } = await supabase.from('clientes').update(formData).eq('id', selectedId);
       if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       updateCustomer(selectedId, formData);
       showToast('Alterações salvas com sucesso!');
@@ -148,7 +148,7 @@ export default function CustomerCatalog() {
   };
 
   const confirmarDelete = async () => {
-    const { error } = await supabase.from('customers').delete().eq('id', selectedId);
+    const { error } = await supabase.from('clientes').delete().eq('id', selectedId);
     if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
     deleteCustomer(selectedId);
     setSelectedId(null);
