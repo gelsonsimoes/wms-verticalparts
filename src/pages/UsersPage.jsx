@@ -261,7 +261,7 @@ function InviteModal({ onClose, onSuccess }) {
               <select
                 value={form.cargo}
                 onChange={e => setForm({ ...form, cargo: e.target.value })}
-                className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold"
+                className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:border-yellow-500 outline-none font-bold"
               >
                 <option>Operador de Armazém</option>
                 <option>Supervisor de Operações</option>
@@ -456,19 +456,15 @@ function InviteModalFixed({ onClose, onSuccess }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/invite-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email:           form.email.toLowerCase().trim(),
-          nome:            form.nome.trim(),
-          cargo:           form.cargo,
-          employee_id:     form.email.split('@')[0],
-          grupo_acesso_id: grupoId,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Falha ao enviar convite.');
+      const { error: invErr } = await supabase.from('convites_pendentes').insert([{
+        email:           form.email.toLowerCase().trim(),
+        nome:            form.nome.trim(),
+        cargo:           form.cargo,
+        grupo_acesso_id: grupoId || null,
+        paginas:         grupoSelecionado?.paginas || [],
+        convidado_por:   'admin',
+      }]);
+      if (invErr) throw new Error(invErr.message);
       onSuccess(form.email);
     } catch (err) {
       setError(err.message);
@@ -513,7 +509,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
               ref={firstInputRef}
               type="email" required value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-900 focus:border-yellow-500 outline-none transition-all"
               placeholder="colaborador@verticalparts.com.br"
             />
           </div>
@@ -524,7 +520,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
             <input
               type="text" required value={form.nome}
               onChange={e => setForm({ ...form, nome: e.target.value })}
-              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm focus:border-yellow-500 outline-none transition-all"
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm text-gray-900 focus:border-yellow-500 outline-none transition-all"
               placeholder="Ex: Ana Paula Rodrigues"
             />
           </div>
@@ -535,7 +531,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
             <select
               value={form.cargo}
               onChange={e => setForm({ ...form, cargo: e.target.value })}
-              className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold"
+              className="w-full h-[42px] border border-gray-200 rounded-lg px-3 text-sm text-gray-900 focus:border-yellow-500 outline-none font-bold"
             >
               <option>Operador de Armazém</option>
               <option>Supervisor de Operações</option>
@@ -564,7 +560,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
               <select
                 value={grupoId}
                 onChange={e => setGrupoId(e.target.value)}
-                className="w-full h-[42px] border-2 border-yellow-400 rounded-lg px-3 text-sm focus:border-yellow-500 outline-none font-bold bg-yellow-50"
+                className="w-full h-[42px] border-2 border-yellow-400 rounded-lg px-3 text-sm text-gray-900 focus:border-yellow-500 outline-none font-bold bg-yellow-50"
               >
                 {grupos.map(g => (
                   <option key={g.id} value={g.id}>{g.nome}</option>
