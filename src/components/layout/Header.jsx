@@ -322,10 +322,10 @@ export default function Header({ toggleSidebar, onLogout, session }) {
               <p className="text-[10px] font-black text-[var(--vp-text-data)] uppercase">{user?.nome}</p>
               <p className="text-[9px] font-bold text-[var(--vp-text-label)] uppercase tracking-widest mt-0.5">{user?.nivel || user?.role}</p>
             </div>
-            <button className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-[var(--vp-text-data)] hover:bg-[var(--vp-bg-alt)] flex items-center gap-2 transition-colors">
+            <button onClick={() => { navigate('/seguranca/usuarios'); setIsSearching(false); }} className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-[var(--vp-text-data)] hover:bg-[var(--vp-bg-alt)] flex items-center gap-2 transition-colors">
               <User size={14} /> Perfil
             </button>
-            <button className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-[var(--vp-text-data)] hover:bg-[var(--vp-bg-alt)] flex items-center gap-2 transition-colors">
+            <button onClick={() => { navigate('/config/geral'); setIsSearching(false); }} className="w-full px-4 py-2 text-left text-[10px] font-black uppercase text-[var(--vp-text-data)] hover:bg-[var(--vp-bg-alt)] flex items-center gap-2 transition-colors">
               <Settings size={14} /> Configurações
             </button>
             <div className="h-px bg-[var(--vp-border)]" />
