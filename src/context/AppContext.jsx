@@ -177,34 +177,30 @@ export function AppProvider({ children, session }) {
         ];
     });
 
-    // Normaliza setores DB (snake_case) → app (camelCase)
+    // Normaliza setores DB → app
+    // DB colunas: id, warehouse_id, area_id, codigo, nome, tipo_produto, temperatura, ativo, capacidade
     const _normSetor = (s) => ({
         ...s,
-        tipoSetor:          s.tipo_setor          || s.tipoSetor          || '',
-        tipoLocal:          s.tipo_local          || s.tipoLocal          || '',
-        codigoIntegracao:   s.codigo_integracao   || s.codigoIntegracao   || '',
-        usoExclusivoCaixa:  s.uso_exclusivo_caixa !== false && (s.usoExclusivoCaixa || false),
+        setor:              s.nome              || s.setor              || '',  // DB 'nome' → app 'setor'
+        tipoSetor:          s.tipo_produto      || s.tipoSetor          || 'Armazenagem',
+        tipoLocal:          s.tipoLocal                                 || '',
+        codigoIntegracao:   s.codigo            || s.codigoIntegracao   || '',
+        usoExclusivoCaixa:  s.usoExclusivoCaixa || false,
         depositantes:       s.depositantes  || [],
         enderecos:          s.enderecos     || [],
         produtos:           s.produtos      || [],
         usuarios:           s.usuarios      || [],
     });
     const _denormSetor = (s) => ({
-        setor:               s.setor               || '',
-        tipo_setor:          s.tipoSetor           || '',
-        tipo_local:          s.tipoLocal           || '',
-        codigo_integracao:   s.codigoIntegracao    || '',
-        ativo:               s.ativo               !== false,
-        uso_exclusivo_caixa: s.usoExclusivoCaixa   || false,
-        depositantes:        s.depositantes        || [],
-        enderecos:           s.enderecos           || [],
-        produtos:            s.produtos            || [],
-        usuarios:            s.usuarios            || [],
+        nome:               s.setor               || '',   // app 'setor' → DB 'nome'
+        codigo:             s.codigoIntegracao    || '',   // app 'codigoIntegracao' → DB 'codigo'
+        tipo_produto:       s.tipoSetor           || '',
+        ativo:              s.ativo               !== false,
     });
 
     const [sectors, setSectors] = useState([]);
     useEffect(() => {
-        supabase.from('setores').select('*').order('setor')
+        supabase.from('setores').select('*').order('nome')
             .then(({ data }) => { if (data) setSectors(data.map(_normSetor)); });
     }, []);
 
