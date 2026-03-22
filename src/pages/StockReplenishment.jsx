@@ -1,4 +1,6 @@
 import React, { useState, useId } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 import {
   RefreshCw,
   ArrowLeftRight,
@@ -282,6 +284,7 @@ function RemanejArModal({ item, onClose, onConfirm }) {
 
 // ─── COMPONENTE PRINCIPAL ────────────────────────────────────────────
 export default function StockReplenishment() {
+  const { warehouseId } = useApp();
   const [items, setItems]             = useState(INITIAL);
   const [selectedId, setSelectedId]   = useState(null);
   const [filterStatus, setFilterStatus] = useState('Todos');
@@ -353,7 +356,24 @@ export default function StockReplenishment() {
     }, 1600);
   };
 
-  const handleRemanejado = (id) => {
+  const handleRemanejado = async (id) => {
+    const item = items.find(i => i.id === id);
+    // Registra no Kardex (movimento_estoque)
+    if (item) {
+      await supabase.from('movimento_estoque').insert([{
+        warehouse_id:      warehouseId || 'default',
+        tipo_movimento:    'remanejamento',
+        sku:               item.produto,
+        descricao:         item.produto,
+        quantidade:        Number(item.qtd) || 0,
+        quantidade_antes:  0,
+        quantidade_apos:   Number(item.qtd) || 0,
+        endereco_id:       item.origemEnd,
+        observacao:        `Remanejar para ${item.destEnd} (${item.tipoDest})`,
+      }]).then(({ error }) => {
+        if (error) console.warn('[StockReplenishment] movimento_estoque insert:', error.message);
+      });
+    }
     setItems(prev => prev.map(i => i.id === id ? { ...i, status: 'Finalizado' } : i));
     setSelectedId(null);
   };

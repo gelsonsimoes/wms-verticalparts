@@ -11,6 +11,7 @@ export function useDashboardData(warehouseId) {
     const [loading, setLoading]   = useState(true);
     const [error, setError]       = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [financeiro, setFinanceiro]   = useState({ faturamentoTotal: 0, aReceber: 0, notasEmitidas: 0 });
 
     const fetch = useCallback(async () => {
         if (!warehouseId) return;
@@ -18,11 +19,23 @@ export function useDashboardData(warehouseId) {
         setLoading(true);
         setError(null);
 
-        const { data: rows, error: err } = await supabase
-            .from('dashboard_kpis')
-            .select('*')
-            .eq('warehouse_id', warehouseId)
-            .maybeSingle();
+        const [
+            { data: rows, error: err },
+            { data: contasRows, error: contasErr },
+            { data: nfRows, error: nfErr },
+        ] = await Promise.all([
+            supabase
+                .from('dashboard_kpis')
+                .select('*')
+                .eq('warehouse_id', warehouseId)
+                .maybeSingle(),
+            supabase
+                .from('contas_receber')
+                .select('valor, status'),
+            supabase
+                .from('notas_fiscais')
+                .select('valor_total'),
+        ]);
 
         if (err) {
             console.error('[useDashboardData]', err.message);
@@ -31,6 +44,16 @@ export function useDashboardData(warehouseId) {
             setData(rows);
             setLastUpdated(new Date());
         }
+        if (contasErr) console.warn('[useDashboardData] contas_receber:', contasErr.message);
+        if (nfErr)     console.warn('[useDashboardData] notas_fiscais:', nfErr.message);
+
+        // Métricas financeiras
+        const allContas = contasRows ?? [];
+        const faturamentoTotal = allContas.reduce((acc, r) => acc + (Number(r.valor) || 0), 0);
+        const aReceber        = allContas.filter(r => r.status === 'aberto').reduce((acc, r) => acc + (Number(r.valor) || 0), 0);
+        const notasEmitidas   = (nfRows ?? []).length;
+
+        setFinanceiro({ faturamentoTotal, aReceber, notasEmitidas });
 
         setLoading(false);
     }, [warehouseId]);
@@ -49,6 +72,8 @@ export function useDashboardData(warehouseId) {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'notas_saida',      filter: `warehouse_id=eq.${warehouseId}` }, fetch)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tarefas',          filter: `warehouse_id=eq.${warehouseId}` }, fetch)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'movimento_estoque',filter: `warehouse_id=eq.${warehouseId}` }, fetch)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'contas_receber' }, fetch)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'notas_fiscais' }, fetch)
             .subscribe();
 
         return () => supabase.removeChannel(channel);
@@ -70,6 +95,10 @@ export function useDashboardData(warehouseId) {
         totalSkusAtivos:   data?.total_skus_ativos  ?? 0,
         // movimentos
         movimentosHoje:    data?.movimentos_hoje    ?? 0,
+        // financeiro
+        faturamentoTotal:  financeiro.faturamentoTotal ?? 0,
+        aReceber:          financeiro.aReceber          ?? 0,
+        notasEmitidas:     financeiro.notasEmitidas     ?? 0,
         // meta
         calculadoEm:       data?.calculado_em       ?? null,
     };
