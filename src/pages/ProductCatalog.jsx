@@ -21,7 +21,7 @@ import { useApp } from '../hooks/useApp';
 
 function cn(...i) { return twMerge(clsx(i)); }
 
-const inputCls = 'w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-yellow-400 transition';
+const inputCls = 'w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-xs font-bold text-slate-950 dark:text-white outline-none focus:ring-2 focus:ring-yellow-400 transition';
 const labelCls = 'text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400';
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -582,6 +582,10 @@ function TabIdentificacao({ prod, onChange, onGoToIA }) {
 
         <Field label="Código Integração Omie" tip="ID numérico gerado pelo Omie ERP">
           <Inp value={prod.codigo_integracao||''} onChange={v=>onChange('codigo_integracao',v)} placeholder="00000000000042" />
+        </Field>
+
+        <Field label="Código MKT" tip="Código de Marketing — usado em catálogos, campanhas e canais de venda externos">
+          <Inp value={prod.codigo_mkt||''} onChange={v=>onChange('codigo_mkt',v)} placeholder="Ex: VP-MKT-2024-001" />
         </Field>
 
         <Field label="Tipo">
@@ -1227,7 +1231,8 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
         (p.ncm||'').toLowerCase().includes(q) ||
         (p.codigo_antigo||'').toLowerCase().includes(q) ||
         (p.part_number||'').toLowerCase().includes(q) ||
-        (p.codigo_integracao||'').toLowerCase().includes(q)
+        (p.codigo_integracao||'').toLowerCase().includes(q) ||
+        (p.codigo_mkt||'').toLowerCase().includes(q)
       )) return false;
       if (filtFamilia && p.familia !== filtFamilia) return false;
       if (filtTipo    && p.tipo    !== filtTipo)    return false;
@@ -1247,7 +1252,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
         <div className="col-span-2 relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input value={busca} onChange={e=>setBusca(e.target.value)}
-            placeholder="Buscar por SKU, descrição, marca, NCM, cód. antigo, cód. integração Omie..."
+            placeholder="Buscar por SKU, descrição, marca, NCM, cód. antigo, integração Omie ou cód. MKT..."
             className={cn(inputCls,'pr-8 text-[11px] py-1.5')} />
         </div>
         <select value={filtFamilia} onChange={e=>setFiltFamilia(e.target.value)} className={selCls}>
@@ -1320,7 +1325,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
               {[
                 'SKU','Descrição','Família','Tipo','Tipo Físico',
                 'NCM','Unid.','Marca / Fabricante',
-                'Part Number','Cód. Integração Omie',
+                'Part Number','Cód. Integração Omie','Cód. MKT',
                 'Barcode EAN','Local de Estoque',
                 'Altura (cm)','Largura (cm)','Prof. (cm)',
                 'Peso Líq. (kg)','Peso Bruto (kg)',
@@ -1375,6 +1380,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
                   <td className={td}>{p.marca||'—'}</td>
                   <td className={td}>{p.part_number||'—'}</td>
                   <td className={td}>{p.codigo_integracao||'—'}</td>
+                  <td className={td}>{p.codigo_mkt||'—'}</td>
                   <td className={td}>{p.ean||'—'}</td>
                   <td className={td}>{p.local_estoque||p.enderecos_estoque?.[0]||'—'}</td>
                   <td className={tdn}>{val(p.altura)}</td>
@@ -1395,7 +1401,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
               );
             })}
             {filtrados.length === 0 && (
-              <tr><td colSpan={22} className="px-3 py-10 text-center text-slate-400 text-xs font-bold">
+              <tr><td colSpan={23} className="px-3 py-10 text-center text-slate-400 text-xs font-bold">
                 {base.length === 0 ? 'Nenhum produto cadastrado ainda.' : 'Nenhum produto corresponde aos filtros.'}
               </td></tr>
             )}
@@ -1413,7 +1419,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
 
 function produtoVazio() {
   return {
-    sku:'', codigo_antigo:'', codigo_integracao:'', part_number:'',
+    sku:'', codigo_antigo:'', codigo_integracao:'', codigo_mkt:'', part_number:'',
     descricao:'', descricao_detalhada:'', observacao:'', ncm:'',
     tipo:'Peça', familia:'', marca:'', unidade:'PC',
     prefixo_vp:'', natureza:'', tipo_fisico:'', atributos_tecnicos:{},
@@ -1669,6 +1675,7 @@ export default function ProductCatalog() {
         sku:                selected.sku.trim().toUpperCase(),
         codigo_antigo:      selected.codigo_antigo      || null,
         codigo_integracao:  selected.codigo_integracao  || null,
+        codigo_mkt:         selected.codigo_mkt         || null,
         part_number:        selected.part_number        || null,
         descricao:          selected.descricao,
         descricao_detalhada:selected.descricao_detalhada|| null,
@@ -1753,6 +1760,7 @@ export default function ProductCatalog() {
       descricao: (selected.descricao || '') + ' (Cópia)',
       codigo_antigo: '',
       codigo_integracao: '',
+      codigo_mkt: '',
       enderecos_estoque: [],
       curva_abc: null,
       estoque_erp: null,
