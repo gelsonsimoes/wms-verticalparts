@@ -1226,7 +1226,8 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
         (p.marca||'').toLowerCase().includes(q) ||
         (p.ncm||'').toLowerCase().includes(q) ||
         (p.codigo_antigo||'').toLowerCase().includes(q) ||
-        (p.part_number||'').toLowerCase().includes(q)
+        (p.part_number||'').toLowerCase().includes(q) ||
+        (p.codigo_integracao||'').toLowerCase().includes(q)
       )) return false;
       if (filtFamilia && p.familia !== filtFamilia) return false;
       if (filtTipo    && p.tipo    !== filtTipo)    return false;
@@ -1246,7 +1247,7 @@ function TabProdutos({ produtos, onSelect, onDelete }) {
         <div className="col-span-2 relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input value={busca} onChange={e=>setBusca(e.target.value)}
-            placeholder="Buscar por SKU, descrição, marca, NCM, cód. antigo..."
+            placeholder="Buscar por SKU, descrição, marca, NCM, cód. antigo, cód. integração Omie..."
             className={cn(inputCls,'pr-8 text-[11px] py-1.5')} />
         </div>
         <select value={filtFamilia} onChange={e=>setFiltFamilia(e.target.value)} className={selCls}>
