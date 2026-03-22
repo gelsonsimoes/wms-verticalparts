@@ -54,26 +54,55 @@ function Toast({ toast, onClose }) {
   );
 }
 
-// ─── Static policies (no dedicated DB table) ───────────────────
-const STATIC_POLICIES = [
-  { id: 1, numero: 'AP-2026-98821', seguradora: 'Porto Seguro S.A.', inicio: '01/01/2026', termino: '01/01/2027', cobertura: 5000000, status: 'Vigente' },
-  { id: 2, numero: 'AP-2025-44102', seguradora: 'Allianz Global',    inicio: '15/05/2025', termino: '15/05/2026', cobertura: 2500000, status: 'Vigente' },
-  { id: 3, numero: 'AP-2024-11200', seguradora: 'Mapfre Seguros',    inicio: '10/02/2024', termino: '10/02/2025', cobertura: 1200000, status: 'Vencida' },
-];
-
+// ─── Depositants (no dedicated DB table with valorEstoque) ─────
 const STATIC_DEPOSITANTS = [
   { id: 1, nome: 'VerticalParts Matriz', cnpj: '12.345.678/0001-99', valorEstoque: 1500000, coberto: true  },
   { id: 2, nome: 'VParts Import Export', cnpj: '98.765.432/0001-11', valorEstoque: 2200000, coberto: true  },
   { id: 3, nome: 'AutoParts Express',    cnpj: '45.123.789/0001-22', valorEstoque:  800000, coberto: false },
 ];
 
+// ─── helpers ──────────────────────────────────────────────────
+const fmtDateBR = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : d.toLocaleDateString('pt-BR');
+};
+
+const STATUS_LABEL = {
+  ativo:         'Vigente',
+  vencido:       'Vencida',
+  cancelado:     'Cancelada',
+  em_renovacao:  'Em Renovação',
+};
+
+const mapPolicy = (r, idx) => ({
+  id:         r.id || idx,
+  numero:     r.numero_apolice  || '—',
+  seguradora: r.seguradora      || '—',
+  inicio:     fmtDateBR(r.inicio_vigencia),
+  termino:    fmtDateBR(r.fim_vigencia),
+  cobertura:  parseFloat(r.valor_segurado) || 0,
+  status:     STATUS_LABEL[r.status] || r.status || 'Vigente',
+  tipo:       r.tipo            || '—',
+});
+
+const SEED_SEGUROS = [
+  { numero_apolice: 'AP-2026-98821', seguradora: 'Porto Seguro S.A.', tipo: 'patrimonial', status: 'ativo',   valor_segurado: 5000000, inicio_vigencia: '2026-01-01', fim_vigencia: '2027-01-01' },
+  { numero_apolice: 'AP-2025-44102', seguradora: 'Allianz Global',    tipo: 'carga',       status: 'ativo',   valor_segurado: 2500000, inicio_vigencia: '2025-05-15', fim_vigencia: '2026-05-15' },
+  { numero_apolice: 'AP-2024-11200', seguradora: 'Mapfre Seguros',    tipo: 'outro',       status: 'vencido', valor_segurado: 1200000, inicio_vigencia: '2024-02-10', fim_vigencia: '2025-02-10' },
+];
+
 export default function InsuranceManagement() {
   const { warehouseId } = useApp();
-  const [selectedId, setSelectedId]       = useState(STATIC_POLICIES[0].id);
+
+  // ─── Policies from DB ────────────────────────────────────────
+  const [policies, setPolicies]         = useState([]);
+  const [loadingPolicies, setLoadingPolicies] = useState(true);
+  const [selectedId, setSelectedId]     = useState(null);
   const [showBondModal, setShowBondModal] = useState(false);
-  const [filterQuery, setFilterQuery]    = useState('');
+  const [filterQuery, setFilterQuery]   = useState('');
   const [realStockValue, setRealStockValue] = useState(null);
-  const [loadingStock, setLoadingStock]  = useState(true);
+  const [loadingStock, setLoadingStock] = useState(true);
 
   // Toast
   const [toast, setToast]  = useState(null);
@@ -90,6 +119,43 @@ export default function InsuranceManagement() {
     Object.fromEntries(STATIC_DEPOSITANTS.map(d => [d.id, d.coberto]))
   );
   const toggleCobertura = (id) => setCoberturas(prev => ({ ...prev, [id]: !prev[id] }));
+
+  // ─── Load seguros from DB ────────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      setLoadingPolicies(true);
+      try {
+        const { data, error } = await supabase
+          .from('seguros')
+          .select('*')
+          .order('inicio_vigencia', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          const { error: seedErr } = await supabase.from('seguros').insert(SEED_SEGUROS);
+          if (seedErr) console.warn('Seed seguros:', seedErr.message);
+          const { data: fresh } = await supabase
+            .from('seguros')
+            .select('*')
+            .order('inicio_vigencia', { ascending: false });
+          const mapped = (fresh || []).map(mapPolicy);
+          setPolicies(mapped);
+          setSelectedId(mapped[0]?.id ?? null);
+        } else {
+          const mapped = data.map(mapPolicy);
+          setPolicies(mapped);
+          setSelectedId(mapped[0]?.id ?? null);
+        }
+      } catch (err) {
+        console.error('InsuranceManagement seguros fetch:', err);
+        showToast('Erro ao carregar apólices: ' + err.message, 'error');
+      } finally {
+        setLoadingPolicies(false);
+      }
+    };
+    load();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Load real stock value from notas_saida ───────────────────
   useEffect(() => {
@@ -112,14 +178,14 @@ export default function InsuranceManagement() {
   }, [warehouseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredPolicies = useMemo(() =>
-    STATIC_POLICIES.filter(p =>
+    policies.filter(p =>
       filterQuery === '' || p.numero.toLowerCase().includes(filterQuery.toLowerCase())
-    ), [filterQuery]
+    ), [policies, filterQuery]
   );
 
   const selectedPolicy = useMemo(() =>
-    STATIC_POLICIES.find(p => p.id === selectedId) || STATIC_POLICIES[0],
-    [selectedId]
+    policies.find(p => p.id === selectedId) || policies[0] || { cobertura: 0, numero: '—', status: 'Vigente' },
+    [policies, selectedId]
   );
 
   // Use real stock if available, otherwise fallback to sum of depositants
@@ -210,55 +276,75 @@ export default function InsuranceManagement() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 dark:bg-slate-850/50">
-                    <th scope="col" className="p-4 text-left   text-[10px] font-black text-slate-400 uppercase tracking-widest">Nº Apólice / Seguradora</th>
-                    <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Vigência</th>
-                    <th scope="col" className="p-4 text-right  text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Cobertura</th>
-                    <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {filteredPolicies.map((p) => (
-                    <tr
-                      key={p.id}
-                      onClick={() => setSelectedId(p.id)}
-                      className={cn(
-                        'cursor-pointer transition-all group',
-                        selectedId === p.id ? 'bg-primary/5' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
-                      )}
-                    >
-                      <td className="p-4">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-black text-slate-900 dark:text-white">{p.numero}</span>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase">{p.seguradora}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-center">
-                        <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-400">
-                          <span>{p.inicio}</span>
-                          <ChevronRight className="w-3 h-3 opacity-30" aria-hidden="true" />
-                          <span>{p.termino}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className="text-xs font-black text-slate-900 dark:text-white">
-                          {p.cobertura.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className={cn(
-                          'px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest',
-                          p.status === 'Vigente' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                        )}>
-                          {p.status}
-                        </span>
-                      </td>
+              {loadingPolicies ? (
+                <div className="flex items-center justify-center py-12 gap-3 text-slate-400">
+                  <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  <span className="text-xs font-black uppercase tracking-widest">Carregando apólices…</span>
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 dark:bg-slate-850/50">
+                      <th scope="col" className="p-4 text-left   text-[10px] font-black text-slate-400 uppercase tracking-widest">Nº Apólice / Seguradora</th>
+                      <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Vigência</th>
+                      <th scope="col" className="p-4 text-right  text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Cobertura</th>
+                      <th scope="col" className="p-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredPolicies.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center text-xs text-slate-400 font-bold uppercase">
+                          Nenhuma apólice encontrada.
+                        </td>
+                      </tr>
+                    )}
+                    {filteredPolicies.map((p) => (
+                      <tr
+                        key={p.id}
+                        onClick={() => setSelectedId(p.id)}
+                        className={cn(
+                          'cursor-pointer transition-all group',
+                          selectedId === p.id ? 'bg-primary/5' : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                        )}
+                      >
+                        <td className="p-4">
+                          <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-900 dark:text-white">{p.numero}</span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase">{p.seguradora}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                            <span>{p.inicio}</span>
+                            <ChevronRight className="w-3 h-3 opacity-30" aria-hidden="true" />
+                            <span>{p.termino}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-right">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {p.cobertura.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className={cn(
+                            'px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest',
+                            p.status === 'Vigente'      ? 'bg-green-500/10 text-green-500'  :
+                            p.status === 'Em Renovação' ? 'bg-blue-500/10 text-blue-500'    :
+                            p.status === 'Cancelada'    ? 'bg-gray-500/10 text-gray-500'    :
+                                                          'bg-red-500/10 text-red-500'
+                          )}>
+                            {p.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
