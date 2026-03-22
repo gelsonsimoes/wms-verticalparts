@@ -7,6 +7,7 @@ import {
 import {
     Target, Layers, Box, TriangleAlert,
     Database, RefreshCw, Package, ArrowUpRight,
+    DollarSign, TrendingUp, FileCheck,
 } from 'lucide-react';
 import StatsCard from '../components/ui/StatsCard'; // Assumindo que ele herda as classes de bordas
 import { useApp } from '../hooks/useApp';
@@ -155,6 +156,53 @@ export default function Dashboard() {
                         </div>
                     ))
                 }
+            </section>
+
+            {/* ─── KPI FINANCEIRO ─── */}
+            <section className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                {[
+                    {
+                        id: 'faturamento',
+                        label: 'Faturamento Total',
+                        value: loading ? '…' : kpis.faturamentoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                        change: 'Contas a receber (total)',
+                        icon: DollarSign,
+                    },
+                    {
+                        id: 'areceber',
+                        label: 'A Receber',
+                        value: loading ? '…' : kpis.aReceber.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                        change: 'Status: aberto',
+                        icon: TrendingUp,
+                    },
+                    {
+                        id: 'nfe',
+                        label: 'NF-e Emitidas',
+                        value: loading ? '…' : String(kpis.notasEmitidas),
+                        change: 'Notas fiscais emitidas',
+                        icon: FileCheck,
+                    },
+                ].map((card) => (
+                    <div key={card.id} className="vp-glass vp-glass-hover p-5 rounded-2xl relative overflow-hidden group transition-all duration-300">
+                        <div className="flex items-start justify-between mb-4">
+                            <div>
+                                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 group-hover:text-white/60 transition-colors">
+                                    {card.label}
+                                </p>
+                                <h3 className="text-3xl font-black text-[var(--vp-primary)] tracking-tighter">
+                                    {card.value}
+                                </h3>
+                            </div>
+                            <div className="p-2 bg-white/5 rounded-xl border border-white/5 group-hover:scale-110 group-hover:rotate-6 transition-all">
+                                <card.icon className="w-5 h-5 text-[var(--vp-primary)]" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-wider">
+                            <span className="px-1.5 py-0.5 bg-white/5 rounded-md border border-white/5">{card.change}</span>
+                        </div>
+                        <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[var(--vp-primary)] opacity-5 blur-2xl rounded-full group-hover:opacity-10 transition-opacity" />
+                    </div>
+                ))}
             </section>
 
             {/* ─── CHARTS & PERFORMANCE ─── */}
