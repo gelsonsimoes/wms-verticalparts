@@ -14,11 +14,36 @@ import { supabase } from '../../lib/supabaseClient';
 // Botão APP + Modal de download do app mobile VerticalParts
 // Qualquer remoção deste bloco quebra o fluxo de instalação do app Android.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const APK_URL = 'https://github.com/gelsonsimoes/WMS_VerticalParts_Mobile/releases/download/v4.3.25/app-release.apk';
+// APK_URL fallback (sobrescrita pelos dados dinâmicos de app_versions)
+const APK_FALLBACK = 'https://github.com/gelsonsimoes/WMS_VerticalParts_Mobile/releases/download/v4.3.25/app-release.apk';
 
 function AppDownloadModal({ onClose }) {
   const [copied, setCopied] = useState(false);
+  const [apkUrl, setApkUrl]   = useState(APK_FALLBACK);
+  const [versao, setVersao]   = useState('4.3.25');
+  const [tamanho, setTamanho] = useState('30.8');
+  const [loadingVer, setLoadingVer] = useState(true);
   const ref = useRef(null);
+
+  // Busca versão mais recente do Supabase
+  useEffect(() => {
+    supabase
+      .from('app_versions')
+      .select('versao, apk_url, tamanho_mb, release_notes')
+      .eq('ativo', true)
+      .eq('plataforma', 'android')
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setApkUrl(data.apk_url || APK_FALLBACK);
+          setVersao(data.versao || '4.3.25');
+          setTamanho(data.tamanho_mb ? String(data.tamanho_mb) : '30.8');
+        }
+        setLoadingVer(false);
+      });
+  }, []);
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -27,7 +52,7 @@ function AppDownloadModal({ onClose }) {
   }, [onClose]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(APK_URL);
+    navigator.clipboard.writeText(apkUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -38,7 +63,10 @@ function AppDownloadModal({ onClose }) {
         <div className="bg-[var(--vp-primary)] px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Smartphone className="w-5 h-5 text-black" />
-            <span className="font-black text-sm uppercase tracking-widest text-black">App Mobile</span>
+            <div>
+              <span className="font-black text-sm uppercase tracking-widest text-black block">App Mobile</span>
+              {!loadingVer && <span className="text-[9px] font-bold text-black/60 uppercase tracking-widest">v{versao} · {tamanho}MB</span>}
+            </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-black/10 rounded transition-colors">
             <X className="w-4 h-4 text-black" />
@@ -50,7 +78,7 @@ function AppDownloadModal({ onClose }) {
           </p>
           <div className="p-3 border-2 border-[var(--vp-primary)] rounded-xl bg-white shadow-inner">
             <QRCodeSVG
-              value={APK_URL}
+              value={apkUrl}
               size={180}
               bgColor="#ffffff"
               fgColor="#0a0a0a"
@@ -64,12 +92,12 @@ function AppDownloadModal({ onClose }) {
             />
           </div>
           <p className="text-[10px] text-gray-400 text-center leading-relaxed">
-            Android · v4.3.25 · 30.8 MB<br/>
+            Android · v{versao} · {tamanho} MB<br/>
             Aceite &quot;instalar de fontes desconhecidas&quot; se solicitado
           </p>
           <div className="w-full flex flex-col gap-2">
             <a
-              href={APK_URL}
+              href={apkUrl}
               download
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--vp-primary)] text-black rounded-lg font-black text-xs uppercase tracking-widest hover:bg-[#F2C94C] transition-colors"
             >

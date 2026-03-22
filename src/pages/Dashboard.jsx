@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -7,11 +7,12 @@ import {
 import {
     Target, Layers, Box, TriangleAlert,
     Database, RefreshCw, Package, ArrowUpRight,
-    DollarSign, TrendingUp, FileCheck,
+    DollarSign, TrendingUp, FileCheck, Truck, Clock,
 } from 'lucide-react';
-import StatsCard from '../components/ui/StatsCard'; // Assumindo que ele herda as classes de bordas
+import StatsCard from '../components/ui/StatsCard';
 import { useApp } from '../hooks/useApp';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { supabase } from '../lib/supabaseClient';
 
 // ─── SKELETON BLINDADO ───────────────────────────────────────────────────────
 function SkeletonCard() {
@@ -31,6 +32,31 @@ function SkeletonCard() {
 export default function Dashboard() {
     const { warehouseId } = useApp();
     const { kpis, loading, error, refetch, lastUpdated } = useDashboardData(warehouseId);
+
+    // ── Caminhões no Pátio ────────────────────────────────────────────
+    const [patio, setPatio] = useState([]);
+    const fetchPatio = useCallback(async () => {
+        const { data } = await supabase
+            .from('movimentacao_patio')
+            .select('id, placa, tipo_veiculo, motorista_nome, operador_nome, entrada_em')
+            .eq('status', 'no_patio')
+            .order('entrada_em', { ascending: true });
+        setPatio(data || []);
+    }, []);
+    useEffect(() => {
+        fetchPatio();
+        const ch = supabase.channel('dashboard-patio')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'movimentacao_patio' }, fetchPatio)
+            .subscribe();
+        return () => supabase.removeChannel(ch);
+    }, [fetchPatio]);
+
+    const minutosPatio = (entradaIso) => {
+        if (!entradaIso) return '—';
+        const min = Math.floor((Date.now() - new Date(entradaIso).getTime()) / 60000);
+        if (min < 60) return `${min}min`;
+        return `${Math.floor(min / 60)}h${min % 60 > 0 ? String(min % 60).padStart(2, '0') + 'min' : ''}`;
+    };
 
     // Gráfico de Ocupação Realistas e Vibrantes
     const chartData = [
@@ -312,6 +338,45 @@ export default function Dashboard() {
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-[var(--vp-primary)] to-transparent animate-pulse" />
                 </section>
             </div>
+
+            {/* ─── CAMINHÕES NO PÁTIO ─── */}
+            <section className="vp-glass rounded-2xl border border-white/5 p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/20 rounded-xl">
+                            <Truck className="w-5 h-5 text-amber-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--vp-primary)]">Caminhões no Pátio</h2>
+                            <p className="text-[9px] text-white/30 font-bold uppercase tracking-widest">Check-ins ativos via app mobile</p>
+                        </div>
+                        {patio.length > 0 && (
+                            <span className="px-2 py-0.5 bg-amber-500 text-black rounded-full text-[9px] font-black">{patio.length}</span>
+                        )}
+                    </div>
+                    <button onClick={fetchPatio} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 transition-colors" title="Atualizar">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+                {patio.length === 0 ? (
+                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest text-center py-4">Nenhum veículo no pátio agora.</p>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {patio.map((v) => (
+                            <div key={v.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/5">
+                                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-black text-[var(--vp-primary)] font-mono tracking-wider text-sm">{v.placa}</p>
+                                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{v.tipo_veiculo} · {v.motorista_nome || 'Motorista—'}</p>
+                                </div>
+                                <div className="flex items-center gap-1 text-[9px] font-black text-white/40 shrink-0">
+                                    <Clock className="w-3 h-3" />{minutosPatio(v.entrada_em)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
 
             {/* ─── FOOTER INFO ─── */}
             <footer className="pt-8 text-center">
