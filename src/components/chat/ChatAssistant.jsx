@@ -7,9 +7,7 @@ import { twMerge } from 'tailwind-merge';
 function cn(...inputs) { return twMerge(clsx(inputs)); }
 
 // Migrando do Supabase Edge Functions para a VPS Própria (Motor WMS-API)
-const CHAT_AI_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3001/api/chat' 
-  : 'https://wmsverticalparts.com.br:3001/api/chat';
+const CHAT_AI_URL = `/api/chat`;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SYSTEM_PROMPT = `
