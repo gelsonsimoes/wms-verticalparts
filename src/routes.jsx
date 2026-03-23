@@ -27,6 +27,9 @@ const RoadWeighingStation = lazy(() => import('./pages/RoadWeighingStation'));
 const WarehouseVisualMap = lazy(() => import('./pages/WarehouseVisualMap'));
 const Buffer1 = lazy(() => import('./pages/Buffer1'));
 const Buffer2 = lazy(() => import('./pages/Buffer2'));
+const Producao = lazy(() => import('./pages/Producao'));
+const CorredorFundos = lazy(() => import('./pages/CorredorFundos'));
+const SuporteGuias = lazy(() => import('./pages/SuporteGuias'));
 const OrderManagement = lazy(() => import('./pages/OrderManagement'));
 
 // 3. PLANEJAR
@@ -126,6 +129,9 @@ export const appRoutes = [
   { path: '/operacao/mapa-visual', element: <WarehouseVisualMap />, meta: { codigo: '2.16', titulo: 'Mapa Visual de Estoque' } },
   { path: '/operacao/buffer-1', element: <Buffer1 />, meta: { codigo: '2.17', titulo: 'Buffer 1' } },
   { path: '/operacao/buffer-2', element: <Buffer2 />, meta: { codigo: '2.18', titulo: 'Buffer 2' } },
+  { path: '/operacao/producao', element: <Producao />, meta: { codigo: '2.19a', titulo: 'Produção' } },
+  { path: '/operacao/corredor-fundos', element: <CorredorFundos />, meta: { codigo: '2.20a', titulo: 'Corredor Fundos' } },
+  { path: '/operacao/suporte-guias', element: <SuporteGuias />, meta: { codigo: '2.21a', titulo: 'Suporte Guias' } },
   { path: '/operacao/gerenciamento-pedidos', element: <OrderManagement />, meta: { codigo: '2.22', titulo: 'Gerenciamento de Pedidos' } },
 
   // PLANEJAR

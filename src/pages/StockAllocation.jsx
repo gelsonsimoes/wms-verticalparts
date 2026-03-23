@@ -187,6 +187,13 @@ export default function StockAllocation() {
       endereco_sugerido: novoEndereco,
     }).eq('id', activeTask.id);
 
+    if (novoEndereco && warehouseId) {
+      await supabase.from('enderecos')
+        .update({ status: 'Ocupado' })
+        .eq('codigo', novoEndereco)
+        .eq('warehouse_id', warehouseId);
+    }
+
     setTasks(prev => prev.map(t =>
       t.id === activeTask.id
         ? { ...t, qtdTotal: activeTask.qtdOriginal - newQtdAlocada, qtdAlocada: newQtdAlocada, status: newStatus === 'Posicionado' ? 'Finalizado' : 'Pendente', enderecoSugerido: novoEndereco }

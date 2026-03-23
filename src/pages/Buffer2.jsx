@@ -8,7 +8,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../hooks/useApp';
 import { supabase } from '../lib/supabaseClient';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { Search, Monitor, X, ArrowRight, Layers, Box, CheckCircle2, XCircle, Grid3X3, Info } from 'lucide-react';
+import { Search, Monitor, X, ArrowRight, Layers, Box, CheckCircle2, XCircle, Grid3X3, Info, Flame } from 'lucide-react';
 
 // ─── Toast Premium ──────────────────────────────────────────────────────────
 function Toast({ msg, type, onClose }) {
@@ -159,6 +159,9 @@ const Buffer2 = () => {
                         { to: '/operacao/mapa-visual', label: 'MAPA GERAL', icon: Layers, color: 'emerald' },
                         { to: '/operacao/buffer-1', label: 'BUFFER 1', icon: Box, color: 'blue' },
                         { to: '/operacao/buffer-2', label: 'BUFFER 2', icon: Box, color: 'purple' },
+                        { to: '/operacao/producao', label: 'PRODUÇÃO', icon: Flame, color: 'orange' },
+                        { to: '/operacao/corredor-fundos', label: 'CORREDOR', icon: ArrowRight, color: 'teal' },
+                        { to: '/operacao/suporte-guias', label: 'SUP. GUIAS', icon: Box, color: 'violet' },
                     ].map((btn) => (
                         <Link
                             key={btn.to}
