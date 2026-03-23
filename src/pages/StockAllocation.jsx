@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useId } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../contexts/AppContext';
 import { 
   PackageSearch, 
   MapPin, 
@@ -25,6 +27,7 @@ const INITIAL_TASKS = [
 ];
 
 export default function StockAllocation() {
+  const { warehouseId } = useApp();
   const [tasks, setTasks] = useState(INITIAL_TASKS);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('Pendentes');
@@ -101,14 +104,21 @@ export default function StockAllocation() {
   };
 
   // Núcleo da confirmação
-  const confirmAllocation = () => {
+  const confirmAllocation = async () => {
     const qty = Number(allocatedQty);
+    const novoEndereco = scannedAddress.trim().toUpperCase();
     const updatedTasks = tasks.map(t =>
       t.id === activeTask.id
-        ? { ...t, qtdTotal: t.qtdTotal - qty, status: t.qtdTotal - qty <= 0 ? 'Finalizado' : 'Pendente', enderecoSugerido: scannedAddress.trim().toUpperCase() }
+        ? { ...t, qtdTotal: t.qtdTotal - qty, status: t.qtdTotal - qty <= 0 ? 'Finalizado' : 'Pendente', enderecoSugerido: novoEndereco }
         : t
     );
     setTasks(updatedTasks);
+    if (novoEndereco && warehouseId) {
+      await supabase.from('enderecos')
+        .update({ status: 'Ocupado' })
+        .eq('codigo', novoEndereco)
+        .eq('warehouse_id', warehouseId);
+    }
     showToast('Alocação confirmada com sucesso!', 'success');
     resetPanel();
   };

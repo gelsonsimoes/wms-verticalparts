@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../hooks/useApp';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { Search, Monitor, X, ArrowRight, Layers, Box } from 'lucide-react';
+import { Search, Monitor, X, ArrowRight, Layers, Box, Flame } from 'lucide-react';
 
 // Centralized Mock Data for Buffer 2
 const dadosBuffer2 = [
@@ -90,45 +90,13 @@ const Buffer2 = () => {
         >
             <div className="space-y-8 pb-20">
                 {/* Navigation Buttons */}
-                <div className="flex items-center justify-center gap-4 mb-8">
-                    <Link 
-                        to="/operacao/mapa-visual"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/mapa-visual' 
-                            ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Layers size={16} />
-                        MAPA VISUAL
-                    </Link>
-                    
-                    <Link 
-                        to="/operacao/buffer-1"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-1' 
-                            ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Box size={16} />
-                        BUFFER 1
-                    </Link>
-                    
-                    <Link 
-                        to="/operacao/buffer-2"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-2' 
-                            ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Box size={16} />
-                        BUFFER 2
-                    </Link>
+                <div className="flex items-center justify-center gap-3 mb-8 flex-wrap">
+                    <Link to="/operacao/mapa-visual" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/mapa-visual' ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Layers size={15} />MAPA VISUAL</Link>
+                    <Link to="/operacao/buffer-1" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/buffer-1' ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />BUFFER 1</Link>
+                    <Link to="/operacao/buffer-2" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/buffer-2' ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />BUFFER 2</Link>
+                    <Link to="/operacao/producao" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/producao' ? 'bg-orange-500 text-white scale-110 shadow-lg shadow-orange-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Flame size={15} />PRODUÇÃO</Link>
+                    <Link to="/operacao/corredor-fundos" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/corredor-fundos' ? 'bg-teal-500 text-white scale-110 shadow-lg shadow-teal-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><ArrowRight size={15} />CORREDOR FUNDOS</Link>
+                    <Link to="/operacao/suporte-guias" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/suporte-guias' ? 'bg-violet-500 text-white scale-110 shadow-lg shadow-violet-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />SUPORTE GUIAS</Link>
                 </div>
 
                 {/* Dashboard Stats */}

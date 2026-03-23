@@ -1585,7 +1585,7 @@ function QRModal({ prod, onClose }) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function ProductCatalog() {
-  const { currentUser } = useApp();
+  const { currentUser, warehouseId } = useApp();
   const _logUser = () => currentUser?.nome || currentUser?.usuario || 'OPERADOR';
 
   const [searchParams] = useSearchParams();
@@ -1706,6 +1706,12 @@ export default function ProductCatalog() {
       };
       const { data, error } = await supabase.from('produtos').upsert(payload, { onConflict:'sku' }).select().single();
       if (error) throw error;
+      if (payload.local_estoque && warehouseId) {
+        await supabase.from('enderecos')
+          .update({ status: 'Ocupado' })
+          .eq('codigo', payload.local_estoque.trim())
+          .eq('warehouse_id', warehouseId);
+      }
       const saved_product = { ...payload, ...data,
         movimenta_estoque: payload.movimenta_estoque,
         compatibilidade: payload.compatibilidade,
