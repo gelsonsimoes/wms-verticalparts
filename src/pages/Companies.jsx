@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 import {
   Building2, Plus, Save, Trash2, FileText,
@@ -161,31 +160,24 @@ export default function Companies() {
     handleChange('cnpj', mascaraCNPJ(raw));
   };
 
-  const handleSave = async () => {
+  // ── Salvar via AppContext (persistência gerenciada internamente com log) ──
+  const handleSave = () => {
     const errosVal = validateForm(formData);
     if (Object.keys(errosVal).length > 0) {
       setErros(errosVal);
       showToast('Corrija os campos destacados antes de salvar.', 'erro');
       return;
     }
-    try {
-      if (isNew) {
-        const { id: _, ...dadosSemId } = formData;
-        const { data, error } = await supabase.from('warehouses').insert(dadosSemId).select().single();
-        if (error) throw error;
-        addCompany(data ?? dadosSemId);
-        showToast('Empresa cadastrada com sucesso!', 'ok');
-      } else {
-        const { error } = await supabase.from('warehouses').update(formData).eq('id', formData.id);
-        if (error) throw error;
-        updateCompany(formData.id, formData);
-        showToast('Registro atualizado com sucesso!', 'ok');
-      }
-      setDirty(false);
-      setErros({});
-    } catch (err) {
-      showToast(`Erro ao salvar: ${err?.message ?? 'Tente novamente.'}`, 'erro');
+    if (isNew) {
+      const { id: _, ...dadosSemId } = formData;
+      addCompany(dadosSemId);
+      showToast('Empresa cadastrada com sucesso!', 'ok');
+    } else {
+      updateCompany(formData.id, formData);
+      showToast('Registro atualizado com sucesso!', 'ok');
     }
+    setDirty(false);
+    setErros({});
   };
 
   const handleDelete = () => {
@@ -193,21 +185,15 @@ export default function Companies() {
     setConfirmDelete(true);
   };
 
-  const confirmarDelete = async () => {
-    try {
-      const { error } = await supabase.from('warehouses').delete().eq('id', selectedCompany.id);
-      if (error) throw error;
-      deleteCompany(selectedCompany.id);
-      showToast(`Empresa "${formData.name}" excluída.`, 'ok');
-      setSelectedCompany(null);
-      setIsNew(false);
-      setFormData(FORM_VAZIO);
-      setDirty(false);
-    } catch (err) {
-      showToast(`Erro ao excluir: ${err?.message ?? 'Tente novamente.'}`, 'erro');
-    } finally {
-      setConfirmDelete(false);
-    }
+  // ── Excluir via AppContext ─────────────────────────────────────────────
+  const confirmarDelete = () => {
+    deleteCompany(selectedCompany.id);
+    showToast(`Empresa "${formData.name}" excluída.`, 'ok');
+    setSelectedCompany(null);
+    setIsNew(false);
+    setFormData(FORM_VAZIO);
+    setDirty(false);
+    setConfirmDelete(false);
   };
 
   // Breadcrumbs refletem estado real
