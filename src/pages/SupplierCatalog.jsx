@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useApp } from '../hooks/useApp';
 import {
   Users,
   Search,
@@ -62,17 +62,14 @@ const emptyForm = () => ({
 });
 
 export default function SupplierCatalog() {
-  const [items, setItems] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(true);
+  // ── AppContext — fonte única de verdade ────────────────────────────────
+  const { customers, addCustomer, updateCustomer, deleteCustomer } = useApp();
 
-  const fetchItems = async () => {
-    setLoadingItems(true);
-    const { data } = await supabase.from('clientes').select('*').eq('tipo', 'fornecedor').order('razao_social');
-    setItems(data || []);
-    setLoadingItems(false);
-  };
-
-  useEffect(() => { fetchItems(); }, []);
+  // Vista filtrada: apenas fornecedores (tipo='fornecedor')
+  const items = useMemo(
+    () => customers.filter(c => c.tipo === 'fornecedor'),
+    [customers]
+  );
 
   const [selectedId, setSelectedId] = useState(null);
   const [isNew, setIsNew] = useState(false);
@@ -136,18 +133,15 @@ export default function SupplierCatalog() {
     setSelectedId(c.id);
   };
 
-  const handleSave = async () => {
+  // ── Salvar via AppContext (persistência gerenciada internamente com log) ──
+  const handleSave = () => {
     if (!formData.razao_social.trim()) { showToast('Razão Social é obrigatória.', 'error'); return; }
     if (isNew) {
-      const { data: inserted, error } = await supabase.from('clientes').insert({ ...formData, tipo: 'fornecedor' }).select().single();
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
-      await fetchItems();
+      addCustomer({ ...formData, tipo: 'fornecedor' });
       setIsNew(false);
       showToast('Fornecedor cadastrado com sucesso!');
     } else if (selectedId) {
-      const { error } = await supabase.from('clientes').update(formData).eq('id', selectedId);
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
-      await fetchItems();
+      updateCustomer(selectedId, formData);
       showToast('Alterações salvas com sucesso!');
     }
   };
@@ -157,10 +151,9 @@ export default function SupplierCatalog() {
     setConfirmDelete(true);
   };
 
-  const confirmarDelete = async () => {
-    const { error } = await supabase.from('clientes').delete().eq('id', selectedId);
-    if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
-    await fetchItems();
+  // ── Excluir via AppContext ─────────────────────────────────────────────
+  const confirmarDelete = () => {
+    deleteCustomer(selectedId);
     setSelectedId(null);
     setFormData(emptyForm());
     showToast('Fornecedor excluído.', 'info');
