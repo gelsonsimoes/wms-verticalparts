@@ -1,5 +1,4 @@
 import React, { useState, useId, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 import { 
   Warehouse, 
@@ -73,27 +72,11 @@ export default function Warehouses() {
     });
   };
 
-  const handleSave = async () => {
+  // ── Salvar via AppContext (persistência gerenciada internamente com log) ──
+  const handleSave = () => {
     if (selectedWarehouse?.id === 'NOVO') {
-      const { id: _, ...data } = formData;
-      const { data: inserted, error } = await supabase.from('warehouses').insert({
-        codigo_interno: data.codigoInterno,
-        nome: data.nome,
-        entidade: data.entidade,
-        tipo: data.tipo,
-        is_active: data.ativo,
-      }).select().single();
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
-      addWarehouse(inserted ?? data);
+      addWarehouse(formData);
     } else {
-      const { error } = await supabase.from('warehouses').update({
-        codigo_interno: formData.codigoInterno,
-        nome: formData.nome,
-        entidade: formData.entidade,
-        tipo: formData.tipo,
-        is_active: formData.ativo,
-      }).eq('id', formData.id);
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       updateWarehouse(formData.id, formData);
     }
     showToast('Registro salvo com sucesso!', 'success');
@@ -107,9 +90,8 @@ export default function Warehouses() {
     setConfirmDelete(true);
   };
 
-  const confirmarDelete = async () => {
-    const { error } = await supabase.from('warehouses').delete().eq('id', selectedWarehouse.id);
-    if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
+  // ── Excluir via AppContext ─────────────────────────────────────────────
+  const confirmarDelete = () => {
     deleteWarehouse(selectedWarehouse.id);
     setSelectedWarehouse(null);
     setFormData({ id: '', codigoInterno: '', nome: '', entidade: '', tipo: 'Distribuição', ativo: true });
