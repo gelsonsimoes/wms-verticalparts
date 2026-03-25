@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useId, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
 import { useApp } from '../hooks/useApp';
 import {
   Users,
@@ -82,11 +81,16 @@ export default function CustomerCatalog() {
   // Confirm Delete Modal
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Clientes sem tipo definido (ou tipo='cliente') — exclui fornecedores e transportadoras
+  const clientesOnly = useMemo(() =>
+    customers.filter(c => !c.tipo || c.tipo === 'cliente'),
+    [customers]);
+
   const filtered = useMemo(() =>
-    customers.filter(c =>
+    clientesOnly.filter(c =>
       (c.razao_social || '').toLowerCase().includes(search.toLowerCase()) ||
       (c.cnpj || '').includes(search)
-    ), [customers, search]);
+    ), [clientesOnly, search]);
 
   const selected = useMemo(() =>
     customers.find(c => c.id === selectedId) || null,
@@ -126,17 +130,14 @@ export default function CustomerCatalog() {
     setSelectedId(c.id);
   };
 
-  const handleSave = async () => {
+  // ── Salvar via AppContext (persistência gerenciada internamente com log) ──
+  const handleSave = () => {
     if (!formData.razao_social.trim()) { showToast('Razão Social é obrigatória.', 'error'); return; }
     if (isNew) {
-      const { data: inserted, error } = await supabase.from('clientes').insert(formData).select().single();
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
-      addCustomer(inserted ?? formData);
+      addCustomer(formData);
       setIsNew(false);
       showToast('Cliente cadastrado com sucesso!');
     } else if (selectedId) {
-      const { error } = await supabase.from('clientes').update(formData).eq('id', selectedId);
-      if (error) { showToast(`Erro ao salvar: ${error.message}`, 'error'); return; }
       updateCustomer(selectedId, formData);
       showToast('Alterações salvas com sucesso!');
     }
@@ -147,9 +148,8 @@ export default function CustomerCatalog() {
     setConfirmDelete(true);
   };
 
-  const confirmarDelete = async () => {
-    const { error } = await supabase.from('clientes').delete().eq('id', selectedId);
-    if (error) { showToast(`Erro ao excluir: ${error.message}`, 'error'); setConfirmDelete(false); return; }
+  // ── Excluir via AppContext ─────────────────────────────────────────────
+  const confirmarDelete = () => {
     deleteCustomer(selectedId);
     setSelectedId(null);
     setFormData(emptyForm());
