@@ -7,7 +7,7 @@ import {
 import {
     Target, Layers, Box, TriangleAlert,
     Database, RefreshCw, Package, ArrowUpRight,
-    DollarSign, TrendingUp, FileCheck, Truck, Clock,
+    DollarSign, TrendingUp, FileCheck,
 } from 'lucide-react';
 import StatsCard from '../components/ui/StatsCard';
 import { useApp } from '../hooks/useApp';
@@ -28,42 +28,74 @@ function SkeletonCard() {
     );
 }
 
+// ─── CORES PARA O GRÁFICO ─────────────────────────────────────────────────────
+const CHART_COLORS = ['#FFD700', '#00E5FF', '#AA00FF', '#FF6B35', '#00FF88', '#FF3CAC'];
+
 // ─── DASHBOARD PREMIUM ────────────────────────────────────────────────────────
 export default function Dashboard() {
     const { warehouseId } = useApp();
     const { kpis, loading, error, refetch, lastUpdated } = useDashboardData(warehouseId);
 
-    // ── Caminhões no Pátio ────────────────────────────────────────────
-    const [patio, setPatio] = useState([]);
-    const fetchPatio = useCallback(async () => {
-        const { data } = await supabase
-            .from('movimentacao_patio')
-            .select('id, placa, tipo_veiculo, motorista_nome, operador_nome, entrada_em')
-            .eq('status', 'no_patio')
-            .order('entrada_em', { ascending: true });
-        setPatio(data || []);
-    }, []);
+    // ── Ocupação por Área (dados reais do banco) ──────────────────────────────
+    const [chartData, setChartData] = useState([]);
+    const [chartLoading, setChartLoading] = useState(true);
+
+    const fetchOcupacaoPorArea = useCallback(async () => {
+        if (!warehouseId) return;
+        setChartLoading(true);
+        try {
+            // Busca áreas do armazém
+            const { data: areas } = await supabase
+                .from('areas_armazem')
+                .select('id, name')
+                .eq('warehouse_id', warehouseId)
+                .eq('is_active', true)
+                .limit(6);
+
+            if (!areas || areas.length === 0) {
+                setChartData([]);
+                return;
+            }
+
+            // Para cada área, conta endereços ocupados vs livres
+            const results = await Promise.all(
+                areas.map(async (area, idx) => {
+                    const { count: ocupados } = await supabase
+                        .from('alocacao_estoque')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('warehouse_id', warehouseId)
+                        .eq('area_id', area.id);
+
+                    const { count: total } = await supabase
+                        .from('enderecos')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('warehouse_id', warehouseId)
+                        .eq('area_id', area.id);
+
+                    const ocp = ocupados || 0;
+                    const liv = Math.max(0, (total || 0) - ocp);
+
+                    return {
+                        name: (area.name || 'Área').substring(0, 4).toUpperCase(),
+                        ocupados: ocp,
+                        livres: liv,
+                        color: CHART_COLORS[idx % CHART_COLORS.length],
+                    };
+                })
+            );
+
+            setChartData(results);
+        } catch (e) {
+            console.error('Erro ao buscar ocupação por área:', e);
+            setChartData([]);
+        } finally {
+            setChartLoading(false);
+        }
+    }, [warehouseId]);
+
     useEffect(() => {
-        fetchPatio();
-        const ch = supabase.channel('dashboard-patio')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'movimentacao_patio' }, fetchPatio)
-            .subscribe();
-        return () => supabase.removeChannel(ch);
-    }, [fetchPatio]);
-
-    const minutosPatio = (entradaIso) => {
-        if (!entradaIso) return '—';
-        const min = Math.floor((Date.now() - new Date(entradaIso).getTime()) / 60000);
-        if (min < 60) return `${min}min`;
-        return `${Math.floor(min / 60)}h${min % 60 > 0 ? String(min % 60).padStart(2, '0') + 'min' : ''}`;
-    };
-
-    // Gráfico de Ocupação Realistas e Vibrantes
-    const chartData = [
-        { name: 'R1', ocupados: 5, livres: 6, color: '#FFD700' },
-        { name: 'R2', ocupados: 3, livres: 2, color: '#00E5FF' },
-        { name: 'R3', ocupados: 2, livres: 2, color: '#AA00FF' },
-    ];
+        fetchOcupacaoPorArea();
+    }, [fetchOcupacaoPorArea]);
 
     const kpiCards = [
         {
@@ -73,7 +105,6 @@ export default function Dashboard() {
             change: loading ? '' : `${kpis.enderecosOcupados} de ${kpis.totalEnderecos}`,
             trend: 'up',
             icon: Database,
-            variant: 'gold', // Custom prop para StatsCard
         },
         {
             id: 'vazio',
@@ -82,7 +113,6 @@ export default function Dashboard() {
             change: 'Prontos p/ receber',
             trend: 'none',
             icon: Layers,
-            variant: 'blue',
         },
         {
             id: 'pedidos',
@@ -91,7 +121,6 @@ export default function Dashboard() {
             change: `${kpis.expedicoesHoje} expedidos hj`,
             trend: 'down',
             icon: Box,
-            variant: 'green',
         },
         {
             id: 'skus',
@@ -100,13 +129,12 @@ export default function Dashboard() {
             change: 'Catálogo sincronizado',
             trend: 'up',
             icon: Package,
-            variant: 'purple',
         },
     ];
 
     return (
         <main className="space-y-6 p-4 md:p-6 animate-fade-up">
-            
+
             {/* ─── HEADER ─── */}
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/5">
                 <div className="flex items-center gap-4">
@@ -126,7 +154,6 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {/* Time Status */}
                     <div className="flex items-center gap-3 text-[10px] font-black text-white px-4 py-2 vp-glass rounded-xl border-white/10">
                         <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
@@ -177,7 +204,6 @@ export default function Dashboard() {
                             <div className="flex items-center gap-2 text-[10px] font-bold text-white/30 uppercase tracking-wider">
                                 <span className="px-1.5 py-0.5 bg-white/5 rounded-md border border-white/5">{kpi.change}</span>
                             </div>
-                            {/* Background Gloam Decorativo */}
                             <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[var(--vp-primary)] opacity-5 blur-2xl rounded-full group-hover:opacity-10 transition-opacity" />
                         </div>
                     ))
@@ -233,17 +259,16 @@ export default function Dashboard() {
 
             {/* ─── CHARTS & PERFORMANCE ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Chart: Ocupação por Rua */}
+                {/* Chart: Ocupação por Área (dados reais) */}
                 <section className="lg:col-span-2 vp-glass rounded-2xl p-6 border-white/5 shadow-2xl relative overflow-hidden group">
-                     {/* Borda Glow superior */}
                      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
-                     
+
                      <div className="flex items-center justify-between mb-8">
                         <div>
                             <h2 className="text-xs font-black uppercase tracking-widest text-white tracking-tighter">
-                                Distribuição de <span className="text-[var(--vp-primary)]">Carga por Rua</span>
+                                Distribuição de <span className="text-[var(--vp-primary)]">Carga por Área</span>
                             </h2>
-                            <p className="text-[9px] text-white/30 font-bold uppercase mt-1">Status físico das locações (R1, R2, R3)</p>
+                            <p className="text-[9px] text-white/30 font-bold uppercase mt-1">Ocupação real por área do armazém</p>
                         </div>
                         <div className="flex gap-4">
                             <div className="flex items-center gap-2 text-[10px] font-black text-green-500">
@@ -256,39 +281,48 @@ export default function Dashboard() {
                     </div>
 
                     <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} barGap={8}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 900 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 900 }} />
-                                <Tooltip
-                                    cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                                    contentStyle={{ 
-                                        backgroundColor: '#0A0A0A', 
-                                        borderRadius: '12px', 
-                                        border: '1px solid rgba(255,255,255,0.1)', 
-                                        fontSize: '11px', 
-                                        fontWeight: '900',
-                                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-                                        color: '#FFF'
-                                    }}
-                                />
-                                <Bar dataKey="ocupados" radius={[4, 4, 0, 0]} barSize={32} name="Ocupados">
-                                    {chartData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
-                                    ))}
-                                </Bar>
-                                <Bar dataKey="livres" fill="rgba(255,255,255,0.05)" radius={[4, 4, 0, 0]} barSize={32} name="Livres" />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        {chartLoading ? (
+                            <div className="h-full flex items-center justify-center">
+                                <RefreshCw className="w-6 h-6 text-white/20 animate-spin" />
+                            </div>
+                        ) : chartData.length === 0 ? (
+                            <div className="h-full flex items-center justify-center">
+                                <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">Sem áreas cadastradas</p>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} barGap={8}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 900 }} dy={10} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 900 }} />
+                                    <Tooltip
+                                        cursor={{ fill: 'rgba(255,255,255,0.02)' }}
+                                        contentStyle={{
+                                            backgroundColor: '#0A0A0A',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            fontSize: '11px',
+                                            fontWeight: '900',
+                                            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                                            color: '#FFF'
+                                        }}
+                                    />
+                                    <Bar dataKey="ocupados" radius={[4, 4, 0, 0]} barSize={32} name="Ocupados">
+                                        {chartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.8} />
+                                        ))}
+                                    </Bar>
+                                    <Bar dataKey="livres" fill="rgba(255,255,255,0.05)" radius={[4, 4, 0, 0]} barSize={32} name="Livres" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </section>
 
-                {/* Performance Card: "The Dashboard Cockpit" */}
+                {/* Performance Card */}
                 <section className="bg-black rounded-2xl border-2 border-[var(--vp-primary)]/10 p-6 flex flex-col justify-between relative overflow-hidden shadow-2xl group">
-                    {/* Linhas de fundo decorativas (grid digital) */}
-                    <div className="absolute inset-0 opacity-20 pointer-events-none" 
-                        style={{ backgroundImage: 'radial-gradient(var(--vp-primary) 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }} 
+                    <div className="absolute inset-0 opacity-20 pointer-events-none"
+                        style={{ backgroundImage: 'radial-gradient(var(--vp-primary) 0.5px, transparent 0.5px)', backgroundSize: '24px 24px' }}
                     />
 
                     <div className="relative z-10">
@@ -298,7 +332,7 @@ export default function Dashboard() {
                             </h2>
                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" />
                         </div>
-                        
+
                         <div className="mb-8">
                             <p className="text-6xl font-black text-white tracking-tighter leading-none">
                                 {loading ? '…' : `${kpis.pctOcupacao}`}
@@ -334,54 +368,14 @@ export default function Dashboard() {
                         </Link>
                     </div>
 
-                    {/* Laser Line Animation */}
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-[var(--vp-primary)] to-transparent animate-pulse" />
                 </section>
             </div>
 
-            {/* ─── CAMINHÕES NO PÁTIO ─── */}
-            <section className="vp-glass rounded-2xl border border-white/5 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-amber-500/20 rounded-xl">
-                            <Truck className="w-5 h-5 text-amber-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--vp-primary)]">Caminhões no Pátio</h2>
-                            <p className="text-[9px] text-white/30 font-bold uppercase tracking-widest">Check-ins ativos via app mobile</p>
-                        </div>
-                        {patio.length > 0 && (
-                            <span className="px-2 py-0.5 bg-amber-500 text-black rounded-full text-[9px] font-black">{patio.length}</span>
-                        )}
-                    </div>
-                    <button onClick={fetchPatio} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 transition-colors" title="Atualizar">
-                        <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-                {patio.length === 0 ? (
-                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest text-center py-4">Nenhum veículo no pátio agora.</p>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {patio.map((v) => (
-                            <div key={v.id} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/5">
-                                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-black text-[var(--vp-primary)] font-mono tracking-wider text-sm">{v.placa}</p>
-                                    <p className="text-[9px] text-white/40 font-bold uppercase truncate">{v.tipo_veiculo} · {v.motorista_nome || 'Motorista—'}</p>
-                                </div>
-                                <div className="flex items-center gap-1 text-[9px] font-black text-white/40 shrink-0">
-                                    <Clock className="w-3 h-3" />{minutosPatio(v.entrada_em)}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </section>
-
             {/* ─── FOOTER INFO ─── */}
             <footer className="pt-8 text-center">
                 <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em]">
-                    VerticalParts WMS — Engine 2026.3.21 — Latency: <span className="text-green-500">14ms</span>
+                    VerticalParts WMS — {new Date().getFullYear()} — {lastUpdated ? `Sync: ${lastUpdated.toLocaleTimeString('pt-BR')}` : 'Aguardando sync...'}
                 </p>
             </footer>
         </main>
