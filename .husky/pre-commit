@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-commit hook para detectar secrets
+echo "🔐 Verificando por secrets..."
+
+# Verificar arquivos staged
+SECRETS_FOUND=0
+
+# Padrões de secrets a procurar
+PATTERNS=(
+    "sk-ant-api03"                      # Anthropic API keys
+    "sk-ant-"                           # Qualquer Anthropic key
+    "ghp_"                              # GitHub Personal Access Token
+    "supabase.*[a-zA-Z0-9_-]{40,}"     # Supabase tokens
+)
+
+for pattern in "${PATTERNS[@]}"; do
+    if git diff --cached | grep -i "$pattern" | grep -vE "(\.example|placeholder|SEU_TOKEN|COLOQUE_SUA)"; then
+        echo "❌ Possível secret encontrado: $pattern"
+        SECRETS_FOUND=1
+    fi
+done
+
+if [ $SECRETS_FOUND -eq 1 ]; then
+    echo "❌ Pre-commit check falhou!"
+    exit 1
+fi
+
+echo "✅ Nenhum secret detectado"
+exit 0

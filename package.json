@@ -11,7 +11,10 @@
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "husky",
+    "check-secrets": "git log -p --all | grep -iE '(sk-ant-api03|ghp_|eyJh)' | grep -v 'COLOQUE\\|SEU_TOKEN\\|placeholder' || echo '✅ No secrets found'",
+    "security-audit": "npm audit && echo '✅ Security audit complete'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -48,6 +51,8 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "playwright": "^1.58.2",
     "vite": "^7.3.1"
   }
