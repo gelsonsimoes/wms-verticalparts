@@ -9,7 +9,7 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useApp } from '../hooks/useApp';
 import { useWarehouseMap } from '../hooks/useWarehouseMap';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { Box, Layers, MapPin, Search, Monitor, X, Info, Filter, ArrowRight, Loader2 } from 'lucide-react';
+import { Box, Layers, MapPin, Search, Monitor, X, Info, Filter, ArrowRight, Loader2, Flame, Archive } from 'lucide-react';
 
 const WarehouseVisualMap = () => {
     const [searchParams] = useSearchParams();
@@ -18,6 +18,8 @@ const WarehouseVisualMap = () => {
     const [searchTerm, setSearchTerm] = useState(() => searchParams.get('endereco') || '');
     const [selectedAisle, setSelectedAisle] = useState('ALL');
     const [hoveredPos, setHoveredPos] = useState(null);
+    const [activeView, setActiveView] = useState('paletes'); // 'paletes' | 'almox'
+    const [selectedArm, setSelectedArm] = useState('ARM01');
 
     // Sincroniza busca se o parâmetro da URL mudar (ex: via busca global)
     useEffect(() => {
@@ -114,45 +116,19 @@ const WarehouseVisualMap = () => {
         >
             <div className="space-y-8 pb-20">
                 {/* Navigation Buttons */}
-                <div className="flex items-center justify-center gap-4 mb-8">
-                    <Link 
-                        to="/operacao/mapa-visual"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/mapa-visual' 
-                            ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Layers size={16} />
-                        MAPA VISUAL
-                    </Link>
-                    
-                    <Link 
-                        to="/operacao/buffer-1"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-1' 
-                            ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Box size={16} />
-                        BUFFER 1
-                    </Link>
-                    
-                    <Link 
-                        to="/operacao/buffer-2"
-                        className={`
-                        flex items-center gap-2 px-6 py-3 rounded-xl font-black text-sm transition-all
-                        ${location.pathname === '/operacao/buffer-2' 
-                            ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10'}
-                        `}
-                    >
-                        <Box size={16} />
-                        BUFFER 2
-                    </Link>
+                <div className="flex items-center justify-center gap-3 mb-8 flex-wrap">
+                    <Link to="/operacao/mapa-visual" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/mapa-visual' ? 'bg-emerald-500 text-white scale-110 shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Layers size={15} />MAPA VISUAL</Link>
+                    <Link to="/operacao/buffer-1" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/buffer-1' ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />BUFFER 1</Link>
+                    <Link to="/operacao/buffer-2" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/buffer-2' ? 'bg-purple-500 text-white scale-110 shadow-lg shadow-purple-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />BUFFER 2</Link>
+                    <Link to="/operacao/producao" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/producao' ? 'bg-orange-500 text-white scale-110 shadow-lg shadow-orange-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Flame size={15} />PRODUÇÃO</Link>
+                    <Link to="/operacao/corredor-fundos" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/corredor-fundos' ? 'bg-teal-500 text-white scale-110 shadow-lg shadow-teal-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><ArrowRight size={15} />CORREDOR FUNDOS</Link>
+                    <Link to="/operacao/suporte-guias" className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all ${location.pathname === '/operacao/suporte-guias' ? 'bg-violet-500 text-white scale-110 shadow-lg shadow-violet-500/20' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}><Box size={15} />SUPORTE GUIAS</Link>
+                </div>
+
+                {/* View Switcher: Porta Paletes vs ALMOX */}
+                <div className="flex items-center justify-center gap-3 mb-2">
+                    <button onClick={() => setActiveView('paletes')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm transition-all border ${activeView === 'paletes' ? 'bg-[#ffcd00] text-black border-[#ffcd00]' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}><Layers size={15} />PORTA PALETES</button>
+                    <button onClick={() => setActiveView('almox')} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm transition-all border ${activeView === 'almox' ? 'bg-sky-500 text-white border-sky-500' : 'bg-white/5 text-white/60 border-white/10 hover:bg-white/10'}`}><Archive size={15} />ALMOXARIFADO</button>
                 </div>
 
                 {/* Dashboard Stats / Info */}
@@ -206,8 +182,109 @@ const WarehouseVisualMap = () => {
                     </div>
                 </div>
 
+                {/* ALMOX View */}
+                {activeView === 'almox' && (() => {
+                    const ARMS = Array.from({ length: 10 }, (_, i) => `ARM${String(i + 1).padStart(2, '0')}`);
+                    const VAOS = [1, 2, 3];
+                    const NIVEIS = [4, 3, 2, 1]; // top-to-bottom display
+                    const GAVETAS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+                    const getAlmoxSlot = (arm, vao, nivel, gaveta) => {
+                        const id = `ALMOX-${arm}-V${vao}-N${nivel}-P${gaveta}`;
+                        return slots[id] ?? null;
+                    };
+
+                    return (
+                        <div className="space-y-6">
+                            {/* ARM selector */}
+                            <div className="flex flex-wrap gap-2 justify-center">
+                                {ARMS.map(arm => (
+                                    <button
+                                        key={arm}
+                                        onClick={() => setSelectedArm(arm)}
+                                        className={`px-4 py-2 rounded-xl font-black text-xs transition-all border ${selectedArm === arm ? 'bg-sky-500 text-white border-sky-500 shadow-lg shadow-sky-500/20' : 'bg-white/5 text-white/50 border-white/10 hover:bg-white/10'}`}
+                                    >
+                                        {arm}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Grid: 3 Vãos × 4 Níveis, cada célula = 8 gavetas */}
+                            <div className="bg-black/40 border border-white/5 rounded-2xl p-6">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-12 h-12 rounded-xl bg-sky-500 flex items-center justify-center font-black text-white text-sm shadow-lg shadow-sky-500/20">
+                                        {selectedArm.replace('ARM', '')}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Armário {selectedArm}</h3>
+                                        <p className="text-xs font-bold text-sky-400 uppercase tracking-widest">3 Vãos × 4 Níveis × 8 Gavetas = 96 posições</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    {VAOS.map(vao => (
+                                        <div key={vao} className="border border-sky-500/20 rounded-xl overflow-hidden">
+                                            <div className="bg-sky-500/10 px-3 py-1.5 text-center">
+                                                <span className="text-[10px] font-black text-sky-400 uppercase tracking-widest">Vão {vao}</span>
+                                            </div>
+                                            <div className="flex flex-col gap-1 p-3">
+                                                {NIVEIS.map(nivel => (
+                                                    <div key={nivel} className="flex items-center gap-1">
+                                                        <span className="text-[9px] font-black text-white/20 w-6 flex-shrink-0">N{nivel}</span>
+                                                        <div className="flex gap-1 flex-wrap">
+                                                            {GAVETAS.map(gav => {
+                                                                const slot = getAlmoxSlot(selectedArm, vao, nivel, gav);
+                                                                const occupied = slot?.status === 'ocupado';
+                                                                return (
+                                                                    <div
+                                                                        key={gav}
+                                                                        onMouseEnter={() => setHoveredPos({ almox: true, label: `ALMOX-${selectedArm}-V${vao}-N${nivel}-P${gav}`, data: slot })}
+                                                                        onMouseLeave={() => setHoveredPos(null)}
+                                                                        title={`ALMOX-${selectedArm}-V${vao}-N${nivel}-P${gav}`}
+                                                                        className={`w-7 h-7 flex items-center justify-center rounded-sm text-[8px] font-black transition-all cursor-pointer border ${occupied ? 'bg-red-600/90 border-red-400 text-white' : 'bg-sky-500/10 border-sky-500/20 text-sky-400/50 hover:bg-sky-500/20 hover:text-sky-300'}`}
+                                                                    >
+                                                                        {occupied ? <X size={14} strokeWidth={3} /> : gav}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Tooltip for ALMOX */}
+                            {hoveredPos?.almox && (
+                                <div className="fixed z-[100] bg-black/90 backdrop-blur-xl border border-white/20 p-4 rounded-xl shadow-2xl pointer-events-none animate-in fade-in zoom-in duration-200" style={{ left: '20px', bottom: '20px' }}>
+                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                            <span className="text-[10px] font-black text-sky-400 tracking-widest">{hoveredPos.label}</span>
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${hoveredPos.data?.status === 'ocupado' ? 'bg-red-600' : 'bg-green-600'} text-white uppercase`}>
+                                                {hoveredPos.data?.status === 'ocupado' ? 'OCUPADO' : 'LIVRE'}
+                                            </span>
+                                        </div>
+                                        {hoveredPos.data?.status === 'ocupado' ? (
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[8px] font-bold text-white/40 uppercase">Produto / SKU</span>
+                                                <span className="text-xs font-black text-white leading-tight">{hoveredPos.data.produto || '—'}</span>
+                                                <span className="text-[10px] font-mono text-sky-400/80">{hoveredPos.data.sku}</span>
+                                                <span className="text-[10px] text-white/50">Qtd: {hoveredPos.data.quantidade ?? 0}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[10px] text-white/60 italic">Gaveta disponível.</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
                 {/* Warehouse Map */}
-                <div className="relative">
+                {activeView === 'paletes' && <div className="relative">
                     {/* Tooltip flutuante (Estética Premium) */}
                     {hoveredPos && (
                         <div 
@@ -357,7 +434,7 @@ const WarehouseVisualMap = () => {
                             </div>
                         ))}
                     </div>
-                </div>
+                </div>}
             </div>
 
             <style dangerouslySetInnerHTML={{ __html: `

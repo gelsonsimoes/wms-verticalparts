@@ -329,7 +329,7 @@ function SecaoVeiculos() {
   const empty = () => ({ id: crypto.randomUUID(), placa:'', codigo:'', classificacao:CLASSIFICACOES[0], modelo:'', transportadora:TRANSPORTADORAS[0], tara:0, lotacao:0, disponivel:true });
 
   const filtered = useMemo(() =>
-    veiculos.filter(v => v.placa.toLowerCase().includes(search.toLowerCase()) || v.modelo.toLowerCase().includes(search.toLowerCase())),
+    veiculos.filter(v => (v.placa ?? '').toLowerCase().includes(search.toLowerCase()) || (v.modelo ?? '').toLowerCase().includes(search.toLowerCase())),
     [veiculos, search]);
 
   const startNew = () => { setEditando(empty()); setIsNew(true); setSaved(false); };
@@ -418,7 +418,7 @@ function SecaoVeiculos() {
             {/* Peso líquido calculado */}
             <Field label="Peso Líquido (calculado)">
               <div className="px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-black text-secondary">
-                {(editando.lotacao - editando.tara).toLocaleString('pt-BR')} kg
+                {((editando.lotacao ?? 0) - (editando.tara ?? 0)).toLocaleString('pt-BR')} kg
               </div>
             </Field>
           </div>
@@ -448,16 +448,16 @@ function SecaoVeiculos() {
                 <td className="p-3">
                   <button
                     role="switch"
-                    aria-checked={v.disponivel}
-                    aria-label={v.disponivel ? `Marcar veículo ${v.placa} como indisponível` : `Marcar veículo ${v.placa} como disponível`}
+                    aria-checked={!!(v.disponivel ?? v.ativo)}
+                    aria-label={(v.disponivel ?? v.ativo) ? `Marcar veículo ${v.placa ?? '—'} como indisponível` : `Marcar veículo ${v.placa ?? '—'} como disponível`}
                     onClick={() => toggleDisp(v.id)}
                     className="flex items-center gap-1.5 group/tog"
                   >
-                    {v.disponivel
+                    {(v.disponivel ?? v.ativo)
                       ? <ToggleRight className="w-5 h-5 text-green-500 group-hover/tog:text-green-600" aria-hidden="true" />
                       : <ToggleLeft className="w-5 h-5 text-slate-400 group-hover/tog:text-red-500" aria-hidden="true" />}
-                    <span className={cn('text-[9px] font-black uppercase', v.disponivel ? 'text-green-600' : 'text-slate-400')}>
-                      {v.disponivel ? 'Disponível' : 'Indispon.'}
+                    <span className={cn('text-[9px] font-black uppercase', (v.disponivel ?? v.ativo) ? 'text-green-600' : 'text-slate-400')}>
+                      {(v.disponivel ?? v.ativo) ? 'Disponível' : 'Indispon.'}
                     </span>
                   </button>
                 </td>
@@ -466,8 +466,8 @@ function SecaoVeiculos() {
                 <td className="p-3"><span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black px-2 py-0.5 rounded-full">{v.classificacao}</span></td>
                 <td className="p-3 text-xs font-bold text-slate-700 dark:text-slate-300">{v.modelo}</td>
                 <td className="p-3 text-xs text-slate-500">{v.transportadora}</td>
-                <td className="p-3 text-right text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">{v.tara.toLocaleString('pt-BR')} kg</td>
-                <td className="p-3 text-right text-xs font-black text-secondary whitespace-nowrap">{v.lotacao.toLocaleString('pt-BR')} kg</td>
+                <td className="p-3 text-right text-xs font-bold text-slate-600 dark:text-slate-400 whitespace-nowrap">{(v.tara ?? v.capacidade_kg ?? 0).toLocaleString('pt-BR')} kg</td>
+                <td className="p-3 text-right text-xs font-black text-secondary whitespace-nowrap">{(v.lotacao ?? v.capacidade_kg ?? 0).toLocaleString('pt-BR')} kg</td>
                 <td className="p-3">
                   <div className="flex items-center gap-1 opacity-30 group-hover:opacity-100 transition-opacity">
                     <button
@@ -513,7 +513,7 @@ function SecaoRotas() {
   const empty = () => ({ id: crypto.randomUUID(), codigo:'', descricao:'', prioridade:'Média', clientes:[] });
 
   const filtered = useMemo(() =>
-    rotas.filter(r => r.codigo.toLowerCase().includes(search.toLowerCase()) || r.descricao.toLowerCase().includes(search.toLowerCase())),
+    rotas.filter(r => (r.codigo ?? '').toLowerCase().includes(search.toLowerCase()) || (r.descricao ?? '').toLowerCase().includes(search.toLowerCase())),
     [rotas, search]);
 
   const startNew = () => { setEditando(empty()); setIsNew(true); setSaved(false); };
@@ -601,7 +601,7 @@ function SecaoRotas() {
                     <td className="p-3"><code className="text-xs font-black text-secondary">{r.codigo}</code></td>
                     <td className="p-3 text-xs font-bold text-slate-700 dark:text-slate-300 max-w-[220px]">{r.descricao}</td>
                     <td className="p-3">
-                      <span className={cn('text-[9px] font-black px-2.5 py-1 rounded-full', priColor[r.prioridade])}>{r.prioridade}</span>
+                      <span className={cn('text-[9px] font-black px-2.5 py-1 rounded-full', priColor[r.prioridade] ?? 'bg-slate-100 text-slate-600')}>{r.prioridade ?? '—'}</span>
                     </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">

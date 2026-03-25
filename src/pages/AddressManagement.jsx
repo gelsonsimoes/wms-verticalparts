@@ -495,10 +495,10 @@ export default function AddressManagement() {
     const q = search.toLowerCase().trim();
     const filtered = data.filter(a =>
         (!q || a.code.toLowerCase().includes(q) || a.type.toLowerCase().includes(q)) &&
-        (!filterStreet || a.street === filterStreet) &&
-        (!filterPP || a.pp === filterPP) &&
-        (!filterLevel || a.level === filterLevel) &&
-        (!filterStatus || a.status === filterStatus)
+        (!filterStreet || a.street.toLowerCase().includes(filterStreet.toLowerCase())) &&
+        (!filterPP || a.pp.toLowerCase().includes(filterPP.toLowerCase())) &&
+        (!filterLevel || a.level.toLowerCase().includes(filterLevel.toLowerCase())) &&
+        (!filterStatus || a.status.toLowerCase().includes(filterStatus.toLowerCase()))
     );
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -662,57 +662,53 @@ export default function AddressManagement() {
                         {/* Rua */}
                         <div>
                             <label htmlFor="flt-street" className="text-[9px] font-black text-slate-400 uppercase block mb-1">Rua</label>
-                            <select
+                            <input
                                 id="flt-street"
+                                type="text"
                                 value={filterStreet}
                                 onChange={e => { setFilterStreet(e.target.value); setFilterPP(''); setPage(1); }}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-yellow-400/20"
-                            >
-                                <option value="">Todas</option>
-                                {STREETS.map(s => <option key={s}>{s}</option>)}
-                            </select>
+                                placeholder="Ex: R1, ALMOX..."
+                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-950 bg-white outline-none focus:ring-2 focus:ring-yellow-400/20 w-32"
+                            />
                         </div>
 
-                        {/* Porta-Palete — derivado de PP_MAP, sem duplicação */}
+                        {/* Porta-Palete */}
                         <div>
                             <label htmlFor="flt-pp" className="text-[9px] font-black text-slate-400 uppercase block mb-1">Porta-Palete</label>
-                            <select
+                            <input
                                 id="flt-pp"
+                                type="text"
                                 value={filterPP}
                                 onChange={e => { setFilterPP(e.target.value); setPage(1); }}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-yellow-400/20"
-                            >
-                                <option value="">Todos</option>
-                                {ppOptions.map(p => <option key={p}>{p}</option>)}
-                            </select>
+                                placeholder="Ex: PP1, ARM01..."
+                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-950 bg-white outline-none focus:ring-2 focus:ring-yellow-400/20 w-32"
+                            />
                         </div>
 
-                        {/* Nível — derivado de LEVELS */}
+                        {/* Nível */}
                         <div>
                             <label htmlFor="flt-level" className="text-[9px] font-black text-slate-400 uppercase block mb-1">Nível</label>
-                            <select
+                            <input
                                 id="flt-level"
+                                type="text"
                                 value={filterLevel}
                                 onChange={e => { setFilterLevel(e.target.value); setPage(1); }}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-yellow-400/20"
-                            >
-                                <option value="">Todos</option>
-                                {LEVELS.map(l => <option key={l.key} value={l.key}>{l.key} — {l.name}</option>)}
-                            </select>
+                                placeholder="Ex: A, N1, Topo..."
+                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-950 bg-white outline-none focus:ring-2 focus:ring-yellow-400/20 w-32"
+                            />
                         </div>
 
-                        {/* Status — derivado de STATUSES */}
+                        {/* Status */}
                         <div>
                             <label htmlFor="flt-status" className="text-[9px] font-black text-slate-400 uppercase block mb-1">Status</label>
-                            <select
+                            <input
                                 id="flt-status"
+                                type="text"
                                 value={filterStatus}
                                 onChange={e => { setFilterStatus(e.target.value); setPage(1); }}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none focus:ring-2 focus:ring-yellow-400/20"
-                            >
-                                <option value="">Todos</option>
-                                {STATUSES.map(s => <option key={s}>{s}</option>)}
-                            </select>
+                                placeholder="Ex: Vazio, Ocupado..."
+                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-950 bg-white outline-none focus:ring-2 focus:ring-yellow-400/20 w-36"
+                            />
                         </div>
                     </div>
                 )}

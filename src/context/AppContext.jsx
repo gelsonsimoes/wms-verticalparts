@@ -86,16 +86,20 @@ export function AppProvider({ children, session }) {
     // ── Veículos (Supabase) ───────────────────────────────────────────────
     const [veiculos, setVeiculos] = useState([]);
     useEffect(() => {
-        supabase.from('veiculos').select('*').order('placa')
+        const whId = warehouses[0]?.id;
+        if (!whId) return;
+        supabase.from('veiculos').select('*').eq('warehouse_id', whId).order('placa')
             .then(({ data }) => { if (data) setVeiculos(data); });
-    }, []);
+    }, [warehouses]);
 
     // ── Rotas (Supabase) ──────────────────────────────────────────────────
     const [rotas, setRotas] = useState([]);
     useEffect(() => {
-        supabase.from('rotas').select('*').order('codigo')
+        const whId = warehouses[0]?.id;
+        if (!whId) return;
+        supabase.from('rotas').select('*').eq('warehouse_id', whId).order('codigo')
             .then(({ data }) => { if (data) setRotas(data.map(r => ({ ...r, clientes: r.clientes || [] }))); });
-    }, []);
+    }, [warehouses]);
 
     // ── Lotes (Supabase) ──────────────────────────────────────────────────
     const _normLote = (l) => ({
@@ -414,7 +418,8 @@ export function AppProvider({ children, session }) {
 
     // ── Veículos CRUD (Supabase) ──────────────────────────────────────────
     const addVeiculo = (veiculo) => {
-        const newV = { ...veiculo, id: crypto.randomUUID() };
+        const whId = warehouses[0]?.id;
+        const newV = { ...veiculo, id: crypto.randomUUID(), warehouse_id: whId };
         setVeiculos(prev => [...prev, newV]);
         supabase.from('veiculos').insert(newV).then(({ error }) => {
             if (error) { console.error('[AppContext] addVeiculo:', error.message); setVeiculos(prev => prev.filter(v => v.id !== newV.id)); return; }
@@ -440,7 +445,8 @@ export function AppProvider({ children, session }) {
 
     // ── Rotas CRUD (Supabase) ─────────────────────────────────────────────
     const addRota = (rota) => {
-        const newR = { ...rota, id: crypto.randomUUID(), clientes: rota.clientes || [] };
+        const whId = warehouses[0]?.id;
+        const newR = { ...rota, id: crypto.randomUUID(), warehouse_id: whId, clientes: rota.clientes || [] };
         setRotas(prev => [...prev, newR]);
         supabase.from('rotas').insert(newR).then(({ error }) => {
             if (error) { console.error('[AppContext] addRota:', error.message); setRotas(prev => prev.filter(r => r.id !== newR.id)); return; }

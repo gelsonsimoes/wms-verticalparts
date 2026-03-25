@@ -1,5 +1,4 @@
 import React, { lazy } from 'react';
-import { Navigate } from 'react-router-dom';
 import EnterprisePageBase from './components/layout/EnterprisePageBase';
 
 // 1. PRINCIPAL
@@ -27,6 +26,9 @@ const RoadWeighingStation = lazy(() => import('./pages/RoadWeighingStation'));
 const WarehouseVisualMap = lazy(() => import('./pages/WarehouseVisualMap'));
 const Buffer1 = lazy(() => import('./pages/Buffer1'));
 const Buffer2 = lazy(() => import('./pages/Buffer2'));
+const Producao = lazy(() => import('./pages/Producao'));
+const CorredorFundos = lazy(() => import('./pages/CorredorFundos'));
+const SuporteGuias = lazy(() => import('./pages/SuporteGuias'));
 const OrderManagement = lazy(() => import('./pages/OrderManagement'));
 
 // 3. PLANEJAR
@@ -40,12 +42,13 @@ const GateManager = lazy(() => import('./pages/GateManager'));
 const DockActivities = lazy(() => import('./pages/DockActivities'));
 
 // 4. CONTROLAR
-const InventoryAudit = lazy(() => import('./pages/InventoryAudit'));
-const KardexReport = lazy(() => import('./pages/KardexReport'));
+const InventoryAudit    = lazy(() => import('./pages/InventoryAudit'));
+const KardexReport      = lazy(() => import('./pages/KardexReport'));
 const InventoryManagement = lazy(() => import('./pages/InventoryManagement'));
+const GestaoInventario    = lazy(() => import('./pages/GestaoInventario'));
 const StockReplenishment = lazy(() => import('./pages/StockReplenishment'));
-const LotManager = lazy(() => import('./pages/LotManager'));
-const DamageControl = lazy(() => import('./pages/DamageControl'));
+const LotManager        = lazy(() => import('./pages/LotManager'));
+const DamageControl     = lazy(() => import('./pages/DamageControl'));
 
 // 5. FISCAL
 const NFeControl = lazy(() => import('./pages/NFeControl'));
@@ -72,6 +75,7 @@ const CarrierCatalog  = lazy(() => import('./pages/CarrierCatalog'));
 
 // 8. INDICADORES
 const FinancialDashboard = lazy(() => import('./pages/FinancialDashboard'));
+const OccupancyAnalysis   = lazy(() => import('./pages/OccupancyAnalysis'));
 const OperatorPerformance = lazy(() => import('./pages/OperatorPerformance'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const IntegrationResults = lazy(() => import('./pages/IntegrationResults'));
@@ -126,6 +130,9 @@ export const appRoutes = [
   { path: '/operacao/mapa-visual', element: <WarehouseVisualMap />, meta: { codigo: '2.16', titulo: 'Mapa Visual de Estoque' } },
   { path: '/operacao/buffer-1', element: <Buffer1 />, meta: { codigo: '2.17', titulo: 'Buffer 1' } },
   { path: '/operacao/buffer-2', element: <Buffer2 />, meta: { codigo: '2.18', titulo: 'Buffer 2' } },
+  { path: '/operacao/producao', element: <Producao />, meta: { codigo: '2.19a', titulo: 'Produção' } },
+  { path: '/operacao/corredor-fundos', element: <CorredorFundos />, meta: { codigo: '2.20a', titulo: 'Corredor Fundos' } },
+  { path: '/operacao/suporte-guias', element: <SuporteGuias />, meta: { codigo: '2.21a', titulo: 'Suporte Guias' } },
   { path: '/operacao/gerenciamento-pedidos', element: <OrderManagement />, meta: { codigo: '2.22', titulo: 'Gerenciamento de Pedidos' } },
 
   // PLANEJAR
@@ -145,7 +152,7 @@ export const appRoutes = [
   { path: '/estoque/remanejar', element: <StockReplenishment />, meta: { codigo: '4.4', titulo: 'Remanejar Produtos' } },
   { path: '/estoque/controlar-lotes', element: <LotManager />, meta: { codigo: '4.5', titulo: 'Controlar Lotes e Validade' } },
   { path: '/estoque/monitorar-avarias', element: <DamageControl />, meta: { codigo: '4.6', titulo: 'Monitorar Avarias' } },
-  { path: '/estoque/gestao-inventario', element: <InventoryManagement />, meta: { codigo: '4.7', titulo: 'Gestão de Inventário' } },
+  { path: '/estoque/gestao-inventario', element: <GestaoInventario />, meta: { codigo: '4.7', titulo: 'Gestão de Inventário' } },
 
   // FISCAL
   { path: '/fiscal/gerenciar-nfe', element: <NFeControl />, meta: { codigo: '5.1', titulo: 'Gerenciar NF-e' } },
@@ -172,7 +179,7 @@ export const appRoutes = [
 
   // INDICADORES
   { path: '/indicadores/financeiro', element: <FinancialDashboard />, meta: { codigo: '8.1', titulo: 'Dashboard Financeiro' } },
-  { path: '/indicadores/ocupacao', element: <EnterprisePageBase title="8.2 Analisar Ocupação" breadcrumbItems={[{label: 'Indicadores'}]} />, meta: { codigo: '8.2', titulo: 'Analisar Ocupação' } },
+  { path: '/indicadores/ocupacao', element: <OccupancyAnalysis />, meta: { codigo: '8.2', titulo: 'Analisar Ocupação' } },
   { path: '/indicadores/produtividade', element: <OperatorPerformance />, meta: { codigo: '8.3', titulo: 'Medir Produtividade' } },
   { path: '/indicadores/auditoria', element: <AuditLogs />, meta: { codigo: '8.4', titulo: 'Auditar Logs do Sistema' } },
   { path: '/indicadores/integracao', element: <IntegrationResults />, meta: { codigo: '8.5', titulo: 'Resultados de Integração' } },

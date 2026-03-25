@@ -41,3 +41,7 @@ tmp/
 # Cache
 .cache/
 .eslintcache
+
+# AI Assistant
+.claude/
+PROJECT_CONTEXT.md
