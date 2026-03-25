@@ -54,12 +54,13 @@ export default function WarehouseAreas() {
         };
     };
 
-    // Filtered data
+    // Filtered data — proteção contra null/undefined em todos os campos
     const filteredAreas = useMemo(() => {
+        const safeSearch = String(searchTerm || '').toLowerCase();
         return warehouseAreas.filter(area =>
-            area.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            area.id.toString().includes(searchTerm) ||
-            (area.endereco && area.endereco.toLowerCase().includes(searchTerm.toLowerCase()))
+            String(area?.name || '').toLowerCase().includes(safeSearch) ||
+            String(area?.id || '').toLowerCase().includes(safeSearch) ||
+            String(area?.endereco || '').toLowerCase().includes(safeSearch)
         );
     }, [warehouseAreas, searchTerm]);
 
@@ -384,17 +385,17 @@ export default function WarehouseAreas() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Toast Notification */}
             {toast && (
-                <div 
+                <div
                     className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right-4 duration-300"
                     role="status"
                 >
                     <div className={`
                         flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-l-4
-                        ${toast.type === 'success' ? 'bg-green-500 border-green-700' : 
-                          toast.type === 'error'   ? 'bg-red-500 border-red-700' : 
+                        ${toast.type === 'success' ? 'bg-green-500 border-green-700' :
+                          toast.type === 'error'   ? 'bg-red-500 border-red-700' :
                           'bg-blue-600 border-blue-800'}
                         text-white
                     `}>
