@@ -1,14 +1,17 @@
 /**
  * useProdutos — Domain hook para o catálogo de produtos (tabela `produtos`)
  *
- * Centraliza todo acesso ao Supabase para a entidade Produto.
- * ProductCatalog.jsx deve usar este hook em vez de chamar supabase.from() diretamente.
+ * Centraliza todo acesso ao Supabase para a entidade Produto via produtosService.
+ * Ideal para componentes de leitura/escrita simples (lista + form separado).
+ *
+ * Para páginas com buffer de edição em tempo real e updates otimistas
+ * (como ProductCatalog), use produtosService diretamente.
  *
  * @example
  * const { produtos, loading, upsertProduto, deleteProduto } = useProdutos();
  */
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../services/supabaseClient';
+import { produtosService } from '../../services/produtosService';
 
 export function useProdutos() {
   const [produtos, setProdutos] = useState([]);
@@ -20,10 +23,7 @@ export function useProdutos() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: err } = await supabase
-        .from('produtos')
-        .select('*')
-        .order('sku');
+      const { data, error: err } = await produtosService.selectAll();
       if (err) throw err;
       setProdutos(data ?? []);
     } catch (err) {
@@ -39,13 +39,9 @@ export function useProdutos() {
   // ── Criar ou atualizar produto (upsert por SKU) ───────────────────────
   const upsertProduto = useCallback(async (payload) => {
     try {
-      const { data, error: err } = await supabase
-        .from('produtos')
-        .upsert(payload, { onConflict: 'sku' })
-        .select()
-        .single();
+      const { data, error: err } = await produtosService.upsertOne(payload);
       if (err) throw err;
-      await fetchProdutos(); // re-sincroniza lista
+      await fetchProdutos();
       return { data, error: null };
     } catch (err) {
       console.error('[useProdutos] upsertProduto:', err.message);
@@ -56,10 +52,7 @@ export function useProdutos() {
   // ── Excluir produto por ID ────────────────────────────────────────────
   const deleteProduto = useCallback(async (id) => {
     try {
-      const { error: err } = await supabase
-        .from('produtos')
-        .delete()
-        .eq('id', id);
+      const { error: err } = await produtosService.deleteOne(id);
       if (err) throw err;
       await fetchProdutos();
       return { error: null };
@@ -73,10 +66,7 @@ export function useProdutos() {
   const bulkDeleteProdutos = useCallback(async (ids) => {
     if (!ids?.length) return { error: null };
     try {
-      const { error: err } = await supabase
-        .from('produtos')
-        .delete()
-        .in('id', ids);
+      const { error: err } = await produtosService.deleteMany(ids);
       if (err) throw err;
       await fetchProdutos();
       return { error: null };
@@ -90,9 +80,7 @@ export function useProdutos() {
   const bulkUpsertProdutos = useCallback(async (payloads) => {
     if (!payloads?.length) return { error: null };
     try {
-      const { error: err } = await supabase
-        .from('produtos')
-        .upsert(payloads, { onConflict: 'sku' });
+      const { error: err } = await produtosService.upsertMany(payloads);
       if (err) throw err;
       await fetchProdutos();
       return { error: null };
