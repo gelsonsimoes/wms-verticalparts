@@ -26,7 +26,8 @@ import {
 } from 'recharts';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../lib/supabaseClient';
+import { segurosService } from '../services/segurosService';
+import { notasSaidaService } from '../services/notasSaidaService';
 import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
@@ -125,20 +126,14 @@ export default function InsuranceManagement() {
     const load = async () => {
       setLoadingPolicies(true);
       try {
-        const { data, error } = await supabase
-          .from('seguros')
-          .select('*')
-          .order('inicio_vigencia', { ascending: false });
+        const { data, error } = await segurosService.getAll();
 
         if (error) throw error;
 
         if (!data || data.length === 0) {
-          const { error: seedErr } = await supabase.from('seguros').insert(SEED_SEGUROS);
+          const { error: seedErr } = await segurosService.insertMany(SEED_SEGUROS);
           if (seedErr) console.warn('Seed seguros:', seedErr.message);
-          const { data: fresh } = await supabase
-            .from('seguros')
-            .select('*')
-            .order('inicio_vigencia', { ascending: false });
+          const { data: fresh } = await segurosService.getAll();
           const mapped = (fresh || []).map(mapPolicy);
           setPolicies(mapped);
           setSelectedId(mapped[0]?.id ?? null);
@@ -161,11 +156,7 @@ export default function InsuranceManagement() {
   useEffect(() => {
     if (!warehouseId) return;
     setLoadingStock(true);
-    supabase
-      .from('notas_saida')
-      .select('valor')
-      .eq('warehouse_id', warehouseId)
-      .neq('situacao', 'Canceladas')
+    notasSaidaService.getValoresByWarehouse(warehouseId)
       .then(({ data, error }) => {
         if (error) { showToast('Erro ao calcular estoque vinculado: ' + error.message, 'error'); setLoadingStock(false); return; }
         const total = (data || []).reduce((sum, row) => {
