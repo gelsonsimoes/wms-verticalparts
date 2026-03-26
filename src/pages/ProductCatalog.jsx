@@ -15,7 +15,7 @@ import { twMerge } from 'tailwind-merge';
 import * as XLSX from 'xlsx';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
-import { supabase } from '../services/supabaseClient';
+import { produtosService } from '../services/produtosService';
 import { logActivity } from '../services/activityLogger';
 import { useApp } from '../hooks/useApp';
 
@@ -1614,7 +1614,7 @@ export default function ProductCatalog() {
   async function fetchProducts() {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('produtos').select('*').order('sku');
+      const { data, error } = await produtosService.selectAll();
       if (error) throw error;
       const adapted = (data||[]).map(p => {
         const at = p.atributos_tecnicos || {};
@@ -1712,7 +1712,7 @@ export default function ProductCatalog() {
         observacao:         selected.observacao   || null,
         ativo:              true,
       };
-      const { data, error } = await supabase.from('produtos').upsert(payload, { onConflict:'sku' }).select().single();
+      const { data, error } = await produtosService.upsertOne(payload);
       if (error) throw error;
       const saved_product = { ...payload, ...data,
         movimenta_estoque: payload.movimenta_estoque,
@@ -1892,7 +1892,7 @@ export default function ProductCatalog() {
     if (isNew) { setProdutos(prev=>prev.filter(p=>p.id!=='__new__')); setIsNew(false); setSelectedId(null); return; }
     const skuDeleted = selected.sku;
     const descDeleted = selected.descricao;
-    const { error } = await supabase.from('produtos').delete().eq('id', selected.id);
+    const { error } = await produtosService.deleteOne(selected.id);
     if (error) { alert('Erro ao excluir: ' + error.message); return; }
     logActivity({
       userName: _logUser(),
@@ -1912,7 +1912,7 @@ export default function ProductCatalog() {
     if (!ids?.length) return;
     const count = ids.length;
     if (!window.confirm(`Excluir ${count} produto${count>1?'s':''}? Esta ação não pode ser desfeita.`)) return;
-    const { error } = await supabase.from('produtos').delete().in('id', ids);
+    const { error } = await produtosService.deleteMany(ids);
     if (error) { alert('Erro ao excluir: ' + error.message); return; }
     logActivity({
       userName: _logUser(),
@@ -1970,7 +1970,7 @@ export default function ProductCatalog() {
           movimenta_estoque:  true, regra_expedicao:'FIFO',
           compatibilidade:[], atributos_tecnicos:{}, fotos:['','','',''], embalagens:[], ativo:true,
         };
-        const { error } = await supabase.from('produtos').upsert(payload, { onConflict:'sku' });
+        const { error } = await produtosService.upsertOne(payload);
         if (error) errors.push(r.codigo); else ok++;
       }
       setImportStatus({ total:ok+errors.length, ok, errors });
