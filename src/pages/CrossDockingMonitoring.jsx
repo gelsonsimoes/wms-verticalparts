@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '../hooks/useApp';
 import { cn } from '../utils/cn';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient'; // Realtime subscription (mantém supabase direto — necessário para channel/subscribe)
+import { crossDockingService } from '../services/crossDockingService';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import Tooltip from '../components/ui/Tooltip';
 
@@ -246,11 +247,7 @@ export default function CrossDockingMonitoring() {
   // ── Buscar dados ──────────────────────────────────────────────────────────
   const fetchNFs = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('cross_docking')
-      .select('*, cross_docking_itens(*)')
-      .eq('warehouse_id', warehouseId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await crossDockingService.getWithItemsByWarehouse(warehouseId);
     if (!error && data) setNfs(data);
     setLoading(false);
   }, [warehouseId]);
@@ -298,21 +295,17 @@ export default function CrossDockingMonitoring() {
   const handleSalvarNF = async (form) => {
     setSalvando(true);
     try {
-      const { data: nfData, error: nfErr } = await supabase
-        .from('cross_docking')
-        .insert({
-          warehouse_id:      warehouseId,
-          numero_nf:         form.numero_nf.trim(),
-          ordem_referencia:  form.ordem_referencia.trim() || null,
-          doca:              form.doca.trim() || null,
-          numero_coleta:     form.numero_coleta.trim() || null,
-          status:            form.status,
-          conferido:         form.conferido,
-          perc_alocada:      form.perc_alocada,
-          perc_expedida:     form.perc_expedida,
-        })
-        .select()
-        .single();
+      const { data: nfData, error: nfErr } = await crossDockingService.insert({
+        warehouse_id:      warehouseId,
+        numero_nf:         form.numero_nf.trim(),
+        ordem_referencia:  form.ordem_referencia.trim() || null,
+        doca:              form.doca.trim() || null,
+        numero_coleta:     form.numero_coleta.trim() || null,
+        status:            form.status,
+        conferido:         form.conferido,
+        perc_alocada:      form.perc_alocada,
+        perc_expedida:     form.perc_expedida,
+      });
 
       if (nfErr) throw nfErr;
 
@@ -328,7 +321,7 @@ export default function CrossDockingMonitoring() {
         }));
 
       if (itens.length > 0) {
-        const { error: itensErr } = await supabase.from('cross_docking_itens').insert(itens);
+        const { error: itensErr } = await crossDockingService.insertItems(itens);
         if (itensErr) throw itensErr;
       }
 
@@ -344,10 +337,7 @@ export default function CrossDockingMonitoring() {
 
   // ── Rota Expressa ─────────────────────────────────────────────────────────
   const handleRotaExpressa = async (nfId, value) => {
-    await supabase
-      .from('cross_docking')
-      .update({ rota_expressa: value, rota_expressa_definida: true })
-      .eq('id', nfId);
+    await crossDockingService.update(nfId, { rota_expressa: value, rota_expressa_definida: true });
     await fetchNFs();
   };
 
