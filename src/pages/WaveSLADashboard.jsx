@@ -18,6 +18,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase } from '../lib/supabaseClient';
+import { tarefasService } from '../services/tarefasService';
 import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
@@ -68,8 +69,6 @@ function buildEtapas(row) {
   const baseTime = elapsedFrom(row.created_at);
   const baseColor = slaColor(row.created_at);
 
-  // For active waves, show real elapsed on early stages; gray for future stages
-  // For finished waves, all stages show the same elapsed time as green
   if (isFinalizada) {
     return {
       gerada:      { time: baseTime, status: 'verde' },
@@ -168,12 +167,7 @@ export default function WaveSLADashboard() {
     if (!warehouseId) { setLoading(false); return; }
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('tarefas')
-      .select('id, tipo, titulo_onda, status, doca, config, cor_colmeia, total_itens, total_pedidos, created_at, detalhes')
-      .eq('tipo', 'separacao')
-      .eq('detalhes->>warehouse_id', warehouseId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await tarefasService.selectSeparacaoByWarehouse(warehouseId);
 
     if (error) {
       console.error('[WaveSLADashboard] fetch tarefas:', error);
@@ -184,7 +178,7 @@ export default function WaveSLADashboard() {
     // Seed pattern
     if (!data || data.length === 0) {
       const seeds = SEED_TAREFAS(warehouseId);
-      const { error: seedErr } = await supabase.from('tarefas').insert(seeds);
+      const { error: seedErr } = await tarefasService.insertMany(seeds);
       if (seedErr) {
         console.warn('[WaveSLADashboard] seed error:', seedErr);
         setWaves([]);
@@ -192,12 +186,7 @@ export default function WaveSLADashboard() {
         return;
       }
       // Re-fetch after seed
-      const { data: seeded } = await supabase
-        .from('tarefas')
-        .select('id, tipo, titulo_onda, status, doca, config, cor_colmeia, total_itens, total_pedidos, created_at, detalhes')
-        .eq('tipo', 'separacao')
-        .eq('detalhes->>warehouse_id', warehouseId)
-        .order('created_at', { ascending: false });
+      const { data: seeded } = await tarefasService.selectSeparacaoByWarehouse(warehouseId);
       setWaves((seeded || []).map(dbRowToWave));
       setLoading(false);
       return;
@@ -209,7 +198,7 @@ export default function WaveSLADashboard() {
 
   useEffect(() => { fetchWaves(); }, [fetchWaves]);
 
-  // ── Realtime subscription ────────────────────────────────────────
+  // ── Realtime subscription (mantém supabase direto — necessário para channel/subscribe) ──
   useEffect(() => {
     if (!warehouseId) return;
     const channel = supabase
