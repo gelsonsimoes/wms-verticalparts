@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../lib/supabaseClient';
+import { produtosService } from '../services/produtosService';
+import { pesagensService } from '../services/pesagensService';
 import { useApp } from '../hooks/useApp';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
@@ -81,11 +82,7 @@ export default function WeighingStation() {
 
   const fetchProducts = async (term) => {
     setIsLoadingProducts(true);
-    const { data, error } = await supabase
-      .from('produtos')
-      .select('id, sku, descricao, unidade, peso_bruto')
-      .ilike('sku', `%${term}%`)
-      .limit(5);
+    const { data, error } = await produtosService.searchBySku(term);
     if (!error) setProducts(data || []);
     setIsLoadingProducts(false);
   };
@@ -135,7 +132,7 @@ export default function WeighingStation() {
     setIsValidated(false);
   };
 
-  // ── Salvar pesagem no Supabase ────────────────────────────────────
+  // ── Salvar pesagem ────────────────────────────────────────────────
   const handleSave = async () => {
     if (isBlocked) {
       showToast('BLOQUEADO: O peso não confere com o cadastro do SKU. Corrija a carga física.', 'erro');
@@ -146,7 +143,7 @@ export default function WeighingStation() {
       return;
     }
     setIsSaving(true);
-    const { error } = await supabase.from('pesagens').insert([{
+    const { error } = await pesagensService.insert({
       warehouse_id:   warehouseId,
       sku:            selectedProduct.sku,
       descricao:      selectedProduct.descricao,
@@ -156,7 +153,7 @@ export default function WeighingStation() {
       modo,
       balanca:        activeScale || null,
       validado:       true,
-    }]);
+    });
     setIsSaving(false);
     if (error) { showToast('Erro ao salvar pesagem.', 'erro'); return; }
     showToast(`Pesagem de ${selectedProduct.sku} confirmada: ${currentWeight} KG`);
