@@ -1,6 +1,9 @@
 import React, { useState, useId, useRef, useEffect } from 'react';
 import { useApp } from '../hooks/useApp';
-import { supabase } from '../services/supabaseClient';
+import { supabase } from '../services/supabaseClient'; // Auth (mantém supabase direto — necessário para supabase.auth)
+import { gruposAcessoService } from '../services/gruposAcessoService';
+import { convitesService } from '../services/convitesService';
+import { profilesService } from '../services/profilesService';
 import {
   User,
   Plus,
@@ -432,10 +435,7 @@ function InviteModalFixed({ onClose, onSuccess }) {
     document.addEventListener('keydown', handler);
     firstInputRef.current?.focus();
 
-    supabase
-      .from('grupos_acesso')
-      .select('id, nome, descricao, paginas')
-      .order('nome')
+    gruposAcessoService.getAll()
       .then(({ data }) => {
         setGrupos(data || []);
         if (data?.length) setGrupoId(data[0].id);
@@ -456,14 +456,14 @@ function InviteModalFixed({ onClose, onSuccess }) {
     setLoading(true);
     setError(null);
     try {
-      const { error: invErr } = await supabase.from('convites_pendentes').insert([{
+      const { error: invErr } = await convitesService.insert({
         email:           form.email.toLowerCase().trim(),
         nome:            form.nome.trim(),
         cargo:           form.cargo,
         grupo_acesso_id: grupoId || null,
         paginas:         grupoSelecionado?.paginas || [],
         convidado_por:   'admin',
-      }]);
+      });
       if (invErr) throw new Error(invErr.message);
       onSuccess(form.email);
     } catch (err) {
@@ -620,7 +620,7 @@ export default function UsersPage() {
   // Fetch profiles do Supabase para enriquecer a lista de usuários
   const [profilesMap, setProfilesMap] = useState({});
   useEffect(() => {
-    supabase.from('profiles').select('*').then(({ data }) => {
+    profilesService.getAll().then(({ data }) => {
       if (data && data.length > 0) {
         const map = {};
         data.forEach(p => { map[p.id] = p; });

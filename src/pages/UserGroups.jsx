@@ -3,7 +3,7 @@ import {
   Shield, Plus, Edit2, Trash2, Save, X, ChevronDown, ChevronRight,
   Users, CheckSquare, Square, Loader2, Lock, Unlock, Search
 } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
+import { gruposAcessoService } from '../services/gruposAcessoService';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
 // ── Todas as páginas do WMS organizadas por seção ────────────
@@ -150,10 +150,7 @@ export default function UserGroups() {
   // ── Carregar grupos do Supabase ───────────────────────────
   const loadGroups = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('grupos_acesso')
-      .select('*')
-      .order('created_at');
+    const { data, error } = await gruposAcessoService.getFullList();
     if (!error) setGroups(data || []);
     setLoading(false);
   }, []);
@@ -210,7 +207,7 @@ export default function UserGroups() {
     setFeedback(null);
 
     if (isNew) {
-      const { error } = await supabase.from('grupos_acesso').insert({
+      const { error } = await gruposAcessoService.insert({
         nome:     editNome.trim(),
         descricao: editDesc.trim() || null,
         tipo:     'personalizado',
@@ -231,10 +228,7 @@ export default function UserGroups() {
       // Só permite renomear grupos personalizados
       if (selected.tipo === 'personalizado') update.nome = editNome.trim();
 
-      const { error } = await supabase
-        .from('grupos_acesso')
-        .update(update)
-        .eq('id', selected.id);
+      const { error } = await gruposAcessoService.update(selected.id, update);
 
       if (error) {
         setFeedback({ type: 'err', msg: error.message });
@@ -252,7 +246,7 @@ export default function UserGroups() {
   const handleDelete = async () => {
     if (!selected || selected.tipo === 'padrao') return;
     if (!window.confirm(`Excluir o grupo "${selected.nome}"? Usuários vinculados perderão o grupo.`)) return;
-    const { error } = await supabase.from('grupos_acesso').delete().eq('id', selected.id);
+    const { error } = await gruposAcessoService.delete(selected.id);
     if (error) {
       setFeedback({ type: 'err', msg: error.message });
     } else {

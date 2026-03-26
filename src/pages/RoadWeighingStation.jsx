@@ -20,7 +20,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../lib/supabaseClient';
+import { pesagensRodoviariasService } from '../services/pesagensRodoviariasService';
+import { veiculosService } from '../services/veiculosService';
+import { pedidosVendaOmieService } from '../services/pedidosVendaOmieService';
 import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) {
@@ -201,11 +203,7 @@ function HistoryModal({ onClose, warehouseId }) {
   }, [onClose]);
 
   useEffect(() => {
-    supabase
-      .from('pesagens_rodoviarias')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30)
+    pesagensRodoviariasService.getHistory(30)
       .then(({ data }) => {
         setHistory(data ?? []);
         setLoading(false);
@@ -290,11 +288,7 @@ export default function RoadWeighingStation() {
   const [loadingVehicles, setLoadingVehicles] = useState(true);
 
   useEffect(() => {
-    supabase
-      .from('veiculos')
-      .select('id, placa, modelo, tipo, transportadora, tara, lotacao, status')
-      .in('status', ['disponivel', 'em_rota'])
-      .order('placa')
+    veiculosService.getActive()
       .then(({ data }) => {
         const list = (data ?? []).map(v => ({
           id:              v.id,
@@ -315,14 +309,7 @@ export default function RoadWeighingStation() {
   // ── Busca peso declarado pelo mobile para o veículo selecionado ──────────
   const fetchPesoDeclarado = useCallback(async (placa) => {
     if (!placa) return null;
-    const { data } = await supabase
-      .from('pedidos_venda_omie')
-      .select('numero_pedido, peso_total_separado')
-      .eq('veiculo_placa', placa)
-      .in('status', ['separado', 'conferido'])
-      .order('atualizado_em', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data } = await pedidosVendaOmieService.getPesoDeclarado(placa);
     return data ?? null;
   }, []);
 
@@ -430,7 +417,7 @@ export default function RoadWeighingStation() {
       operador_nome:      'Balança Rodoviária',
       balanca:            activeScale,
     };
-    const { error } = await supabase.from('pesagens_rodoviarias').insert([payload]);
+    const { error } = await pesagensRodoviariasService.insert(payload);
     setSaving(false);
     if (error) { showToast('Erro ao salvar pesagem: ' + error.message, 'error'); return; }
     setSaved(true);

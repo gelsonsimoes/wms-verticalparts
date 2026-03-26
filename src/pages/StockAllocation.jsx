@@ -14,7 +14,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient'; // Realtime subscription (mantém supabase direto — necessário para channel/subscribe)
+import { alocacaoService } from '../services/alocacaoService';
 import { useApp } from '../hooks/useApp';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
@@ -70,12 +71,7 @@ export default function StockAllocation() {
   const fetchTasks = useCallback(async () => {
     if (!warehouseId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('alocacoes')
-      .select('*')
-      .eq('warehouse_id', warehouseId)
-      .in('status', ['Pendente', 'Posicionado'])
-      .order('created_at', { ascending: false });
+    const { data, error } = await alocacaoService.getPendentes(warehouseId);
 
     if (error) { setLoading(false); showToast('Erro ao carregar tarefas de alocação.', 'error'); return; }
 
@@ -83,11 +79,7 @@ export default function StockAllocation() {
 
     // Seed from ordens_recebimento_itens when empty
     if (list.length === 0) {
-      const { data: ors } = await supabase
-        .from('ordens_recebimento')
-        .select('codigo, depositante, nf, ordens_recebimento_itens(*)')
-        .eq('warehouse_id', warehouseId)
-        .in('status', ['Pendente', 'Aguardando Alocação']);
+      const { data: ors } = await alocacaoService.getReceivingForSeed(warehouseId);
 
       if (ors && ors.length > 0) {
         const toInsert = [];
@@ -105,13 +97,8 @@ export default function StockAllocation() {
           }
         }
         if (toInsert.length > 0) {
-          await supabase.from('alocacoes').insert(toInsert);
-          const { data: refreshed } = await supabase
-            .from('alocacoes')
-            .select('*')
-            .eq('warehouse_id', warehouseId)
-            .in('status', ['Pendente', 'Posicionado'])
-            .order('created_at', { ascending: false });
+          await alocacaoService.insertMany(toInsert);
+          const { data: refreshed } = await alocacaoService.getPendentes(warehouseId);
           list = (refreshed || []).map(mapAlocacao);
         }
       }
@@ -181,11 +168,11 @@ export default function StockAllocation() {
     const newStatus = newQtdAlocada >= activeTask.qtdOriginal ? 'Posicionado' : 'Pendente';
     const novoEndereco = scannedAddress.trim().toUpperCase();
 
-    await supabase.from('alocacoes').update({
+    await alocacaoService.update(activeTask.id, {
       quantidade_alocada: newQtdAlocada,
       status: newStatus,
       endereco_sugerido: novoEndereco,
-    }).eq('id', activeTask.id);
+    });
 
     setTasks(prev => prev.map(t =>
       t.id === activeTask.id

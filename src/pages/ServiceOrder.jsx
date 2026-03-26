@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useId } from 'react';
 import { Search, Filter, Wrench, CheckCircle2, Calendar, AlertCircle, X, Plus, Edit2 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { clsx } from 'clsx';
-import { supabase } from '../lib/supabaseClient';
+import { ordensServicoService } from '../services/ordensServicoService';
 import { useApp } from '../hooks/useApp';
 
 function cn(...inputs) { return twMerge(clsx(inputs)); }
@@ -100,17 +100,13 @@ export default function ServiceOrder() {
   const loadOS = async () => {
     if (!warehouseId) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('ordens_servico')
-      .select('*')
-      .eq('warehouse_id', warehouseId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await ordensServicoService.getByWarehouse(warehouseId);
     if (error) { showToast('Erro ao carregar OS: ' + error.message, 'error'); setLoading(false); return; }
 
     if (data.length === 0) {
       // Seed demo records
       const seeds = SEED_OS.map(s => ({ ...s, warehouse_id: warehouseId, cliente: 'VerticalParts' }));
-      const { data: inserted, error: seedErr } = await supabase.from('ordens_servico').insert(seeds).select();
+      const { data: inserted, error: seedErr } = await ordensServicoService.insertMany(seeds);
       if (seedErr) { showToast('Erro ao inserir OS demo: ' + seedErr.message, 'error'); }
       else setOsList(inserted || []);
     } else {
@@ -142,7 +138,7 @@ export default function ServiceOrder() {
       data_previsao: prazo.toISOString().split('T')[0],
       cliente:       'VerticalParts',
     };
-    const { data, error } = await supabase.from('ordens_servico').insert([payload]).select().single();
+    const { data, error } = await ordensServicoService.insert(payload);
     if (error) { showToast('Erro ao criar OS: ' + error.message, 'error'); return; }
     setOsList(prev => [data, ...prev]);
     setForm({ tipo: 'Instalação', tecnico_id: 'Danilo', equipamento: '', descricao: '', prioridade: 'Normal' });
@@ -152,7 +148,7 @@ export default function ServiceOrder() {
 
   // ─── Update status ────────────────────────────────────────────
   const handleUpdateStatus = async (id, newStatus) => {
-    const { error } = await supabase.from('ordens_servico').update({ status: newStatus }).eq('id', id);
+    const { error } = await ordensServicoService.updateStatus(id, newStatus);
     if (error) { showToast('Erro ao atualizar status: ' + error.message, 'error'); return; }
     setOsList(prev => prev.map(os => os.id === id ? { ...os, status: newStatus } : os));
     setEditingId(null);
@@ -163,7 +159,7 @@ export default function ServiceOrder() {
   const handleDelete = (id) => {
     askConfirm('Deseja cancelar esta Ordem de Serviço?', async () => {
       closeConfirm();
-      const { error } = await supabase.from('ordens_servico').update({ status: 'Cancelada' }).eq('id', id);
+      const { error } = await ordensServicoService.updateStatus(id, 'Cancelada');
       if (error) { showToast('Erro: ' + error.message, 'error'); return; }
       setOsList(prev => prev.map(os => os.id === id ? { ...os, status: 'Cancelada' } : os));
       showToast('OS cancelada.');

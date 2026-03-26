@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../hooks/useApp';
-import { supabase } from '../lib/supabaseClient';
+import { movimentoEstoqueService } from '../services/movimentoEstoqueService';
+import { produtosService } from '../services/produtosService';
 import {
   BookOpen,
   Package,
@@ -560,20 +561,13 @@ export default function KardexReport() {
     if (!warehouseId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('movimento_estoque')
-        .select('*')
-        .eq('warehouse_id', warehouseId)
-        .order('created_at', { ascending: false });
+      const { data, error } = await movimentoEstoqueService.getByWarehouse(warehouseId);
 
       if (error) throw error;
 
       if (!data || data.length === 0) {
         // seed: busca produtos para criar movimentos demo
-        const { data: prods } = await supabase
-          .from('produtos')
-          .select('id, sku, descricao')
-          .limit(5);
+        const { data: prods } = await produtosService.listSeed(5);
 
         const tipos = ['Entrada', 'Saída', 'Ajuste', 'Transferência', 'Entrada'];
         if (prods && prods.length > 0) {
@@ -589,7 +583,7 @@ export default function KardexReport() {
             saldo_final:    Math.floor(Math.random() * 80) + 20,
             endereco_id:    `R${i + 1}_PP1_CL001_N001`,
           }));
-          const { error: seedErr } = await supabase.from('movimento_estoque').insert(seeds);
+          const { error: seedErr } = await movimentoEstoqueService.insertMany(seeds);
           if (seedErr) throw seedErr;
           return fetchMovimentos();
         }
