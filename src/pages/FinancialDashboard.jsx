@@ -21,7 +21,7 @@ import {
     Wallet,
     CreditCard
 } from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+import { financeiroService } from '../services/financeiroService';
 import { useApp } from '../hooks/useApp';
 
 // ====== DADOS ESTÁTICOS (gráficos que ainda não têm fonte real) ======
@@ -67,7 +67,7 @@ export default function FinancialDashboard() {
 
     useEffect(() => {
         const load = async () => {
-            const { data } = await supabase.from('notas_fiscais').select('tipo, valor_total, data_emissao');
+            const { data } = await financeiroService.getNotasFiscais();
             if (!data || data.length === 0) return; // mantém fallback estático
 
             // Agrupa por mês
@@ -108,8 +108,8 @@ export default function FinancialDashboard() {
 
                 // Busca contas_pagar e contas_receber em paralelo
                 const [resPagar, resReceber] = await Promise.all([
-                    supabase.from('contas_pagar').select('valor, vencimento, status'),
-                    supabase.from('contas_receber').select('valor, vencimento, status'),
+                    financeiroService.getContasPagar(),
+                    financeiroService.getContasReceber(),
                 ]);
 
                 const pagar    = resPagar.data    || [];
