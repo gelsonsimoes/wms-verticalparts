@@ -33,4 +33,12 @@ export const produtosService = {
   /** Importar/atualizar múltiplos produtos em lote (upsert por SKU) */
   upsertMany: (payloads) =>
     supabase.from('produtos').upsert(payloads, { onConflict: 'sku' }),
+
+  /** Buscar produtos por SKU (pesquisa parcial, limite 5) — usado em WeighingStation e outros */
+  searchBySku: (term) =>
+    supabase
+      .from('produtos')
+      .select('id, sku, descricao, unidade, peso_bruto')
+      .ilike('sku', `%${term}%`)
+      .limit(5),
 };
