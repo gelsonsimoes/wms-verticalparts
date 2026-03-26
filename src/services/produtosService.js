@@ -41,4 +41,8 @@ export const produtosService = {
       .select('id, sku, descricao, unidade, peso_bruto')
       .ilike('sku', `%${term}%`)
       .limit(5),
+
+  /** Buscar N produtos para seed de demonstração (id, sku, descricao) */
+  listSeed: (limit = 5) =>
+    supabase.from('produtos').select('id, sku, descricao').limit(limit),
 };
