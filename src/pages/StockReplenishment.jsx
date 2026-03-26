@@ -1,5 +1,5 @@
 import React, { useState, useId } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { movimentoEstoqueService } from '../services/movimentoEstoqueService';
 import { useApp } from '../hooks/useApp';
 import {
   RefreshCw,
@@ -360,7 +360,7 @@ export default function StockReplenishment() {
     const item = items.find(i => i.id === id);
     // Registra no Kardex (movimento_estoque)
     if (item) {
-      await supabase.from('movimento_estoque').insert([{
+      await movimentoEstoqueService.insert({
         warehouse_id:      warehouseId || 'default',
         tipo_movimento:    'remanejamento',
         sku:               item.produto,
@@ -370,7 +370,7 @@ export default function StockReplenishment() {
         quantidade_apos:   Number(item.qtd) || 0,
         endereco_id:       item.origemEnd,
         observacao:        `Remanejar para ${item.destEnd} (${item.tipoDest})`,
-      }]).then(({ error }) => {
+      }).then(({ error }) => {
         if (error) console.warn('[StockReplenishment] movimento_estoque insert:', error.message);
       });
     }
