@@ -23,7 +23,8 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient'; // Realtime subscription (mantém supabase direto — necessário para channel/subscribe)
+import { recebimentoService } from '../services/recebimentoService';
 import { useApp } from '../hooks/useApp';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 
@@ -232,14 +233,10 @@ export default function ReceivingManager() {
   };
   useEffect(() => () => clearTimeout(toastRef.current), []);
 
-  // ── Supabase fetch ───────────────────────────────────────────────
+  // ── Fetch ordens de recebimento ──────────────────────────────────
   const fetchOrdens = async () => {
     if (!warehouseId) return;
-    const { data, error } = await supabase
-      .from('ordens_recebimento')
-      .select('*')
-      .eq('warehouse_id', warehouseId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await recebimentoService.getByWarehouse(warehouseId);
     if (error) { console.error('ordens_recebimento:', error); setLoading(false); return; }
     setOrdens(data || []);
     setLoading(false);
@@ -290,7 +287,7 @@ export default function ReceivingManager() {
 
   // ── Ações status (persistência) ──────────────────────────────────
   const updateStatus = async (id, status, extra = {}) => {
-    const { error } = await supabase.from('ordens_recebimento').update({ status, ...extra }).eq('id', id);
+    const { error } = await recebimentoService.update(id, { status, ...extra });
     if (error) { showToast('Erro ao atualizar status.', 'erro'); return false; }
     setOrdens(prev => prev.map(o => o.id === id ? { ...o, status, ...extra } : o));
     return true;
@@ -364,11 +361,13 @@ export default function ReceivingManager() {
   const handleSalvarOR = async (form) => {
     setSalvando(true);
     const codigo = 'OR-' + Date.now().toString().slice(-5);
-    const { data, error } = await supabase
-      .from('ordens_recebimento')
-      .insert([{ ...form, warehouse_id: warehouseId, codigo, conferidos: 0, status: 'Pendente' }])
-      .select()
-      .single();
+    const { data, error } = await recebimentoService.insert({
+      ...form,
+      warehouse_id: warehouseId,
+      codigo,
+      conferidos: 0,
+      status: 'Pendente',
+    });
     setSalvando(false);
     if (error) { showToast('Erro ao criar O.R.', 'erro'); return; }
     setOrdens(prev => [data, ...prev]);
