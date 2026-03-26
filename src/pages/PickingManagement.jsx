@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../hooks/useApp';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient'; // Realtime subscription (mantém supabase direto — necessário para channel/subscribe)
+import { tarefasService } from '../services/tarefasService';
+import { itensTarefaService } from '../services/itensTarefaService';
 import EnterprisePageBase from '../components/layout/EnterprisePageBase';
 import {
   ClipboardList, ArrowLeft, ArrowRight, Clock, CheckCircle2, CalendarDays,
@@ -103,15 +105,7 @@ export default function PickingManagement() {
   const fetchOrdens = useCallback(async () => {
     setLoading(true);
     try {
-      // Busca tarefas de picking cujo warehouse_id bate via detalhes->>'warehouse_id'
-      const { data, error } = await supabase
-        .from('tarefas')
-        .select('*, itens_tarefa(*)')
-        .eq('tipo', 'picking')
-        .neq('status', 'cancelado')
-        .filter('detalhes->>warehouse_id', 'eq', warehouseId)
-        .order('created_at', { ascending: false });
-
+      const { data, error } = await tarefasService.selectPickingWithItemsByWarehouse(warehouseId);
       if (error) throw error;
       setOrders((data || []).map(mapTarefa));
     } catch (err) {
@@ -154,7 +148,7 @@ export default function PickingManagement() {
     setView('ACTIVE');
     localStorage.setItem('vparts_active_picking_id', order.id);
     if (order.status === 'pendente') {
-      await supabase.from('tarefas').update({ status: 'em_execucao' }).eq('id', order.id);
+      await tarefasService.updateStatus(order.id, 'em_execucao');
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'em_execucao' } : o));
     }
   };
@@ -214,13 +208,13 @@ export default function PickingManagement() {
     try {
       // 1. Persiste quantidade_conferida de cada item_tarefa
       for (const item of selectedOrder.orderItems) {
-        await supabase
-          .from('itens_tarefa')
-          .update({ quantidade_conferida: item.collected, status: item.collected >= item.expected ? 'finalizado' : 'pendente' })
-          .eq('id', item.id);
+        await itensTarefaService.update(item.id, {
+          quantidade_conferida: item.collected,
+          status: item.collected >= item.expected ? 'finalizado' : 'pendente',
+        });
       }
       // 2. Finaliza a tarefa
-      await supabase.from('tarefas').update({ status: 'finalizado' }).eq('id', selectedOrder.id);
+      await tarefasService.updateStatus(selectedOrder.id, 'finalizado');
       setShowFinalizeModal(false);
       handleBackToList();
     } catch (err) {
